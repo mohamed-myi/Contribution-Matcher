@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# Database
+*.db
+!contribution_matcher.db
+*.sqlite
+*.sqlite3
+
+# Model files
+*.pkl
+
+# Profile data
+dev_profile.json
+
+# Resume files
+my_resume/
+*.pdf
+
+
+.env
+.env.local
+
+
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+
+.DS_Store
+Thumbs.db
+
+
+*.log
+docs/COMMAND_REFERENCE.md
+IMPLEMENTATION_STATUS.md 

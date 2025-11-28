@@ -1,0 +1,49 @@
+name: Daily Issue Discovery
+
+on:
+  schedule:
+    # Run daily at 10 AM US Central Time (15:00 UTC = 10 AM CDT, 16:00 UTC = 10 AM CST)
+    # Note: Adjust for daylight saving time if needed
+    - cron: '0 15 * * *'  # 10 AM CDT (most of the year)
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  discover-issues:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Run issue discovery
+        env:
+          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          python main.py discover --limit 100
+      
+      - name: Display results
+        run: |
+          python main.py stats
+      
+      - name: Commit database changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add contribution_matcher.db
+          git diff --staged --quiet || (git commit -m "Update issue database [skip ci]" && git push)
+

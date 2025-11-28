@@ -15,7 +15,7 @@ DEV_PROFILE_JSON = "dev_profile.json"
 
 
 def create_profile_from_github(username: str) -> Dict:
-    """
+    '''
     Create developer profile from GitHub username.
     
     Args:
@@ -23,7 +23,8 @@ def create_profile_from_github(username: str) -> Dict:
         
     Returns:
         Dictionary with profile data
-    """
+    '''
+
     print(f"Fetching GitHub profile for: {username}")
     
     # Get user info
@@ -102,7 +103,7 @@ def create_profile_from_github(username: str) -> Dict:
 
 
 def create_profile_from_resume(pdf_path: str) -> Dict:
-    """
+    '''
     Create developer profile from resume PDF.
     
     Args:
@@ -110,7 +111,8 @@ def create_profile_from_resume(pdf_path: str) -> Dict:
         
     Returns:
         Dictionary with profile data
-    """
+    '''
+
     # Use basic PDF parsing
     try:
         import PyPDF2
@@ -180,7 +182,7 @@ def create_profile_from_resume(pdf_path: str) -> Dict:
 
 
 def create_profile_manual(profile_data: Dict) -> Dict:
-    """
+    '''
     Create profile from manual input.
     
     Args:
@@ -188,7 +190,8 @@ def create_profile_manual(profile_data: Dict) -> Dict:
         
     Returns:
         Dictionary with profile data
-    """
+    '''
+
     profile = {
         "skills": profile_data.get("skills", []),
         "experience_level": profile_data.get("experience_level", "intermediate"),
@@ -206,13 +209,14 @@ def create_profile_manual(profile_data: Dict) -> Dict:
 
 
 def save_dev_profile(profile: Dict, output_path: str = DEV_PROFILE_JSON) -> None:
-    """
+    '''
     Save developer profile to JSON file and database.
     
     Args:
         profile: Dictionary with profile data
         output_path: Path to output JSON file
-    """
+    '''
+
     # Save to JSON file
     with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(profile, f, indent=2, ensure_ascii=False)
@@ -274,7 +278,7 @@ def save_dev_profile(profile: Dict, output_path: str = DEV_PROFILE_JSON) -> None
 
 
 def load_dev_profile(json_path: str = DEV_PROFILE_JSON) -> Dict:
-    """
+    '''
     Load developer profile from JSON file.
     
     Args:
@@ -282,7 +286,8 @@ def load_dev_profile(json_path: str = DEV_PROFILE_JSON) -> Dict:
         
     Returns:
         Dictionary with profile data
-    """
+    '''
+
     if not os.path.exists(json_path):
         raise FileNotFoundError(
             f"Developer profile not found: {json_path}. "

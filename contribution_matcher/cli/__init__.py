@@ -1,4 +1,4 @@
-"""CLI interface module."""
+# CLI interface module
 
 from .contribution_matcher import main
 

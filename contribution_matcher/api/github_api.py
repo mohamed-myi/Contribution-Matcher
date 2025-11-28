@@ -18,7 +18,8 @@ RATE_LIMIT_RESET = 0
 
 
 def _get_headers() -> Dict[str, str]:
-    """Get headers for GitHub API requests."""
+    # Get headers for GitHub API requests
+
     headers = {
         "Accept": "application/vnd.github.v3+json",
         "User-Agent": "ContributionMatcher/1.0"
@@ -29,7 +30,8 @@ def _get_headers() -> Dict[str, str]:
 
 
 def _handle_rate_limit(response: requests.Response) -> None:
-    """Handle rate limiting by checking headers and waiting if needed."""
+    # Handle rate limiting by checking headers and waiting if needed
+
     global RATE_LIMIT_REMAINING, RATE_LIMIT_RESET
     
     if "X-RateLimit-Remaining" in response.headers:
@@ -46,7 +48,8 @@ def _handle_rate_limit(response: requests.Response) -> None:
 
 
 def _make_request(url: str, params: Optional[Dict] = None) -> Optional[requests.Response]:
-    """Make a GitHub API request with rate limiting and error handling."""
+    # Make a GitHub API request with rate limiting and error handling
+
     global RATE_LIMIT_REMAINING
     
     # Debug: Check token
@@ -103,7 +106,7 @@ def search_issues(
     min_stars: Optional[int] = None,
     limit: int = 100
 ) -> List[Dict]:
-    """
+    '''
     Search GitHub for issues with specified criteria.
     
     Args:
@@ -114,7 +117,8 @@ def search_issues(
         
     Returns:
         List of issue dictionaries
-    """
+    '''
+
     if labels is None:
         # Use most common labels that work well with GitHub API
         # GitHub API has issues with complex OR queries, so use simpler defaults
@@ -217,7 +221,7 @@ def search_issues(
 
 
 def get_repo_metadata_from_api(repo_owner: str, repo_name: str, use_cache: bool = True) -> Optional[Dict]:
-    """
+    '''
     Fetch repository metadata from GitHub API or cache.
     
     Args:
@@ -227,7 +231,8 @@ def get_repo_metadata_from_api(repo_owner: str, repo_name: str, use_cache: bool 
         
     Returns:
         Dictionary with repo metadata or None
-    """
+    '''
+
     # Check cache first
     if use_cache:
         cached = get_repo_metadata(repo_owner, repo_name)

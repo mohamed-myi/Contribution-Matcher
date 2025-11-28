@@ -25,7 +25,8 @@ def db_conn():
 
 
 def init_db() -> None:
-    """Create tables if they do not already exist."""
+    # Create tables if they do not already exist
+
     with db_conn() as conn:
         cur = conn.cursor()
 

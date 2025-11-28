@@ -1,4 +1,4 @@
-"""GitHub API integration module."""
+# GitHub API integration module
 
 from .github_api import (
     get_repo_metadata_from_api,

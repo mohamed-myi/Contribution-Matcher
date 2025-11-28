@@ -1,4 +1,4 @@
-"""Database operations module."""
+# Database operations module
 
 from .database import (
     db_conn,

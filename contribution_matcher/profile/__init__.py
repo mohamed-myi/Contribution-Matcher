@@ -1,4 +1,4 @@
-"""Developer profile management module."""
+# Developer profile management module
 
 from .dev_profile import (
     create_profile_from_github,

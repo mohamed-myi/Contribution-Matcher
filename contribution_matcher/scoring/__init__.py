@@ -1,4 +1,4 @@
-"""Issue scoring and ML training module."""
+# Issue scoring and ML training module
 
 from .issue_scorer import (
     calculate_experience_match,

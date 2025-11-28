@@ -1,4 +1,4 @@
-"""
+'''
 ML Training Module for Issue Quality Prediction
 
 This module trains a machine learning model to predict whether a GitHub issue is "good" 
@@ -6,7 +6,7 @@ This module trains a machine learning model to predict whether a GitHub issue is
 
 The model learns from your manual labels - when you label issues as "good" or "bad", 
 the model learns patterns from those examples to predict future issues.
-"""
+'''
 
 import os
 import pickle
@@ -28,7 +28,7 @@ SCALER_PATH = "issue_scaler.pkl"
 
 
 def extract_features(issue: Dict, profile_data: Optional[Dict] = None) -> List[float]:
-    """
+    '''
     Extract numerical features from an issue for ML training.
     
     This function converts an issue (text/data) into a list of 15 numbers that 
@@ -41,7 +41,8 @@ def extract_features(issue: Dict, profile_data: Optional[Dict] = None) -> List[f
         
     Returns:
         List of 15 float values representing the issue's features
-    """
+    '''
+
     # Lazy import to avoid circular dependency
     from contribution_matcher.scoring.issue_scorer import get_match_breakdown, score_issue_against_profile
     
@@ -167,12 +168,13 @@ def extract_features(issue: Dict, profile_data: Optional[Dict] = None) -> List[f
 
 
 def load_labeled_issues() -> Tuple[List[Dict], List[str]]:
-    """
+    '''
     Load labeled issues from the database.
     
     Returns:
         Tuple of (issues list, labels list)
-    """
+    '''
+
     with db_conn() as conn:
         cur = conn.cursor()
         
@@ -207,7 +209,7 @@ def load_labeled_issues() -> Tuple[List[Dict], List[str]]:
 
 
 def train_model(force: bool = False) -> Dict:
-    """
+    '''
     Train a machine learning model to predict issue quality (good vs bad).
     
     Args:
@@ -215,7 +217,8 @@ def train_model(force: bool = False) -> Dict:
         
     Returns:
         Dictionary with training metrics
-    """
+    '''
+
     print("\n" + "=" * 80)
     print("STEP 1: LOADING LABELED ISSUES")
     print("=" * 80)
@@ -392,7 +395,7 @@ def train_model(force: bool = False) -> Dict:
 
 
 def predict_issue_quality(issue: Dict, profile_data: Optional[Dict] = None) -> Tuple[float, float]:
-    """
+    '''
     Predict whether an issue is "good" or "bad" using the trained ML model.
     
     Args:
@@ -401,7 +404,8 @@ def predict_issue_quality(issue: Dict, profile_data: Optional[Dict] = None) -> T
         
     Returns:
         Tuple of (probability_good, probability_bad)
-    """
+    '''
+
     if not os.path.exists(MODEL_PATH) or not os.path.exists(SCALER_PATH):
         return 0.5, 0.5  # Neutral prediction
     

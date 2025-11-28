@@ -14,7 +14,7 @@ def query_issues(
     days_back: Optional[int] = None,
     limit: Optional[int] = None,
 ) -> List[Dict]:
-    """
+    '''
     Query issues from the database with various filters.
     
     Args:
@@ -27,7 +27,8 @@ def query_issues(
     
     Returns:
         List of issue dictionaries with all fields
-    """
+    '''
+
     with db_conn() as conn:
         cur = conn.cursor()
         

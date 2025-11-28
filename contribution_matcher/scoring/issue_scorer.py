@@ -1,4 +1,4 @@
-"""Issue scoring module for matching developer profile against GitHub issues."""
+# Issue scoring module for matching developer profile against GitHub issues
 
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
@@ -17,13 +17,12 @@ from contribution_matcher.scoring.ml_trainer import predict_issue_quality
 
 
 def calculate_skill_match(user_skills: List[str], tech_stack: List[str]) -> Tuple[float, List[str], List[str]]:
-    """
-
+    '''
     Compares user skills with tech stack and calculates match percentage.
 
     Returns - (match_percentage, matching_skills, missing_skills)
+    '''
 
-    """
     if not tech_stack:
         return (100.0, [], [])
 
@@ -54,13 +53,12 @@ def calculate_skill_match(user_skills: List[str], tech_stack: List[str]) -> Tupl
 
 
 def calculate_experience_match(profile_level: str, issue_difficulty: Optional[str]) -> float:
-    """
-
+    '''
     Calculate experience level match.
 
     Returns - Score from 0-20 (20 = perfect match, 0 = mismatch)
+    '''
 
-    """
     if not issue_difficulty:
         return 10.0  # Neutral score if no difficulty specified
     
@@ -100,13 +98,12 @@ def calculate_experience_match(profile_level: str, issue_difficulty: Optional[st
 
 
 def calculate_repo_quality(repo_metadata: Optional[Dict]) -> float:
-    """
-
+    '''
     Calculate repository quality score.
 
     Returns - Score from 0-15
+    '''
 
-    """
     if not repo_metadata:
         return 5.0  # Neutral if no metadata
     
@@ -156,13 +153,12 @@ def calculate_repo_quality(repo_metadata: Optional[Dict]) -> float:
 
 
 def calculate_freshness(issue_updated_at: Optional[str]) -> float:
-    """
-
+    '''
     Calculate issue freshness score.
 
     Returns - Score from 0-10
+    '''
 
-    """
     if not issue_updated_at:
         return 1.0  # Default low score
     
@@ -183,13 +179,12 @@ def calculate_freshness(issue_updated_at: Optional[str]) -> float:
 
 
 def calculate_time_match(profile_availability: Optional[int], issue_time_estimate: Optional[str]) -> float:
-    """
-
+    '''
     Calculate time availability match.
 
     Returns - Score from 0-10
+    '''
 
-    """
     if not profile_availability or not issue_time_estimate:
         return 5.0  # Neutral if missing
     
@@ -232,13 +227,12 @@ def calculate_time_match(profile_availability: Optional[int], issue_time_estimat
 
 
 def calculate_interest_match(profile_interests: List[str], repo_topics: List[str]) -> float:
-    """
-
+    '''
     Calculate interest match based on repo topics.
 
     Returns - Score from 0-5
+    '''
 
-    """
     if not profile_interests or not repo_topics:
         return 2.5  # Neutral if missing
     
@@ -259,13 +253,12 @@ def calculate_interest_match(profile_interests: List[str], repo_topics: List[str
 
 
 def get_match_breakdown(profile: Dict, issue_data: Dict) -> Dict:
-    """
-
+    '''
     Get detailed breakdown of profile-issue match.
 
     Returns - Dictionary with detailed match breakdown
+    '''
 
-    """
     # Get issue technologies
     issue_id = issue_data.get("id")
     if issue_id:
@@ -343,14 +336,13 @@ def get_match_breakdown(profile: Dict, issue_data: Dict) -> Dict:
 
 
 def score_issue_against_profile(profile: Dict, issue_data: Dict) -> Dict:
-    """
-
+    '''
     Calculate overall match score for profile against an issue.
     Uses hybrid approach: rule-based scoring adjusted by ML predictions.
 
     Returns - Dictionary with score and breakdown
+    '''
 
-    """
     breakdown = get_match_breakdown(profile, issue_data)
     
     # Calculate weighted score (rule-based)
@@ -412,13 +404,12 @@ def score_profile_against_all_issues(
     issue_ids: Optional[List[int]] = None,
     limit: Optional[int] = None
 ) -> List[Dict]:
-    """
-
+    '''
     Score profile against multiple issues.
 
     Returns - List of score dictionaries, sorted by score (descending)
+    '''
 
-    """
     if profile is None:
         profile = load_dev_profile()
     
@@ -454,13 +445,12 @@ def get_top_matches(
     profile: Optional[Dict] = None,
     limit: int = 10
 ) -> List[Dict]:
-    """
-
+    '''
     Get top N matching issues for profile.
 
     Returns - List of top scoring issues
+    '''
 
-    """
     all_scores = score_profile_against_all_issues(profile=profile)
     return all_scores[:limit]
 

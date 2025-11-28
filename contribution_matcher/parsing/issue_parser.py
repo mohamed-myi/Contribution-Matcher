@@ -8,7 +8,8 @@ from contribution_matcher.config import SKILL_CATEGORIES
 
 
 def _clean_text(text: str) -> str:
-    """Remove excessive whitespace and normalize."""
+    # Remove excessive whitespace and normalize
+
     if not text:
         return ""
     text = re.sub(r'\s+', ' ', text)
@@ -16,13 +17,12 @@ def _clean_text(text: str) -> str:
 
 
 def find_difficulty(issue: str, labels: List[str]) -> Optional[str]:
-    """
-
+    '''
     Find difficulty level from issue body and labels.
 
     Returns - 'beginner', 'intermediate', 'advanced', or None
+    '''
 
-    """
     if not issue and not labels:
         return None
 
@@ -83,13 +83,12 @@ def find_technologies(
     repo_languages: Optional[Dict[str, int]] = None,
     repo_topics: Optional[List[str]] = None
 ) -> List[Tuple[str, Optional[str]]]:
-    """
-
+    '''
     Find technologies from issue body, repo languages, and topics.
 
     Returns - List of (technology, category) tuples
+    '''
 
-    """
     technologies = []
 
     # Extract from issue body using skill_extractor
@@ -128,12 +127,13 @@ def find_technologies(
 
 
 def categorize_technologies(technologies: List[Tuple[str, Optional[str]]]) -> Dict[str, List[str]]:
-    """
+    '''
     Group technologies by category.
     
     Returns:
         Dictionary mapping category to list of technologies
-    """
+    '''
+
     categorized = {}
     for tech, category in technologies:
         if category:
@@ -151,13 +151,12 @@ def categorize_technologies(technologies: List[Tuple[str, Optional[str]]]) -> Di
 
 
 def find_time_estimate(issue: str) -> Optional[str]:
-    """
-
+    '''
     Find time estimate from issue body.
 
     Returns - Time estimate string (e.g., "2-3 hours", "1 day", "weekend project") or None
+    '''
 
-    """
     if not issue:
         return None
 
@@ -198,13 +197,12 @@ def find_time_estimate(issue: str) -> Optional[str]:
 
 
 def classify_issue_type(issue: str, labels: List[str]) -> Optional[str]:
-    """
-
+    '''
     Classify issue type.
 
     Returns - 'bug', 'feature', 'documentation', 'testing', 'refactoring', or None
+    '''
 
-    """
     if not issue and not labels:
         return None
 
@@ -263,13 +261,12 @@ def classify_issue_type(issue: str, labels: List[str]) -> Optional[str]:
 
 
 def parse_issue(issue_data: Dict, repo_metadata: Optional[Dict] = None) -> Dict:
-    """
-
+    '''
     Parse a GitHub issue and extract structured information.
 
     Returns - Dictionary with parsed issue data
+    '''
 
-    """
     issue_body = issue_data.get("body", "") or ""
     labels = [label.get("name", "") for label in issue_data.get("labels", [])]
 

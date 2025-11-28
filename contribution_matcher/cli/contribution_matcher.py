@@ -39,7 +39,8 @@ load_dotenv()
 
 
 def cmd_discover(args):
-    """Search for new GitHub issues and store in database."""
+    # Search for new GitHub issues and store in database
+
     try:
         init_db()
     except Exception as e:
@@ -167,7 +168,8 @@ def cmd_list(args):
 
 
 def cmd_score(args):
-    """Score profile against issues."""
+    # Score profile against issues
+
     try:
         init_db()
     except Exception as e:
@@ -278,7 +280,8 @@ def _print_score_results(scores: List[Dict], verbose: bool = False):
 
 
 def cmd_create_profile(args):
-    """Create developer profile."""
+    # Create developer profile
+
     try:
         init_db()
     except Exception as e:
@@ -329,7 +332,8 @@ def cmd_create_profile(args):
 
 
 def cmd_update_profile(args):
-    """Update existing profile interactively."""
+    # Update existing profile interactively
+
     try:
         init_db()
     except Exception as e:
@@ -412,7 +416,8 @@ def cmd_update_profile(args):
 
 
 def cmd_label_export(args):
-    """Export unlabeled issues to CSV for manual labeling."""
+    # Export unlabeled issues to CSV for manual labeling
+
     try:
         init_db()
     except Exception as e:
@@ -485,7 +490,8 @@ def cmd_label_export(args):
 
 
 def cmd_label_import(args):
-    """Import labels from CSV file."""
+    # Import labels from CSV file
+
     try:
         init_db()
     except Exception as e:
@@ -550,7 +556,8 @@ def cmd_label_import(args):
 
 
 def cmd_label_status(args):
-    """Show labeling progress and statistics."""
+    # Show labeling progress and statistics
+
     try:
         init_db()
     except Exception as e:
@@ -590,7 +597,8 @@ def cmd_label_status(args):
 
 
 def cmd_train_model(args):
-    """Train ML model on labeled issues."""
+    # Train ML model on labeled issues
+
     try:
         init_db()
     except Exception as e:
@@ -675,7 +683,8 @@ def cmd_export(args):
 
 
 def main():
-    """Main entry point with CLI interface."""
+    # Main entry point with CLI interface
+
     parser = argparse.ArgumentParser(
         description="Contribution Matcher - Find and match GitHub issues to your skills"
     )

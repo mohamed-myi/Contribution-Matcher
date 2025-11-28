@@ -1,4 +1,4 @@
-"""Issue parsing and data extraction module."""
+# Issue parsing and data extraction module
 
 from .issue_parser import (
     classify_issue_type,

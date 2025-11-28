@@ -51,3 +51,8 @@ contribution_matcher/
 pytest tests/
 ```
 
+## Credits
+
+This project is brought to you by Mohamed Ibrahim. It is my first attempt at creating a ML model. Please feel free to give suggestions or any bugs you spot.
+
+Documents regarding setup were written by an AI agent with appropriate context. Feel free to point out any inconsistencies there.

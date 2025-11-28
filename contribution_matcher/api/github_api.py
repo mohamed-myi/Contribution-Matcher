@@ -49,6 +49,10 @@ def _make_request(url: str, params: Optional[Dict] = None) -> Optional[requests.
     """Make a GitHub API request with rate limiting and error handling."""
     global RATE_LIMIT_REMAINING
     
+    # Debug: Check token
+    if not GITHUB_TOKEN:
+        print("Warning: PAT_TOKEN not found in environment. Using unauthenticated requests (60/hour limit).")
+    
     if RATE_LIMIT_REMAINING < 10:
         _handle_rate_limit(requests.Response())
     
@@ -59,6 +63,16 @@ def _make_request(url: str, params: Optional[Dict] = None) -> Optional[requests.
         if response.status_code == 200:
             return response
         elif response.status_code == 404:
+            print(f"Warning: API returned 404 (Not Found) for: {url}")
+            if params:
+                print(f"   Query: {params.get('q', 'N/A')}")
+            return None
+        elif response.status_code == 401:
+            print(f"Error: Authentication failed (401). Check your PAT_TOKEN in .env file.")
+            print(f"   URL: {url}")
+            error_msg = response.json().get("message", "") if response.text else ""
+            if error_msg:
+                print(f"   Error: {error_msg}")
             return None
         elif response.status_code == 403:
             # Rate limited
@@ -69,12 +83,17 @@ def _make_request(url: str, params: Optional[Dict] = None) -> Optional[requests.
                     print(f"Rate limited. Waiting {wait_time} seconds...")
                     time.sleep(wait_time)
                     return _make_request(url, params)  # Retry
+            else:
+                print(f"Error: Rate limited (403) - No reset time available")
             return None
         else:
-            print(f"GitHub API error {response.status_code}: {response.text[:200]}")
+            print(f"Error: GitHub API error {response.status_code}: {response.text[:200]}")
+            if params:
+                print(f"   Query: {params.get('q', 'N/A')}")
             return None
     except Exception as e:
-        print(f"Error making GitHub API request: {e}")
+        print(f"Error: Error making GitHub API request: {e}")
+        print(f"   URL: {url}")
         return None
 
 
@@ -97,74 +116,103 @@ def search_issues(
         List of issue dictionaries
     """
     if labels is None:
-        labels = GOOD_FIRST_ISSUE_LABELS + HELP_WANTED_LABELS
+        # Use most common labels that work well with GitHub API
+        # GitHub API has issues with complex OR queries, so use simpler defaults
+        labels = ["good first issue", "help wanted"]
+    
+    print(f"Searching with labels: {', '.join(labels[:5])}{'...' if len(labels) > 5 else ''}")
+    if language:
+        print(f"   Language filter: {language}")
+    if min_stars:
+        print(f"   Min stars: {min_stars}")
     
     all_issues = []
-    page = 1
-    per_page = min(100, limit)  # GitHub API max is 100 per page
+    seen_urls = set()  # Track seen issues to avoid duplicates
     
-    while len(all_issues) < limit:
-        # Build query string
-        query_parts = []
-        
-        # Add label filters (use OR logic for multiple labels)
-        if len(labels) > 1:
-            label_query = " OR ".join([f"label:{label}" for label in labels])
-            query_parts.append(f"({label_query})")
-        elif len(labels) == 1:
-            query_parts.append(f"label:{labels[0]}")
-        
-        # Add language filter
-        if language:
-            query_parts.append(f"language:{language}")
-        
-        # Add state filter (only open issues)
-        query_parts.append("state:open")
-        
-        query = " ".join(query_parts)
-        
-        params = {
-            "q": query,
-            "sort": "updated",
-            "order": "desc",
-            "per_page": per_page,
-            "page": page
-        }
-        
-        url = f"{GITHUB_API_BASE}/search/issues"
-        response = _make_request(url, params)
-        
-        if not response:
+    # Search each label separately and combine results (workaround for OR query issues)
+    for label in labels:
+        if len(all_issues) >= limit:
             break
         
-        data = response.json()
-        items = data.get("items", [])
+        page = 1
+        per_page = min(100, limit - len(all_issues))
         
-        if not items:
-            break
-        
-        # Filter by min_stars if specified
-        for item in items:
-            repo_url = item.get("repository_url", "")
-            if min_stars and repo_url:
-                # Extract repo owner/name from URL
-                parts = repo_url.replace(f"{GITHUB_API_BASE}/repos/", "").split("/")
-                if len(parts) >= 2:
-                    repo_owner, repo_name = parts[0], parts[1]
-                    repo_meta = get_repo_metadata(repo_owner, repo_name)
-                    if repo_meta and repo_meta.get("stars", 0) < min_stars:
-                        continue
+        while len(all_issues) < limit:
+            # Build query string for single label
+            query_parts = []
             
-            all_issues.append(item)
-            if len(all_issues) >= limit:
+            # Quote labels that contain spaces for GitHub API
+            if " " in label:
+                query_parts.append(f'label:"{label}"')
+            else:
+                query_parts.append(f"label:{label}")
+            
+            # Add language filter
+            if language:
+                query_parts.append(f"language:{language}")
+            
+            # Add state filter (only open issues)
+            query_parts.append("state:open")
+            
+            query = " ".join(query_parts)
+            
+            params = {
+                "q": query,
+                "sort": "updated",
+                "order": "desc",
+                "per_page": per_page,
+                "page": page
+            }
+            
+            if page == 1:
+                print(f"Searching label '{label}': {query[:80]}{'...' if len(query) > 80 else ''}")
+            
+            url = f"{GITHUB_API_BASE}/search/issues"
+            response = _make_request(url, params)
+            
+            if not response:
+                print(f"Warning: No response from API for label '{label}', page {page}. Moving to next label.")
                 break
-        
-        if len(items) < per_page:
-            break
-        
-        page += 1
-        time.sleep(0.5)  # Be nice to the API
+            
+            data = response.json()
+            total_count = data.get("total_count", 0)
+            items = data.get("items", [])
+            
+            if page == 1:
+                print(f"   Found {total_count} total matches for this label")
+            
+            if not items:
+                break
+            
+            # Filter by min_stars and deduplicate
+            for item in items:
+                issue_url = item.get("html_url", "")
+                if issue_url in seen_urls:
+                    continue
+                
+                repo_url = item.get("repository_url", "")
+                if min_stars and repo_url:
+                    # Extract repo owner/name from URL
+                    parts = repo_url.replace(f"{GITHUB_API_BASE}/repos/", "").split("/")
+                    if len(parts) >= 2:
+                        repo_owner, repo_name = parts[0], parts[1]
+                        repo_meta = get_repo_metadata(repo_owner, repo_name)
+                        if repo_meta and repo_meta.get("stars", 0) < min_stars:
+                            continue
+                
+                all_issues.append(item)
+                seen_urls.add(issue_url)
+                
+                if len(all_issues) >= limit:
+                    break
+            
+            if len(items) < per_page or len(all_issues) >= limit:
+                break
+            
+            page += 1
+            time.sleep(0.5)  # Be nice to the API
     
+    print(f"Total unique issues found: {len(all_issues)}")
     return all_issues[:limit]
 
 

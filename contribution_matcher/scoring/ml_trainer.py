@@ -250,7 +250,7 @@ def train_model(force: bool = False) -> Dict:
             "Label some issues as 'bad' to teach the model what to avoid."
         )
     
-    print(f"✓ Data validation passed:")
+    print(f"Data validation passed:")
     print(f"  - Total issues: {len(issues)}")
     print(f"  - Good issues: {good_count}")
     print(f"  - Bad issues: {bad_count}")
@@ -263,12 +263,12 @@ def train_model(force: bool = False) -> Dict:
     profile_data = None
     try:
         profile_data = load_dev_profile()
-        print("✓ Profile data loaded - will calculate match scores (features 2-8)")
+        print("Profile data loaded - will calculate match scores (features 2-8)")
     except FileNotFoundError:
-        print("⚠ Warning: Profile data not found (dev_profile.json)")
+        print("Warning: Profile data not found (dev_profile.json)")
         print("  Match score features (2-8) will be 0.0")
     except Exception as e:
-        print(f"⚠ Warning: Error loading profile data: {e}")
+        print(f"Warning: Error loading profile data: {e}")
     
     print("\n" + "=" * 80)
     print("STEP 4: EXTRACTING FEATURES")
@@ -283,7 +283,7 @@ def train_model(force: bool = False) -> Dict:
             X.append(features)
             y.append(1 if label == 'good' else 0)
         except Exception as e:
-            print(f"⚠ Warning: Error extracting features for issue {issue.get('id')}: {e}")
+            print(f"Warning: Error extracting features for issue {issue.get('id')}: {e}")
             continue
     
     if len(X) < 10:
@@ -295,7 +295,7 @@ def train_model(force: bool = False) -> Dict:
     X = np.array(X)
     y = np.array(y)
     
-    print(f"✓ Feature extraction complete:")
+    print(f"Feature extraction complete:")
     print(f"  - Issues processed: {len(X)}")
     print(f"  - Features per issue: {X.shape[1]} (should be 15)")
     
@@ -310,7 +310,7 @@ def train_model(force: bool = False) -> Dict:
         stratify=y
     )
     
-    print(f"✓ Data split complete:")
+    print(f"Data split complete:")
     print(f"  - Training set: {len(X_train)} issues (80%)")
     print(f"  - Test set: {len(X_test)} issues (20%)")
     
@@ -322,7 +322,7 @@ def train_model(force: bool = False) -> Dict:
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
     
-    print("✓ Feature scaling complete")
+    print("Feature scaling complete")
     
     print("\n" + "=" * 80)
     print("STEP 7: TRAINING GRADIENT BOOSTING CLASSIFIER")
@@ -337,7 +337,7 @@ def train_model(force: bool = False) -> Dict:
     
     model.fit(X_train_scaled, y_train)
     
-    print("✓ Model training complete")
+    print("Model training complete")
     
     print("\n" + "=" * 80)
     print("STEP 8: EVALUATING MODEL PERFORMANCE")
@@ -351,10 +351,10 @@ def train_model(force: bool = False) -> Dict:
     recall = recall_score(y_test, y_pred)
     f1 = f1_score(y_test, y_pred)
     
-    print(f"\n📊 ACCURACY: {accuracy:.3f} ({accuracy*100:.1f}%)")
-    print(f"🎯 PRECISION: {precision:.3f} ({precision*100:.1f}%)")
-    print(f"🔍 RECALL: {recall:.3f} ({recall*100:.1f}%)")
-    print(f"⚖️  F1-SCORE: {f1:.3f} ({f1*100:.1f}%)")
+    print(f"\nACCURACY: {accuracy:.3f} ({accuracy*100:.1f}%)")
+    print(f"PRECISION: {precision:.3f} ({precision*100:.1f}%)")
+    print(f"RECALL: {recall:.3f} ({recall*100:.1f}%)")
+    print(f"F1-SCORE: {f1:.3f} ({f1*100:.1f}%)")
     
     cm = confusion_matrix(y_test, y_pred)
     print("\nCONFUSION MATRIX:")
@@ -369,11 +369,11 @@ def train_model(force: bool = False) -> Dict:
     
     with open(MODEL_PATH, 'wb') as f:
         pickle.dump(model, f)
-    print(f"✓ Model saved to {MODEL_PATH}")
+    print(f"Model saved to {MODEL_PATH}")
     
     with open(SCALER_PATH, 'wb') as f:
         pickle.dump(scaler, f)
-    print(f"✓ Scaler saved to {SCALER_PATH}")
+    print(f"Scaler saved to {SCALER_PATH}")
     
     print("\n" + "=" * 80)
     print("TRAINING COMPLETE!")

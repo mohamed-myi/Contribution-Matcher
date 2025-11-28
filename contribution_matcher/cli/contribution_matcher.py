@@ -579,12 +579,12 @@ def cmd_label_status(args):
         print(f"  - Need {needed_good} more 'good' labels")
         print(f"  - Need {needed_bad} more 'bad' labels")
     else:
-        print("\n✓ Minimum sample size (200) reached!")
+        print("\nMinimum sample size (200) reached!")
         if not stats['is_balanced']:
             diff = abs(stats['good_issues'] - stats['bad_issues'])
             print(f"  Note: Labeling is unbalanced (difference: {diff} issues)")
         else:
-            print("  ✓ Labeling is balanced")
+            print("  Labeling is balanced")
     
     print("\n" + "=" * 80)
 
@@ -599,7 +599,7 @@ def cmd_train_model(args):
     
     try:
         results = train_model(force=args.force)
-        print("\n✓ Model training completed successfully!")
+        print("\nModel training completed successfully!")
         print(f"  Model accuracy: {results['accuracy']:.3f}")
         print(f"  Model saved. ML predictions will now be used in scoring.")
     except ValueError as e:

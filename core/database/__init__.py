@@ -1,22 +1,16 @@
 """
 Unified Database Package.
 
-This package provides both:
-1. New DatabaseManager with connection pooling (recommended)
-2. Legacy functions for backward compatibility
+Provides DatabaseManager (recommended) and legacy functions for backward compatibility.
 
-NEW API (recommended):
+New API:
     from core.database import db, get_db, Base
-    
     db.initialize()
     with db.session() as session:
         issues = session.query(Issue).all()
 
-LEGACY API (deprecated, for backward compatibility):
+Legacy API (deprecated):
     from core.database import upsert_issue, query_issues
-    
-    issue_id = upsert_issue(title="...", url="...")
-    issues = query_issues(limit=10)
 """
 
 # New API - DatabaseManager from the internal module

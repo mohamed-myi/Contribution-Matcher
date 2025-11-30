@@ -1,21 +1,4 @@
-"""
-DEPRECATED: Legacy SQLite database module.
-
-This module is deprecated and will be removed in a future version.
-Please use the new unified database layer instead:
-
-    from core.database import db
-    from core.repositories import IssueRepository
-
-    with db.session() as session:
-        repo = IssueRepository(session)
-        issues = repo.list_with_bookmarks(user_id, filters)
-
-Migration Guide:
-- db_conn() -> db.session()
-- upsert_issue() -> IssueRepository.bulk_upsert()
-- get_repo_metadata() -> RepoMetadataRepository.get()
-"""
+"""DEPRECATED: Legacy SQLite database module. Use core.database and core.repositories instead."""
 
 import json
 import os
@@ -28,7 +11,6 @@ from typing import Dict, Iterable, List, Optional, Tuple
 import numpy as np
 
 
-# Issue deprecation warning on import
 warnings.warn(
     "core.database.database is deprecated. Use core.database and core.repositories instead.",
     DeprecationWarning,
@@ -187,12 +169,7 @@ def upsert_issue(
     contributor_count: Optional[int] = None,
     is_active: int = 1,
 ) -> int:
-    """
-    DEPRECATED: Use IssueRepository.bulk_upsert() instead.
-
-    Insert or update an issue row and return its id.
-    Issues are uniquely identified by URL.
-    """
+    """DEPRECATED: Use IssueRepository.bulk_upsert() instead."""
     warnings.warn(
         "upsert_issue is deprecated. Use IssueRepository.bulk_upsert() instead.",
         DeprecationWarning,
@@ -253,9 +230,7 @@ def replace_issue_technologies(
     issue_id: int,
     technologies: Iterable[Tuple[str, Optional[str]]],
 ) -> None:
-    """
-    Replace issue_technologies entries for a given issue.
-    """
+    """Replace issue_technologies entries for a given issue."""
     with db_conn() as conn:
         cur = conn.cursor()
 
@@ -273,16 +248,7 @@ def replace_issue_technologies(
 
 
 def update_issue_label(issue_id: int, label: str) -> bool:
-    """
-    Update the label for an issue.
-    
-    Args:
-        issue_id: The issue ID
-        label: The label ('good' or 'bad')
-        
-    Returns:
-        True if successful, False otherwise
-    """
+    """Update the label for an issue ('good' or 'bad'). Returns True if successful."""
     if label not in ['good', 'bad']:
         return False
     

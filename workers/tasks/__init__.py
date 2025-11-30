@@ -1,10 +1,7 @@
 """
 Celery task definitions.
 
-Tasks are organized by function:
-- discovery_tasks: GitHub issue discovery
-- scoring_tasks: Issue scoring against profiles
-- ml_tasks: ML model training
+Organized by function: discovery_tasks, scoring_tasks, ml_tasks.
 """
 
 from workers.tasks.discovery_tasks import (

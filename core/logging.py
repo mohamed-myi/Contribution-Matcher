@@ -1,12 +1,4 @@
-"""
-Structured logging configuration for Contribution Matcher.
-
-Features:
-- JSON output in production, colored console in development
-- Context variables for request tracing
-- Automatic timestamp and log level formatting
-- Integration with FastAPI middleware
-"""
+"""Structured logging configuration for Contribution Matcher."""
 
 import logging
 import sys
@@ -19,10 +11,6 @@ from structlog.types import Processor
 
 from .config import get_settings
 
-
-# =============================================================================
-# Configuration
-# =============================================================================
 
 def _is_development() -> bool:
     """Check if running in development mode."""
@@ -66,7 +54,6 @@ def get_processors() -> list[Processor]:
     ]
     
     if _is_development():
-        # Development: colored console output
         return shared_processors + [
             structlog.dev.ConsoleRenderer(
                 colors=True,
@@ -74,7 +61,6 @@ def get_processors() -> list[Processor]:
             )
         ]
     else:
-        # Production: JSON output
         return shared_processors + [
             structlog.processors.format_exc_info,
             structlog.processors.JSONRenderer(),

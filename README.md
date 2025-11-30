@@ -1,23 +1,19 @@
 # Contribution Matcher
 
-An intelligent system that discovers GitHub issues, matches them to your developer skills, and recommends contribution opportunities using hybrid scoring (rules + ML).
+Discovers GitHub issues and matches them to developer skills using hybrid scoring (rules + ML).
 
 ## Quick Start
 
 ```bash
-# Clone and install
 git clone <repo-url> && cd contribution_matcher
 pip install -r requirements.txt
+cp docker/env.example .env  # Edit with GitHub credentials
 
-# Set up environment
-cp docker/env.example .env
-# Edit .env with your GitHub credentials
-
-# Start backend
+# Backend
 source venv/bin/activate
 uvicorn backend.app.main:app --reload
 
-# Start frontend (separate terminal)
+# Frontend (separate terminal)
 cd frontend && npm install && npm run dev
 ```
 
@@ -25,50 +21,25 @@ Visit http://localhost:5173
 
 ## Features
 
-- **GitHub OAuth Login** - Sign in with your GitHub account
-- **Issue Discovery** - Find issues labeled "good first issue", "help wanted", etc.
-- **Smart Matching** - Score issues against your skills, experience, interests
-- **ML-Enhanced Scoring** - Train personalized models on your preferences
-- **Multiple Profiles** - Create from GitHub repos, resume PDF, or manually
-
-## Architecture
-
-```
-contribution_matcher/
-├── core/                    # Shared library
-│   ├── cache/               # Redis caching
-│   ├── database/            # SQLAlchemy + legacy SQLite
-│   ├── models/              # ORM models
-│   ├── repositories/        # Data access layer
-│   ├── scoring/             # Issue scoring + ML
-│   ├── security/            # Encryption + rate limiting
-│   └── services/            # Business logic
-├── backend/                 # FastAPI API
-├── workers/                 # Celery background tasks
-├── frontend/                # React SPA
-└── docker/                  # Docker configuration
-```
+- GitHub OAuth login
+- Issue discovery (good first issue, help wanted)
+- Smart matching (skills, experience, interests)
+- ML-enhanced scoring
+- Multiple profile sources (GitHub, resume PDF, manual)
 
 ## Configuration
 
-Required environment variables:
+**Required:**
+- `JWT_SECRET_KEY` (min 32 chars)
+- `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`
+- `PAT_TOKEN` (GitHub PAT)
 
-| Variable | Description |
-|----------|-------------|
-| `JWT_SECRET_KEY` | Min 32 chars for JWT signing |
-| `GITHUB_CLIENT_ID` | GitHub OAuth app client ID |
-| `GITHUB_CLIENT_SECRET` | GitHub OAuth app secret |
-| `PAT_TOKEN` | GitHub PAT for issue discovery |
+**Optional:**
+- `DATABASE_URL` (default: `sqlite:///contribution_matcher.db`)
+- `REDIS_HOST` (default: `localhost`)
+- `TOKEN_ENCRYPTION_KEY` (Fernet key)
 
-Optional:
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DATABASE_URL` | `sqlite:///contribution_matcher.db` | Database connection |
-| `REDIS_HOST` | `localhost` | Redis for caching |
-| `TOKEN_ENCRYPTION_KEY` | - | Fernet key for token encryption |
-
-Generate keys:
+**Generate keys:**
 ```bash
 # JWT secret
 python -c "import secrets; print(secrets.token_urlsafe(48))"
@@ -80,24 +51,12 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 ## CLI Commands
 
 ```bash
-# Discover issues
 python main.py discover --limit 100
-
-# List from database
 python main.py list --difficulty beginner --limit 10
-
-# View statistics
 python main.py stats
-
-# Score issues against profile
 python main.py score --top 10
-
-# Create profile
 python main.py create-profile --github your-username
-python main.py create-profile --resume path/to/resume.pdf
-
-# Train ML model (after labeling 200+ issues)
-python main.py train-model
+python main.py train-model  # After labeling 200+ issues
 ```
 
 ## API Endpoints
@@ -110,42 +69,25 @@ python main.py train-model
 | `/api/profile` | GET/PUT | Profile |
 | `/api/ml/train` | POST | Train model |
 
-## Docker Deployment
+## Docker
 
 ```bash
-# Copy environment
-cp docker/env.example .env
-# Edit .env
-
-# Start all services
+cp docker/env.example .env  # Edit .env
 docker-compose up -d
-
-# Run migrations
 docker-compose exec api alembic upgrade head
 ```
 
-Services:
-- `api` - FastAPI (port 8000)
-- `worker-discovery` - Celery (GitHub API)
-- `worker-scoring` - Celery (scoring)
-- `worker-ml` - Celery (ML training)
-- `scheduler` - Celery beat
-- `postgres` - PostgreSQL 15
-- `redis` - Redis 7
+**Services:** `api` (FastAPI), `worker-discovery/scoring/ml` (Celery), `scheduler` (Celery beat), `postgres`, `redis`
 
-## Scoring Algorithm
+## Scoring
 
-**Rule-Based (100 points):**
-- Skill match: 40%
-- Experience match: 20%
-- Repo quality: 15%
-- Freshness: 10%
-- Time match: 10%
-- Interest match: 5%
+**Rule-based (100 points):** Skill match 40%, Experience 20%, Repo quality 15%, Freshness 10%, Time match 10%, Interest 5%
 
-**ML Adjustment:**
-- Trained on your labeled issues (good/bad)
-- Adjusts score ±15 points based on prediction confidence
+**ML adjustment:** ±15 points based on labeled issue preferences
+
+## Tech Stack
+
+Python 3.11, FastAPI, SQLAlchemy, Celery | React 19, Vite | SQLite/PostgreSQL | Redis | XGBoost, scikit-learn, Sentence-BERT
 
 ## Testing
 
@@ -153,30 +95,12 @@ Services:
 pytest tests/ -v -p no:asyncio
 ```
 
-## Tech Stack
-
-- **Backend:** Python 3.11, FastAPI, SQLAlchemy, Celery
-- **Frontend:** React 19, Vite
-- **Database:** SQLite (dev), PostgreSQL (prod)
-- **Caching:** Redis
-- **ML:** XGBoost, scikit-learn, Sentence-BERT
-
 ## Documentation
 
-See `docs/PROJECT_STATE.md` for detailed architecture and `docs/TODO.md` for remaining work.
+See `docs/PROJECT_STATE.md` (architecture) and `docs/TODO.md` (remaining work).
 
 ## Development Notes
 
-> **Note:** Most testing and development has been done locally, with commits intentionally kept minimal to maintain the stability of the GitHub Actions workflow responsible for daily issue discovery and data collection critical for training the ML model.
+Proof of concept. Most development done locally with minimal commits to maintain GitHub Actions workflow stability. Current priorities: issue discovery pipeline, ML training data collection, frontend polish, Celery deployment, production infrastructure.
 
-This repository represents a **proof of concept **. Some features are still a work in progress and are being actively developed in the background. The current GitHub state prioritizes:
-
-- Working issue discovery pipeline
-- Database population for ML training data
-- Frontend polish and additional UI features (in progress)
-- Full Celery worker deployment (in progress)
-- Production PostgreSQL/Redis infrastructure (in progress)
-
-## Credits
-
-Brought to you by Mohamed Ibrahim.
+**Credits:** Mohamed Ibrahim

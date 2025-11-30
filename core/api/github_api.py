@@ -1,8 +1,4 @@
-"""
-GitHub API client with rate limiting and caching.
-
-Uses structured logging for better observability.
-"""
+"""GitHub API client with rate limiting and caching."""
 
 import os
 import time
@@ -31,10 +27,7 @@ GITHUB_TOKEN = os.getenv("PAT_TOKEN")
 RATE_LIMIT_REMAINING = 5000
 RATE_LIMIT_RESET = 0
 
-# Fast discovery mode - skip expensive API calls (commits, contributors)
 FAST_DISCOVERY = os.getenv("FAST_DISCOVERY", "true").lower() == "true"
-
-# Cache validity in days (extended from 24 hours to reduce API calls)
 CACHE_VALIDITY_DAYS = int(os.getenv("CACHE_VALIDITY_DAYS", "7"))
 
 
@@ -61,10 +54,7 @@ def _get_graphql_headers() -> Dict[str, str]:
 
 
 def _graphql_batch_fetch_repos(repo_list: List[tuple]) -> Dict[tuple, Optional[Dict]]:
-    """
-    Fetch metadata for multiple repositories using a single GraphQL query.
-    This reduces 5 API calls per repo to just 1 call for all repos.
-    """
+    """Fetch metadata for multiple repositories using a single GraphQL query."""
     if not GITHUB_TOKEN:
         logger.warning("graphql_auth_required", message="GraphQL requires authentication")
         return {}

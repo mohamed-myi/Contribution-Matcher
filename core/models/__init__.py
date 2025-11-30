@@ -1,14 +1,10 @@
 """
 Unified SQLAlchemy models for Contribution Matcher.
 
-This package provides the single source of truth for all database models.
-Both the CLI and backend use these shared models.
+Single source of truth for all database models. Used by both CLI and backend.
 
 Usage:
     from core.models import User, Issue, DevProfile
-
-    # Or import all
-    from core.models import *
 """
 
 from .base import Base

@@ -1,12 +1,4 @@
-'''
-ML Training Module for Issue Quality Prediction
-
-This module trains a machine learning model to predict whether a GitHub issue is "good" 
-(i.e., an issue you want to contribute to) or "bad" (i.e., an issue you don't want to contribute to).
-
-The model learns from your manual labels - when you label issues as "good" or "bad", 
-the model learns patterns from those examples to predict future issues.
-'''
+"""ML Training Module for Issue Quality Prediction."""
 
 import json
 import os
@@ -25,37 +17,19 @@ from core.database import db_conn
 from core.database import get_issue_technologies
 from core.profile import load_dev_profile
 
-# File paths for saving/loading models (version 2 - XGBoost)
 MODEL_PATH_V2 = "issue_classifier_v2_xgb.pkl"
 SCALER_PATH_V2 = "issue_scaler_v2.pkl"
 FEATURE_SELECTOR_PATH_V2 = "feature_selector_v2.pkl"
-
-# Legacy file paths (GradientBoosting)
 MODEL_PATH = "issue_classifier.pkl"
 SCALER_PATH = "issue_scaler.pkl"
 
 
 def extract_base_features(issue: Dict, profile_data: Optional[Dict] = None) -> List[float]:
-    '''
-    Extract base numerical features from an issue (14 features).
-    
-    This function extracts the core 14 features that form the foundation
-    for advanced feature engineering.
-    
-    Args:
-        issue: Issue dictionary from database
-        profile_data: Optional profile data for calculating match scores
-        
-    Returns:
-        List of 14 float values representing base features
-    '''
+    """Extract base numerical features from an issue (14 features)."""
 
-    # Lazy import to avoid circular dependency
     from core.scoring.issue_scorer import get_match_breakdown
     
     features = []
-    
-    # Get issue technologies from database
     issue_id = issue.get('id')
     if issue_id:
         issue_techs_tuples = get_issue_technologies(issue_id)
@@ -63,39 +37,23 @@ def extract_base_features(issue: Dict, profile_data: Optional[Dict] = None) -> L
     else:
         all_issue_technologies = []
     
-    # FEATURE 1: Number of technologies required
     features.append(len(all_issue_technologies))
     
-    # FEATURES 2-8: Profile match scores (if profile data available)
     if profile_data:
         try:
             breakdown = get_match_breakdown(profile_data, issue)
-            
-            # FEATURE 2: Skill match percentage
             skills = breakdown.get('skills', {})
             features.append(skills.get('match_percentage', 0.0))
-            
-            # FEATURE 3: Experience match score
             exp = breakdown.get('experience', {})
             features.append(exp.get('score', 0.0))
-            
-            # FEATURE 4: Repo quality score
             repo_quality = breakdown.get('repo_quality', {})
             features.append(repo_quality.get('score', 0.0))
-            
-            # FEATURE 5: Freshness score
             freshness = breakdown.get('freshness', {})
             features.append(freshness.get('score', 0.0))
-            
-            # FEATURE 6: Time match score
             time_match = breakdown.get('time_match', {})
             features.append(time_match.get('score', 0.0))
-            
-            # FEATURE 7: Interest match score
             interest_match = breakdown.get('interest_match', {})
             features.append(interest_match.get('score', 0.0))
-            
-            # FEATURE 8: Total rule-based score (calculate directly from breakdown to avoid redundant call)
             from core.config import (
                 EXPERIENCE_MATCH_WEIGHT,
                 FRESHNESS_WEIGHT,
@@ -120,39 +78,17 @@ def extract_base_features(issue: Dict, profile_data: Optional[Dict] = None) -> L
     else:
         features.extend([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
     
-    # FEATURE 9: Repo stars (normalized)
-    repo_stars = issue.get('repo_stars') or 0
-    features.append(float(repo_stars))
+    features.append(float(issue.get('repo_stars') or 0))
+    features.append(float(issue.get('repo_forks') or 0))
+    features.append(float(issue.get('contributor_count') or 0))
     
-    # FEATURE 10: Repo forks (normalized)
-    repo_forks = issue.get('repo_forks') or 0
-    features.append(float(repo_forks))
-    
-    # FEATURE 11: Contributor count (normalized)
-    contributor_count = issue.get('contributor_count') or 0
-    features.append(float(contributor_count))
-    
-    # FEATURE 12: Issue type encoded
     issue_type = issue.get('issue_type', '') or ''
-    type_map = {
-        'bug': 1.0,
-        'feature': 2.0,
-        'documentation': 3.0,
-        'testing': 4.0,
-        'refactoring': 5.0,
-    }
+    type_map = {'bug': 1.0, 'feature': 2.0, 'documentation': 3.0, 'testing': 4.0, 'refactoring': 5.0}
     features.append(type_map.get(issue_type.lower() if issue_type else '', 0.0))
     
-    # FEATURE 13: Difficulty encoded
     difficulty = issue.get('difficulty', '') or ''
-    difficulty_map = {
-        'beginner': 0.0,
-        'intermediate': 1.0,
-        'advanced': 2.0,
-    }
+    difficulty_map = {'beginner': 0.0, 'intermediate': 1.0, 'advanced': 2.0}
     features.append(difficulty_map.get(difficulty.lower() if difficulty else '', 1.0))
-    
-    # FEATURE 14: Time estimate hours
     time_estimate = issue.get('time_estimate', '')
     hours_estimate = 0.0
     if time_estimate:
@@ -696,20 +632,7 @@ def train_model(
     tune_iterations: int = 50,
     legacy: bool = False,
 ) -> Dict:
-    '''
-    Train a machine learning model to predict issue quality (good vs bad).
-    
-    Args:
-        force: If True, train even if you have less than 200 labeled issues
-        use_advanced: Whether to use advanced features (embeddings, interactions, etc.)
-        use_stacking: Whether to use stacking ensemble (XGBoost + LightGBM + RF)
-        use_tuning: Whether to optimize hyperparameters
-        tune_iterations: Number of hyperparameter optimization iterations
-        legacy: If True, use legacy GradientBoosting model
-        
-    Returns:
-        Dictionary with training metrics
-    '''
+    """Train ML model to predict issue quality (good vs bad)."""
     
     if legacy:
         return train_legacy_model(force=force)
@@ -761,10 +684,9 @@ def train_model(
     profile_data = None
     try:
         profile_data = load_dev_profile()
-        print("Profile data loaded - will calculate match scores")
+        print("Profile data loaded")
     except FileNotFoundError:
-        print("Warning: Profile data not found (dev_profile.json)")
-        print("  Match score features will be 0.0")
+        print("Warning: Profile data not found")
     except Exception as e:
         print(f"Warning: Error loading profile data: {e}")
     
@@ -802,10 +724,9 @@ def train_model(
     print("STEP 5: SPLITTING DATA (TIME SERIES)")
     print("=" * 80)
     
-    # Use time series split for final train/test
     tscv = TimeSeriesSplit(n_splits=5)
     splits = list(tscv.split(X))
-    train_idx, test_idx = splits[-1]  # Use last fold for final split
+    train_idx, test_idx = splits[-1]
     
     X_train, X_test = X[train_idx], X[test_idx]
     y_train, y_test = y[train_idx], y[test_idx]

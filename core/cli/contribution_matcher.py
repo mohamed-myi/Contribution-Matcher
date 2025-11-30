@@ -1,11 +1,7 @@
 """
 Contribution Matcher CLI.
 
-Refactored to use:
-- Core repositories for database access
-- ScoringService for cached scoring
-- Celery tasks for background operations
-- Unified database layer
+Uses core repositories, ScoringService, Celery tasks, and unified database layer.
 """
 
 import argparse
@@ -16,14 +12,11 @@ from typing import Dict, List, Optional
 
 from dotenv import load_dotenv
 
-# Core imports - unified data layer
 from core.db import db
 from core.config import get_settings
 from core.repositories import IssueRepository, ProfileRepository, RepoMetadataRepository
 from core.services import ScoringService
 from core.cache import cache, CacheKeys
-
-# Legacy imports for backward compatibility
 from core.database import (
     init_db,
     replace_issue_technologies,
@@ -65,9 +58,7 @@ load_dotenv()
 def _init_database():
     """Initialize database (legacy SQLite + new ORM)."""
     try:
-        init_db()  # Legacy SQLite tables
-        
-        # Initialize new ORM database
+        init_db()
         settings = get_settings()
         if not db.is_initialized:
             db.initialize(settings.database_url)
@@ -80,27 +71,16 @@ def cmd_discover(args):
     """Discover new GitHub issues."""
     _init_database()
 
-    print(f"\n{'='*60}")
-    print("Searching for GitHub Issues")
-    print(f"{'='*60}\n")
+    print(f"\n{'='*60}\nSearching for GitHub Issues\n{'='*60}\n")
     
-    # Build search parameters
     labels = None
     if args.labels:
         labels = args.labels.split(",")
     
-    # Search for issues
     print(f"Searching GitHub for issues...")
-    issues = search_issues(
-        labels=labels,
-        language=args.language,
-        min_stars=args.stars,
-        limit=args.limit or 100
-    )
-    
+    issues = search_issues(labels=labels, language=args.language, min_stars=args.stars, limit=args.limit or 100)
     print(f"Found {len(issues)} issues")
     
-    # Batch collect repo info for efficient metadata fetching
     repo_list = []
     issue_repo_map = {}
     for issue in issues:
@@ -114,7 +94,6 @@ def cmd_discover(args):
                     repo_list.append(repo_key)
                 issue_repo_map[id(issue)] = repo_key
     
-    # Batch fetch repo metadata (uses GraphQL when possible)
     if repo_list:
         if args.verbose:
             print(f"Fetching metadata for {len(repo_list)} repositories...")
@@ -122,7 +101,6 @@ def cmd_discover(args):
     else:
         repo_metadata_batch = {}
     
-    # Process and store issues
     new_count = 0
     for issue in issues:
         try:
@@ -130,21 +108,15 @@ def cmd_discover(args):
             repo_key = issue_repo_map.get(issue_id_obj)
             repo_metadata = repo_metadata_batch.get(repo_key) if repo_key else None
             
-            # Check issue quality
             is_valid, quality_issues = check_issue_quality(issue, repo_metadata)
             if not is_valid and not args.no_quality_filters:
                 if args.verbose:
                     print(f"Skipping issue {issue.get('html_url', 'unknown')}: {', '.join(quality_issues)}")
                 continue
             
-            # Parse issue
             parsed = parse_issue(issue, repo_metadata)
-            
-            # Extract technologies
             issue_body = parsed.get("body", "") or ""
             category, technologies, keyword_counts = analyze_job_text(issue_body)
-            
-            # Store using legacy function (maintains CLI database)
             issue_id = upsert_issue(
                 title=parsed.get("title", ""),
                 url=parsed.get("url", ""),

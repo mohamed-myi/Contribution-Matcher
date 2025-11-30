@@ -145,7 +145,7 @@ export function MLTraining() {
             <CardHeader>
               <h3>Quick Labeling</h3>
               <span className="ml-keyboard-hint">
-                Use ← → or G/B keys
+                Use arrow keys or G/B
               </span>
             </CardHeader>
             <CardBody>
@@ -195,7 +195,7 @@ export function MLTraining() {
                 </div>
               ) : (
                 <div className="labeling-empty">
-                  <span className="labeling-empty-icon">✓</span>
+                  <span className="labeling-empty-icon">Done</span>
                   <p>All issues labeled!</p>
                   <Button variant="outline" onClick={fetchData}>
                     Refresh

@@ -35,7 +35,7 @@ export function Header() {
             onClick={toggleTheme}
             aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
           >
-            {theme === 'dark' ? '☀' : '☾'}
+            {theme === 'dark' ? 'Light' : 'Dark'}
           </button>
           {user && (
             <>

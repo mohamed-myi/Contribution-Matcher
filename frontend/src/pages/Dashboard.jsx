@@ -135,7 +135,7 @@ export function Dashboard() {
           <Card className="dashboard-card animate-slide-up stagger-1">
             <CardHeader>
               <h3>Top Matches</h3>
-              <Link to="/issues" className="dashboard-card-link">View All →</Link>
+              <Link to="/issues" className="dashboard-card-link">View All</Link>
             </CardHeader>
             <CardBody>
               {topMatches.length === 0 ? (

@@ -393,7 +393,7 @@ function IssueCard({ issue, onSelect, onBookmark, delay }) {
           }}
           aria-label={issue.is_bookmarked ? 'Remove bookmark' : 'Add bookmark'}
         >
-          {issue.is_bookmarked ? '★' : '☆'}
+          {issue.is_bookmarked ? '[*]' : '[ ]'}
         </button>
       </div>
 
@@ -402,7 +402,7 @@ function IssueCard({ issue, onSelect, onBookmark, delay }) {
       <div className="issue-card-repo">
         <span>{issue.repo_owner}/{issue.repo_name}</span>
         {issue.repo_stars && (
-          <span className="issue-card-stars">⭐ {issue.repo_stars.toLocaleString()}</span>
+          <span className="issue-card-stars">{issue.repo_stars.toLocaleString()} stars</span>
         )}
       </div>
 
@@ -528,7 +528,7 @@ function IssueDetailModal({ issue, onClose, onBookmark }) {
                 {issue.repo_owner}/{issue.repo_name} #{issue.issue_number}
               </a>
               {issue.repo_stars && (
-                <span>⭐ {issue.repo_stars.toLocaleString()}</span>
+                <span>{issue.repo_stars.toLocaleString()} stars</span>
               )}
             </div>
           </div>
@@ -624,7 +624,7 @@ function IssueDetailModal({ issue, onClose, onBookmark }) {
                 onClick={onBookmark}
                 className="action-btn-equal"
               >
-                {issue.is_bookmarked ? '★ Bookmarked' : '☆ Bookmark'}
+                {issue.is_bookmarked ? 'Bookmarked' : 'Bookmark'}
               </Button>
               <Button 
                 variant="primary"

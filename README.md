@@ -165,6 +165,18 @@ pytest tests/ -v -p no:asyncio
 
 See `docs/PROJECT_STATE.md` for detailed architecture and `docs/TODO.md` for remaining work.
 
+## Development Notes
+
+> **Note:** Most testing and development has been done locally, with commits intentionally kept minimal to maintain the stability of the GitHub Actions workflow responsible for daily issue discovery and data collection—critical for training the ML model.
+
+This repository represents a **proof of concept (POC)**. Some features are still a work in progress and are being actively developed in the background. The current GitHub state prioritizes:
+
+- Working issue discovery pipeline
+- Database population for ML training data
+- Frontend polish and additional UI features (in progress)
+- Full Celery worker deployment (in progress)
+- Production PostgreSQL/Redis infrastructure (in progress)
+
 ## Credits
 
 Created by Mohamed Ibrahim.

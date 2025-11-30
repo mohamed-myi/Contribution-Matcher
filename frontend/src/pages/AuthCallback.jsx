@@ -38,7 +38,7 @@ export function AuthCallback() {
     return (
       <AuthLayout>
         <div className="auth-callback-error animate-slide-up">
-          <div className="auth-callback-error-icon">✕</div>
+          <div className="auth-callback-error-icon">X</div>
           <h2>Authentication Failed</h2>
           <p>{error}</p>
           <a href="/login" className="auth-callback-retry">

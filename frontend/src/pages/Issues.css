@@ -56,17 +56,12 @@
   min-width: 180px;
 }
 
-.filter-checkbox label {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  cursor: pointer;
-}
-
-.filter-checkbox input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  accent-color: var(--primary);
+/* Bookmark filter button - match select/input height */
+.filter-bookmark-btn {
+  white-space: nowrap;
+  padding: var(--space-3) var(--space-4) !important;
+  min-height: auto !important;
+  font-size: var(--font-size-base) !important;
 }
 
 .issues-error {
@@ -122,23 +117,10 @@
   gap: var(--space-2);
 }
 
+/* Bookmark button on issue cards - uses Button component */
 .issue-bookmark-btn {
-  background: none;
-  border: none;
-  font-size: var(--font-size-xl);
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: var(--space-1);
-  transition: all var(--transition-fast);
-}
-
-.issue-bookmark-btn:hover {
-  color: var(--primary);
-  transform: scale(1.1);
-}
-
-.issue-bookmark-btn.bookmarked {
-  color: var(--primary);
+  font-size: var(--font-size-xs) !important;
+  padding: var(--space-1) var(--space-2) !important;
 }
 
 .issue-card-title {

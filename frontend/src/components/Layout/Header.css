@@ -128,3 +128,8 @@
   border-color: var(--primary);
 }
 
+.theme-icon {
+  width: 18px;
+  height: 18px;
+}
+

@@ -274,15 +274,16 @@ export function Issues() {
                 </select>
               </div>
 
-              <div className="filter-group filter-checkbox">
-                <label>
-                  <input 
-                    type="checkbox"
-                    checked={filters.bookmarked}
-                    onChange={(e) => handleFilterChange('bookmarked', e.target.checked)}
-                  />
-                  <span>Bookmarked Only</span>
-                </label>
+              <div className="filter-group">
+                <label>Filter</label>
+                <Button 
+                  variant={filters.bookmarked ? 'secondary' : 'outline'}
+                  size="sm"
+                  onClick={() => handleFilterChange('bookmarked', !filters.bookmarked)}
+                  className="filter-bookmark-btn"
+                >
+                  {filters.bookmarked ? 'Showing Bookmarked Only' : 'Bookmarked Only'}
+                </Button>
               </div>
 
               {hasActiveFilters && (
@@ -385,16 +386,18 @@ function IssueCard({ issue, onSelect, onBookmark, delay }) {
           <DifficultyBadge difficulty={issue.difficulty} size="sm" />
           <ScoreBadge score={issue.score || 0} size="sm" />
         </div>
-        <button 
-          className={`issue-bookmark-btn ${issue.is_bookmarked ? 'bookmarked' : ''}`}
+        <Button 
+          variant={issue.is_bookmarked ? 'secondary' : 'outline'}
+          size="sm"
           onClick={(e) => {
             e.stopPropagation();
             onBookmark();
           }}
           aria-label={issue.is_bookmarked ? 'Remove bookmark' : 'Add bookmark'}
+          className="issue-bookmark-btn"
         >
-          {issue.is_bookmarked ? '[*]' : '[ ]'}
-        </button>
+          {issue.is_bookmarked ? 'Bookmarked' : 'Bookmark'}
+        </Button>
       </div>
 
       <h3 className="issue-card-title">{issue.title}</h3>

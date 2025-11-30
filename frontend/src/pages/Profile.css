@@ -302,24 +302,24 @@
   border-top: 1px solid var(--border);
 }
 
-.delete-account-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: var(--space-6);
-  flex-wrap: wrap;
-}
-
-.delete-account-info h4 {
-  margin: 0 0 var(--space-2) 0;
+.delete-account-section h4 {
+  margin: 0 0 var(--space-4) 0;
   color: var(--text-primary);
 }
 
-.delete-account-info p {
+.delete-account-content {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.delete-account-description {
   margin: 0;
   color: var(--text-secondary);
   font-size: var(--font-size-sm);
-  max-width: 400px;
+  flex: 1;
+  min-width: 200px;
 }
 
 .delete-confirm {

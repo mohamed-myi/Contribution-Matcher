@@ -187,6 +187,20 @@ export function Profile() {
             <p>Manage your developer profile for better matching</p>
           </div>
           <div className="profile-actions">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf"
+              onChange={handleFileChange}
+              style={{ display: 'none' }}
+            />
+            <Button 
+              variant="outline" 
+              onClick={() => fileInputRef.current?.click()}
+              loading={uploadingResume}
+            >
+              Sync from Resume
+            </Button>
             <Button 
               variant="outline" 
               onClick={handleSyncFromGitHub}
@@ -248,13 +262,6 @@ export function Profile() {
                   onDrop={handleDrop}
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".pdf"
-                    onChange={handleFileChange}
-                    style={{ display: 'none' }}
-                  />
                   {uploadingResume ? (
                     <div className="upload-loading">
                       <span className="upload-spinner"></span>
@@ -506,11 +513,8 @@ export function Profile() {
 
         {/* Delete Account Section */}
         <div className="delete-account-section animate-slide-up">
+          <h4>Delete Account</h4>
           <div className="delete-account-content">
-            <div className="delete-account-info">
-              <h4>Delete Account</h4>
-              <p>Permanently delete your account and all associated data. This action cannot be undone.</p>
-            </div>
             {showDeleteConfirm ? (
               <div className="delete-confirm">
                 <p>Are you sure? This will permanently delete:</p>
@@ -537,12 +541,15 @@ export function Profile() {
                 </div>
               </div>
             ) : (
-              <Button 
-                variant="danger"
-                onClick={() => setShowDeleteConfirm(true)}
-              >
-                Delete Account
-              </Button>
+              <>
+                <p className="delete-account-description">Permanently delete your account and all associated data. This action cannot be undone.</p>
+                <Button 
+                  variant="danger"
+                  onClick={() => setShowDeleteConfirm(true)}
+                >
+                  Delete Account
+                </Button>
+              </>
             )}
           </div>
         </div>

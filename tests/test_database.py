@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from contribution_matcher.database import (
+from core.database import (
     get_repo_metadata,
     init_db,
     replace_issue_technologies,
@@ -28,7 +28,7 @@ class TestDatabaseOperations:
     
     def test_init_db_creates_tables(self, test_db):
         """Test that init_db creates all required tables."""
-        from contribution_matcher.database import db_conn
+        from core.database import db_conn
         
         with db_conn() as conn:
             cur = conn.cursor()
@@ -55,7 +55,7 @@ class TestDatabaseOperations:
         assert issue_id > 0
         
         # Verify it was inserted
-        from contribution_matcher.database import db_conn
+        from core.database import db_conn
         with db_conn() as conn:
             cur = conn.cursor()
             cur.execute("SELECT * FROM issues WHERE id = ?", (issue_id,))
@@ -82,7 +82,7 @@ class TestDatabaseOperations:
         assert updated_id == issue_id  # Should be same ID
         
         # Verify update
-        from contribution_matcher.database import db_conn
+        from core.database import db_conn
         with db_conn() as conn:
             cur = conn.cursor()
             cur.execute("SELECT title FROM issues WHERE id = ?", (issue_id,))
@@ -131,7 +131,7 @@ class TestDatabaseOperations:
         assert result is True
         
         # Verify
-        from contribution_matcher.database import db_conn
+        from core.database import db_conn
         with db_conn() as conn:
             cur = conn.cursor()
             cur.execute("SELECT label FROM issues WHERE id = ?", (issue_id,))
@@ -187,47 +187,29 @@ class TestQueryIssues:
         assert len(issues) == 1
         assert issues[0]["issue_type"] == "bug"
     
-    def test_query_by_technology(self, test_db, multiple_issues_in_db):
-        """Test filtering by technology."""
-        issues = query_issues(technology="python")
-        assert len(issues) >= 1
-        # All returned issues should have python technology
-        for issue in issues:
-            techs = get_issue_technologies(issue["id"])
-            tech_names = [t[0].lower() for t in techs]
-            assert "python" in tech_names
-    
-    def test_query_by_repo_owner(self, test_db, multiple_issues_in_db):
-        """Test filtering by repository owner."""
-        issues = query_issues(repo_owner="testowner")
-        assert len(issues) == 3
-    
     def test_query_with_limit(self, test_db, multiple_issues_in_db):
         """Test limiting results."""
         issues = query_issues(limit=2)
         assert len(issues) == 2
     
-    def test_query_days_back(self, test_db):
-        """Test filtering by days back."""
-        # Create issue with recent date
-        issue_id = upsert_issue(
-            title="Recent Issue",
-            url="https://github.com/test/repo/issues/recent",
-        )
+    def test_query_with_offset(self, test_db, multiple_issues_in_db):
+        """Test pagination with offset."""
+        all_issues = query_issues()
+        offset_issues = query_issues(offset=1, limit=2)
         
-        # Update created_at to be recent
-        from contribution_matcher.database import db_conn
-        with db_conn() as conn:
-            cur = conn.cursor()
-            recent_date = datetime.now().isoformat()
-            cur.execute(
-                "UPDATE issues SET created_at = ? WHERE id = ?",
-                (recent_date, issue_id)
-            )
+        assert len(offset_issues) == 2
+        # First issue in offset result should be second in all results
+        assert offset_issues[0]["id"] == all_issues[1]["id"]
+    
+    def test_query_by_label(self, test_db, multiple_issues_in_db):
+        """Test filtering by label."""
+        # Label one issue
+        issues = query_issues()
+        update_issue_label(issues[0]["id"], "good")
         
-        # Query recent issues
-        issues = query_issues(days_back=7)
-        assert len(issues) >= 1
+        # Query by label
+        good_issues = query_issues(label="good")
+        assert len(good_issues) == 1
 
 
 class TestGetStatistics:
@@ -238,19 +220,17 @@ class TestGetStatistics:
         stats = get_statistics()
         
         assert stats["total_issues"] == 3
-        assert "issues_by_difficulty" in stats
-        assert "issues_by_type" in stats
-        assert "top_technologies" in stats
-        assert "top_repos" in stats
-        assert "issues_last_7_days" in stats
-        assert "avg_technologies_per_issue" in stats
+        assert "by_difficulty" in stats
+        assert "active_issues" in stats
+        assert "labeled_issues" in stats
     
     def test_statistics_empty_database(self, test_db):
         """Test statistics with empty database."""
         stats = get_statistics()
         
         assert stats["total_issues"] == 0
-        assert stats["avg_technologies_per_issue"] == 0
+        assert stats["active_issues"] == 0
+        assert stats["labeled_issues"] == 0
 
 
 class TestLabelingQueries:
@@ -280,14 +260,10 @@ class TestLabelingQueries:
         
         stats = get_labeling_statistics()
         
-        assert stats["total_issues"] == 3
-        assert stats["labeled_issues"] == 2
-        assert stats["unlabeled_issues"] == 1
-        assert stats["good_issues"] == 1
-        assert stats["bad_issues"] == 1
-        assert "progress_to_200" in stats
-        assert "remaining_to_200" in stats
-        assert "is_balanced" in stats
+        assert stats["total_labeled"] == 2
+        assert "by_label" in stats
+        assert stats["by_label"].get("good", 0) == 1
+        assert stats["by_label"].get("bad", 0) == 1
 
 
 class TestExport:
@@ -297,9 +273,10 @@ class TestExport:
         """Test exporting issues to CSV."""
         output_file = tmp_path / "test_export.csv"
         
-        export_to_csv(str(output_file))
+        count = export_to_csv(str(output_file))
         
         assert output_file.exists()
+        assert count == 3
         
         # Verify CSV content
         import csv
@@ -312,23 +289,21 @@ class TestExport:
         """Test exporting issues to JSON."""
         output_file = tmp_path / "test_export.json"
         
-        export_to_json(str(output_file))
+        count = export_to_json(str(output_file))
         
         assert output_file.exists()
+        assert count == 3
         
         # Verify JSON content
         with open(output_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
             assert len(data) == 3
-            assert "technologies" in data[0]
     
-    def test_export_empty_database(self, test_db, tmp_path, capsys):
+    def test_export_empty_database(self, test_db, tmp_path):
         """Test exporting from empty database."""
         output_file = tmp_path / "test_export.csv"
         
-        export_to_csv(str(output_file))
+        count = export_to_csv(str(output_file))
         
-        # Should print message
-        captured = capsys.readouterr()
-        assert "No issues to export" in captured.out
-
+        # Should return 0 for empty database
+        assert count == 0

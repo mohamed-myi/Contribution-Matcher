@@ -1,0 +1,130 @@
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle texture overlay */
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.02) 0%,
+    transparent 50%,
+    rgba(0, 0, 0, 0.05) 100%
+  );
+  pointer-events: none;
+}
+
+/* Variants */
+.card-default {
+  background: var(--surface);
+}
+
+.card-elevated {
+  background: var(--surface-elevated);
+  box-shadow: var(--shadow-md);
+}
+
+.card-outlined {
+  background: transparent;
+  border: 1px solid var(--border-strong);
+}
+
+.card-glass {
+  background: rgba(61, 46, 40, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Padding */
+.card-padding-none {
+  padding: 0;
+}
+
+.card-padding-sm {
+  padding: var(--space-3);
+}
+
+.card-padding-md {
+  padding: var(--space-5);
+}
+
+.card-padding-lg {
+  padding: var(--space-8);
+}
+
+/* Hover Effect */
+.card-hover {
+  transition: transform var(--transition-fast), 
+              box-shadow var(--transition-fast),
+              border-color var(--transition-fast);
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--border-strong);
+}
+
+/* Glow Effect */
+.card-glow {
+  box-shadow: var(--shadow-glow);
+}
+
+/* Clickable */
+.card-clickable {
+  cursor: pointer;
+}
+
+.card-clickable:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(203, 152, 79, 0.4);
+}
+
+/* Card Sections */
+.card-header {
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.card-body {
+  padding: var(--space-5);
+}
+
+.card-footer {
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+/* Nested padding adjustments */
+.card-padding-none .card-header,
+.card-padding-none .card-body,
+.card-padding-none .card-footer {
+  /* Keep section padding */
+}
+
+.card-padding-sm .card-header,
+.card-padding-sm .card-body,
+.card-padding-sm .card-footer {
+  padding: var(--space-3);
+}
+
+.card-padding-lg .card-header,
+.card-padding-lg .card-body,
+.card-padding-lg .card-footer {
+  padding: var(--space-6) var(--space-8);
+}
+

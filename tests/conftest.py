@@ -13,8 +13,8 @@ import pytest
 # Set test database path before importing database module
 os.environ["CONTRIBUTION_MATCHER_DB_PATH"] = "test_contribution_matcher.db"
 
-from contribution_matcher.database import init_db, upsert_issue, replace_issue_technologies, update_issue_label, upsert_repo_metadata
-from contribution_matcher.profile import save_dev_profile
+from core.database import init_db, upsert_issue, replace_issue_technologies, update_issue_label, upsert_repo_metadata
+from core.profile import save_dev_profile
 
 
 @pytest.fixture(scope="function")

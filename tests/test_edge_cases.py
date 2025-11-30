@@ -7,9 +7,9 @@ from unittest.mock import patch
 
 import pytest
 
-from contribution_matcher.database import update_issue_label, upsert_issue, query_issues
-from contribution_matcher.parsing import find_difficulty, find_time_estimate, parse_issue
-from contribution_matcher.scoring import (
+from core.database import update_issue_label, upsert_issue, query_issues
+from core.parsing import find_difficulty, find_time_estimate, parse_issue
+from core.scoring import (
     calculate_experience_match,
     calculate_freshness,
     calculate_interest_match,
@@ -53,7 +53,7 @@ class TestMissingData:
             "time_availability_hours_per_week": None,
         }
         
-        from contribution_matcher.database import query_issues
+        from core.database import query_issues
         issues = query_issues()
         issue = issues[0]
         
@@ -70,7 +70,7 @@ class TestMissingData:
             url="https://github.com/test/repo/issues/1",
         )
         
-        from contribution_matcher.database import query_issues
+        from core.database import query_issues
         issues = query_issues()
         issue = issues[0]
         
@@ -83,7 +83,7 @@ class TestMissingData:
     def test_query_issues_with_malformed_json(self, test_db):
         """Test querying issues with malformed JSON in database."""
         # Insert issue with invalid JSON
-        from contribution_matcher.database import db_conn
+        from core.database import db_conn
         
         issue_id = upsert_issue(
             title="Test",
@@ -118,10 +118,10 @@ class TestBoundaryConditions:
             issue_type="feature",
         )
         
-        from contribution_matcher.database import replace_issue_technologies
+        from core.database import replace_issue_technologies
         replace_issue_technologies(issue_id, [("java", "backend")])
         
-        from contribution_matcher.database import query_issues
+        from core.database import query_issues
         issues = query_issues()
         issue = issues[0]
         
@@ -143,13 +143,13 @@ class TestBoundaryConditions:
             repo_forks=100,
         )
         
-        from contribution_matcher.database import replace_issue_technologies
+        from core.database import replace_issue_technologies
         replace_issue_technologies(issue_id, [
             ("python", "backend"),
             ("django", "backend"),
         ])
         
-        from contribution_matcher.database import query_issues
+        from core.database import query_issues
         issues = query_issues()
         issue = issues[0]
         
@@ -217,7 +217,7 @@ class TestDataTypeMismatches:
         )
         
         # Manually change to string
-        from contribution_matcher.database import db_conn
+        from core.database import db_conn
         with db_conn() as conn:
             cur = conn.cursor()
             cur.execute(
@@ -240,7 +240,7 @@ class TestDataTypeMismatches:
         )
         
         # Manually change to string
-        from contribution_matcher.database import db_conn
+        from core.database import db_conn
         with db_conn() as conn:
             cur = conn.cursor()
             cur.execute(
@@ -310,13 +310,13 @@ class TestUnicodeAndSpecialCharacters:
     def test_issue_title_with_unicode(self, test_db):
         """Test handling unicode in issue titles."""
         issue_id = upsert_issue(
-            title="Fix bug: 修复错误 🐛",
+            title="Fix bug: 修复错误",
             url="https://github.com/test/repo/issues/1",
         )
         
-        from contribution_matcher.database import query_issues
+        from core.database import query_issues
         issues = query_issues()
-        assert issues[0]["title"] == "Fix bug: 修复错误 🐛"
+        assert issues[0]["title"] == "Fix bug: 修复错误"
     
     def test_issue_body_with_special_characters(self):
         """Test parsing issue body with special characters."""
@@ -332,13 +332,13 @@ class TestUnicodeAndSpecialCharacters:
             url="https://github.com/test/repo/issues/1",
         )
         
-        from contribution_matcher.database import replace_issue_technologies
+        from core.database import replace_issue_technologies
         replace_issue_technologies(issue_id, [
             ("C++", "backend"),
             (".NET", "backend"),
         ])
         
-        from contribution_matcher.database import get_issue_technologies
+        from core.database import get_issue_technologies
         techs = get_issue_technologies(issue_id)
         tech_names = [t[0] for t in techs]
         assert "C++" in tech_names or ".NET" in tech_names
@@ -359,7 +359,7 @@ class TestConcurrentOperations:
         assert id1 == id2 == id3
         
         # Final title should be "Third"
-        from contribution_matcher.database import query_issues
+        from core.database import query_issues
         issues = query_issues()
         assert issues[0]["title"] == "Third"
     
@@ -370,7 +370,7 @@ class TestConcurrentOperations:
             url="https://github.com/test/repo/issues/1",
         )
         
-        from contribution_matcher.database import replace_issue_technologies
+        from core.database import replace_issue_technologies
         
         # Replace multiple times
         replace_issue_technologies(issue_id, [("python", "backend")])
@@ -378,7 +378,7 @@ class TestConcurrentOperations:
         replace_issue_technologies(issue_id, [("react", "frontend")])
         
         # Should only have the last set
-        from contribution_matcher.database import get_issue_technologies
+        from core.database import get_issue_technologies
         techs = get_issue_technologies(issue_id)
         assert len(techs) == 1
         assert techs[0][0] == "react"

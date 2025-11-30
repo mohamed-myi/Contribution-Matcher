@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from contribution_matcher.scoring import (
+from core.scoring import (
     calculate_experience_match,
     calculate_freshness,
     calculate_interest_match,
@@ -322,7 +322,7 @@ class TestGetMatchBreakdown:
     
     def test_complete_breakdown(self, test_db, sample_profile, sample_issue_in_db):
         """Test getting complete match breakdown."""
-        from contribution_matcher.database import query_issues
+        from core.database import query_issues
         
         issues = query_issues()
         issue = issues[0]
@@ -344,12 +344,12 @@ class TestGetMatchBreakdown:
 class TestScoreIssueAgainstProfile:
     """Tests for overall issue scoring."""
     
-    @patch('contribution_matcher.scoring.ml_trainer.predict_issue_quality')
+    @patch('core.scoring.ml_trainer.predict_issue_quality')
     def test_score_without_ml(self, mock_predict, test_db, sample_profile, sample_issue_in_db):
         """Test scoring without ML model."""
         mock_predict.return_value = (0.5, 0.5)  # Neutral prediction
         
-        from contribution_matcher.database import query_issues
+        from core.database import query_issues
         
         issues = query_issues()
         issue = issues[0]
@@ -361,12 +361,12 @@ class TestScoreIssueAgainstProfile:
         assert 0 <= result["score"] <= 100
         assert "ml_prediction" in result["breakdown"]
     
-    @patch('contribution_matcher.scoring.issue_scorer.predict_issue_quality')
+    @patch('core.scoring.issue_scorer.predict_issue_quality')
     def test_score_with_ml_boost(self, mock_predict, test_db, sample_profile, sample_issue_in_db):
         """Test scoring with ML prediction boost."""
         mock_predict.return_value = (0.9, 0.1)  # High confidence good
         
-        from contribution_matcher.database import query_issues
+        from core.database import query_issues
         
         issues = query_issues()
         issue = issues[0]
@@ -377,12 +377,12 @@ class TestScoreIssueAgainstProfile:
         assert result["score"] > 0
         assert result["breakdown"]["ml_prediction"]["adjustment"] > 0
     
-    @patch('contribution_matcher.scoring.issue_scorer.predict_issue_quality')
+    @patch('core.scoring.issue_scorer.predict_issue_quality')
     def test_score_with_ml_penalty(self, mock_predict, test_db, sample_profile, sample_issue_in_db):
         """Test scoring with ML prediction penalty."""
         mock_predict.return_value = (0.1, 0.9)  # High confidence bad
         
-        from contribution_matcher.database import query_issues
+        from core.database import query_issues
         
         issues = query_issues()
         issue = issues[0]
@@ -394,7 +394,7 @@ class TestScoreIssueAgainstProfile:
     
     def test_score_clamped_to_100(self, test_db, sample_profile, sample_issue_in_db):
         """Test that scores are clamped to 100 maximum."""
-        from contribution_matcher.database import query_issues
+        from core.database import query_issues
         
         issues = query_issues()
         issue = issues[0]

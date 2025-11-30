@@ -1,0 +1,259 @@
+# =============================================================================
+# Contribution Matcher - Docker Compose Configuration
+# =============================================================================
+# 
+# Services:
+#   - api: FastAPI application
+#   - worker-discovery: Celery worker for GitHub API (rate limited)
+#   - worker-scoring: Celery worker for scoring (parallel)
+#   - worker-ml: Celery worker for ML training (single)
+#   - scheduler: Celery beat for periodic tasks
+#   - postgres: PostgreSQL 15 database
+#   - redis: Redis 7 for caching and Celery broker
+#
+# Usage:
+#   docker-compose up -d              # Start all services
+#   docker-compose up -d api postgres redis  # Start minimal stack
+#   docker-compose logs -f api        # Follow API logs
+#   docker-compose exec api alembic upgrade head  # Run migrations
+#
+# =============================================================================
+
+version: "3.9"
+
+services:
+  # ===========================================================================
+  # API Service
+  # ===========================================================================
+  api:
+    build:
+      context: .
+      target: api
+    container_name: cm-api
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-8000}:8000"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-contribution_matcher}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+      - TOKEN_ENCRYPTION_KEY=${TOKEN_ENCRYPTION_KEY:-}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
+      - PAT_TOKEN=${PAT_TOKEN:-}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+      - DEBUG=${DEBUG:-false}
+      - JSON_LOGS=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - cm-network
+    volumes:
+      - ./models:/app/models:ro  # ML models (read-only)
+
+  # ===========================================================================
+  # Celery Worker - Discovery (GitHub API, rate limited)
+  # ===========================================================================
+  worker-discovery:
+    build:
+      context: .
+      target: worker-discovery
+    container_name: cm-worker-discovery
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-contribution_matcher}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - PAT_TOKEN=${PAT_TOKEN:-}
+      - JSON_LOGS=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - cm-network
+
+  # ===========================================================================
+  # Celery Worker - Scoring (parallel processing)
+  # ===========================================================================
+  worker-scoring:
+    build:
+      context: .
+      target: worker-scoring
+    container_name: cm-worker-scoring
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-contribution_matcher}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - JSON_LOGS=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - cm-network
+    volumes:
+      - ./models:/app/models:ro
+
+  # ===========================================================================
+  # Celery Worker - ML (single worker, memory intensive)
+  # ===========================================================================
+  worker-ml:
+    build:
+      context: .
+      target: worker-ml
+    container_name: cm-worker-ml
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-contribution_matcher}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - JSON_LOGS=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - cm-network
+    volumes:
+      - ./models:/app/models  # ML models (read-write for training)
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  # ===========================================================================
+  # Celery Beat Scheduler
+  # ===========================================================================
+  scheduler:
+    build:
+      context: .
+      target: scheduler
+    container_name: cm-scheduler
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-contribution_matcher}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - JSON_LOGS=true
+    depends_on:
+      - redis
+    networks:
+      - cm-network
+
+  # ===========================================================================
+  # PostgreSQL Database
+  # ===========================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: cm-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-contribution_matcher}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-contribution_matcher}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - cm-network
+
+  # ===========================================================================
+  # Redis Cache & Message Broker
+  # ===========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: cm-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - cm-network
+
+  # ===========================================================================
+  # Frontend (optional - for local development)
+  # ===========================================================================
+  frontend:
+    image: node:20-alpine
+    container_name: cm-frontend
+    working_dir: /app
+    profiles:
+      - frontend  # Only start with: docker-compose --profile frontend up
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    volumes:
+      - ./frontend:/app
+      - frontend-node-modules:/app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:${API_PORT:-8000}
+    depends_on:
+      - api
+    networks:
+      - cm-network
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  postgres-data:
+    name: cm-postgres-data
+  redis-data:
+    name: cm-redis-data
+  frontend-node-modules:
+    name: cm-frontend-node-modules
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  cm-network:
+    name: cm-network
+    driver: bridge
+

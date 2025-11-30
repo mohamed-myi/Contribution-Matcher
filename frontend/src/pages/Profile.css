@@ -1,0 +1,355 @@
+.profile-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.profile-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.profile-header h1 {
+  margin-bottom: var(--space-1);
+}
+
+.profile-header p {
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.profile-actions {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.profile-error {
+  padding: var(--space-4);
+  background: var(--error-bg);
+  border: 1px solid var(--error);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.profile-error p {
+  margin: 0;
+  color: var(--error);
+}
+
+/* Empty State */
+.profile-empty {
+  max-width: 500px;
+  margin: var(--space-8) auto;
+}
+
+.profile-empty-content {
+  text-align: center;
+  padding: var(--space-8);
+}
+
+.profile-empty-icon {
+  font-size: 4rem;
+  margin-bottom: var(--space-4);
+  display: block;
+}
+
+.profile-empty-content h3 {
+  margin-bottom: var(--space-2);
+}
+
+.profile-empty-content p {
+  color: var(--text-secondary);
+  margin-bottom: var(--space-6);
+}
+
+.profile-empty-actions {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-3);
+}
+
+/* Profile Grid */
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--space-4);
+}
+
+.profile-card {
+  min-height: 150px;
+}
+
+/* Tag Input */
+.tag-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.tag-input-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.tag-input-row input {
+  flex: 1;
+}
+
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.tag-remove {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  margin-left: var(--space-1);
+  opacity: 0.7;
+  font-size: 1.1em;
+}
+
+.tag-remove:hover {
+  opacity: 1;
+}
+
+.no-data {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Radio Group */
+.radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.radio-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  cursor: pointer;
+  padding: var(--space-3);
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast);
+}
+
+.radio-option:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.radio-option input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+}
+
+.radio-label {
+  text-transform: capitalize;
+}
+
+/* Slider */
+.slider-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.slider-group input[type="range"] {
+  width: 100%;
+  height: 8px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: var(--radius-full);
+  outline: none;
+}
+
+.slider-group input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  background: var(--primary);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+
+.slider-group input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+}
+
+.slider-value {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+/* Time Display */
+.time-display {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.time-value {
+  font-size: var(--font-size-3xl);
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.time-label {
+  color: var(--text-secondary);
+}
+
+/* Resume Upload */
+.profile-divider {
+  display: flex;
+  align-items: center;
+  margin: var(--space-6) 0;
+  color: var(--text-muted);
+}
+
+.profile-divider::before,
+.profile-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.profile-divider span {
+  padding: 0 var(--space-4);
+  font-size: var(--font-size-sm);
+}
+
+.resume-upload-zone {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-8);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.resume-upload-zone:hover {
+  border-color: var(--primary);
+  background: rgba(var(--primary-rgb), 0.05);
+}
+
+.resume-upload-zone.drag-active {
+  border-color: var(--primary);
+  background: rgba(var(--primary-rgb), 0.1);
+  transform: scale(1.02);
+}
+
+.upload-icon {
+  font-size: 2rem;
+  color: var(--primary);
+  font-weight: 700;
+  padding: var(--space-3) var(--space-4);
+  background: rgba(var(--primary-rgb), 0.1);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-2);
+}
+
+.resume-upload-zone p {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.upload-hint {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
+.upload-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.upload-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Delete Account Section */
+.delete-account-section {
+  margin-top: var(--space-8);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--border);
+}
+
+.delete-account-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-6);
+  flex-wrap: wrap;
+}
+
+.delete-account-info h4 {
+  margin: 0 0 var(--space-2) 0;
+  color: var(--text-primary);
+}
+
+.delete-account-info p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  max-width: 400px;
+}
+
+.delete-confirm {
+  padding: var(--space-4);
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-md);
+  max-width: 400px;
+}
+
+.delete-confirm p {
+  margin: 0 0 var(--space-3) 0;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.delete-confirm ul {
+  margin: 0 0 var(--space-4) 0;
+  padding-left: var(--space-5);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.delete-confirm li {
+  margin-bottom: var(--space-1);
+}
+
+.delete-confirm-actions {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+

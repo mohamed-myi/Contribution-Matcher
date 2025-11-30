@@ -1,0 +1,89 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+  text-transform: capitalize;
+}
+
+/* Sizes */
+.badge-sm {
+  font-size: var(--font-size-xs);
+  padding: 2px var(--space-2);
+  min-height: 20px;
+}
+
+.badge-md {
+  font-size: var(--font-size-sm);
+  padding: var(--space-1) var(--space-3);
+  min-height: 24px;
+}
+
+.badge-lg {
+  font-size: var(--font-size-base);
+  padding: var(--space-2) var(--space-4);
+  min-height: 32px;
+}
+
+/* Variants */
+.badge-default {
+  background: var(--surface-elevated);
+  color: var(--text-secondary);
+}
+
+.badge-primary {
+  background: rgba(203, 152, 79, 0.2);
+  color: var(--primary);
+}
+
+.badge-success {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.badge-warning {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+
+.badge-error {
+  background: var(--error-bg);
+  color: var(--error);
+}
+
+.badge-info {
+  background: var(--info-bg);
+  color: var(--info);
+}
+
+.badge-muted {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-muted);
+}
+
+/* Difficulty Variants */
+.badge-beginner {
+  background: var(--beginner-bg);
+  color: var(--beginner);
+}
+
+.badge-intermediate {
+  background: var(--intermediate-bg);
+  color: var(--intermediate);
+}
+
+.badge-advanced {
+  background: var(--advanced-bg);
+  color: var(--advanced);
+}
+
+/* Tech Badge */
+.badge-tech {
+  background: rgba(95, 61, 31, 0.5);
+  color: var(--sand-light);
+  border: 1px solid rgba(203, 152, 79, 0.2);
+}
+

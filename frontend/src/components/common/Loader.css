@@ -1,0 +1,89 @@
+.loader {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loader-spinner {
+  animation: spin 1.2s linear infinite;
+}
+
+.loader-spinner svg {
+  display: block;
+}
+
+/* Sizes */
+.loader-sm .loader-spinner svg {
+  width: 20px;
+  height: 20px;
+}
+
+.loader-md .loader-spinner svg {
+  width: 32px;
+  height: 32px;
+}
+
+.loader-lg .loader-spinner svg {
+  width: 48px;
+  height: 48px;
+}
+
+/* Spinner Colors */
+.loader-track {
+  stroke: var(--surface-elevated);
+}
+
+.loader-progress {
+  stroke: var(--primary);
+  stroke-dasharray: 80, 200;
+  stroke-dashoffset: 0;
+}
+
+/* Page Loader */
+.page-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  min-height: 200px;
+  padding: var(--space-8);
+}
+
+.page-loader-message {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  margin: 0;
+}
+
+/* Skeleton Loader */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--surface) 25%,
+    var(--surface-elevated) 50%,
+    var(--surface) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-sm);
+}
+
+.skeleton-text {
+  height: 1em;
+  border-radius: var(--radius-sm);
+}
+
+.skeleton-circle {
+  border-radius: 50%;
+}
+
+.skeleton-rect {
+  border-radius: var(--radius-md);
+}
+
+.skeleton-card {
+  border-radius: var(--radius-lg);
+  min-height: 120px;
+}
+

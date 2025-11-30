@@ -1,0 +1,493 @@
+.issues-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.issues-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.issues-header h1 {
+  margin-bottom: var(--space-1);
+}
+
+.issues-header p {
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.issues-header-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* Filters */
+.issues-filters {
+  position: sticky;
+  top: 80px;
+  z-index: 10;
+}
+
+.filters-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-4);
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.filter-group label {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.filter-group select,
+.filter-group input[type="text"] {
+  min-width: 180px;
+}
+
+.filter-checkbox label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+
+.filter-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+}
+
+.issues-error {
+  padding: var(--space-4);
+  background: var(--error-bg);
+  border: 1px solid var(--error);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.issues-error p {
+  margin: 0;
+  color: var(--error);
+}
+
+/* Issues Grid */
+.issues-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-4);
+}
+
+.issues-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: var(--space-12);
+  color: var(--text-muted);
+}
+
+.issues-empty p {
+  margin: var(--space-2) 0;
+}
+
+/* Issue Card */
+.issue-card {
+  padding: var(--space-5);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.issue-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.issue-card-badges {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.issue-bookmark-btn {
+  background: none;
+  border: none;
+  font-size: var(--font-size-xl);
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: var(--space-1);
+  transition: all var(--transition-fast);
+}
+
+.issue-bookmark-btn:hover {
+  color: var(--primary);
+  transform: scale(1.1);
+}
+
+.issue-bookmark-btn.bookmarked {
+  color: var(--primary);
+}
+
+.issue-card-title {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  margin: 0;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.issue-card-repo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+
+.issue-card-stars {
+  color: var(--primary);
+}
+
+.issue-card-description {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.issue-card-techs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: auto;
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-modal);
+  padding: var(--space-4);
+}
+
+.modal-content {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  max-width: 700px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+}
+
+.modal-close {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  background: none;
+  border: none;
+  font-size: var(--font-size-2xl);
+  color: var(--text-muted);
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all var(--transition-fast);
+}
+
+.modal-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+/* Issue Detail */
+.issue-detail {
+  padding: var(--space-6);
+}
+
+.issue-detail-header {
+  margin-bottom: var(--space-6);
+}
+
+.issue-detail-badges {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.issue-detail-header h2 {
+  margin-bottom: var(--space-2);
+  padding-right: var(--space-8);
+}
+
+.issue-detail-repo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+
+.issue-detail-repo a {
+  color: var(--primary);
+}
+
+.issue-detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  margin-bottom: var(--space-6);
+}
+
+.issue-detail-body section h4 {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  margin-bottom: var(--space-3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.issue-detail-body section p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.issue-detail-techs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* Score Breakdown */
+.score-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.score-item {
+  display: grid;
+  grid-template-columns: 140px 1fr 50px;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.score-item-label {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.score-item-bar {
+  height: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.score-item-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: var(--radius-full);
+  transition: width var(--transition-slow);
+}
+
+.score-item-value {
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  text-align: right;
+}
+
+/* Actions */
+.issue-detail-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+/* Main action buttons row (Bookmark + Open in GitHub) */
+.action-buttons-row {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.action-btn-equal {
+  flex: 1;
+  justify-content: center;
+}
+
+/* Like/Dislike buttons - far left and far right */
+.preference-buttons {
+  display: flex;
+  justify-content: space-between;
+}
+
+/* Label Buttons - muted style distinct from other buttons */
+.label-btn {
+  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), 
+              box-shadow 0.15s ease,
+              background-color 0.15s ease,
+              border-color 0.15s ease;
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: var(--text-secondary);
+}
+
+.label-btn:active {
+  transform: scale(0.96);
+}
+
+.label-btn:not(:disabled):hover {
+  transform: scale(1.02);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: var(--text-primary);
+}
+
+/* Active/Selected state for Like/Dislike */
+.label-btn-active {
+  background: rgba(var(--primary-rgb), 0.15);
+  border-color: var(--primary);
+  color: var(--primary);
+  box-shadow: 0 0 8px rgba(var(--primary-rgb), 0.3);
+}
+
+.label-btn-active:not(:disabled):hover {
+  background: rgba(var(--primary-rgb), 0.2);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* Issues Count */
+.issues-count {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  padding: var(--space-2) 0;
+}
+
+/* Load More */
+.issues-load-more {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-6) 0;
+}
+
+.issues-load-more button {
+  min-width: 200px;
+}
+
+/* Notes Section */
+.notes-section {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.notes-add {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.notes-add textarea {
+  width: 100%;
+  padding: var(--space-3);
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  resize: vertical;
+}
+
+.notes-add textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.notes-add button {
+  align-self: flex-end;
+}
+
+.notes-loading,
+.notes-empty {
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  font-style: italic;
+}
+
+.notes-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.note-item {
+  padding: var(--space-3);
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: var(--radius-md);
+}
+
+.note-content {
+  margin: 0 0 var(--space-2) 0;
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+
+.note-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.note-date {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
+.note-delete {
+  background: none;
+  border: none;
+  color: var(--error);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast);
+}
+
+.note-delete:hover {
+  background: rgba(var(--error-rgb), 0.1);
+}
+

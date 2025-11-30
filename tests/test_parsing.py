@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from contribution_matcher.parsing import (
+from core.parsing import (
     classify_issue_type,
     find_difficulty,
     find_technologies,

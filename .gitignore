@@ -42,5 +42,7 @@ Thumbs.db
 
 
 *.log
-docs/COMMAND_REFERENCE.md
-IMPLEMENTATION_STATUS.md 
+
+# Documentation (except README)
+*.md
+!README.md 

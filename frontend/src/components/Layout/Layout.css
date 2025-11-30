@@ -1,0 +1,33 @@
+.layout {
+  min-height: 100vh;
+}
+
+.layout-main {
+  padding-top: 64px; /* Header height */
+  min-height: 100vh;
+}
+
+.layout-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: var(--space-6);
+  position: relative;
+  z-index: 2;
+}
+
+/* Auth Layout (Login page) */
+.auth-layout {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-layout-main {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 440px;
+  padding: var(--space-4);
+}
+

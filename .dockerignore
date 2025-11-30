@@ -1,0 +1,76 @@
+# =============================================================================
+# Docker Ignore File
+# =============================================================================
+
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+.env
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv
+.venv
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.cursor/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Frontend build (use pre-built)
+frontend/node_modules/
+frontend/.vite/
+
+# Local files
+*.db
+*.sqlite
+*.sqlite3
+*.log
+*.local
+
+# Docker
+docker-compose*.yml
+Dockerfile*
+.docker/
+
+# Models (mount as volume instead)
+models/
+
+# Tests
+tests/
+
+# Misc
+.DS_Store
+Thumbs.db
+*.bak
+*.tmp
+

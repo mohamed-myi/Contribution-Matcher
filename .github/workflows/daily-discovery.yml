@@ -10,6 +10,7 @@ on:
 jobs:
   discover-issues:
     runs-on: ubuntu-latest
+    timeout-minutes: 45  # Allow time for multi-strategy discovery
     permissions:
       contents: write
     
@@ -30,20 +31,91 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
       
-      - name: Run issue discovery
+      # Multi-strategy discovery for variety
+      - name: Discover beginner-friendly issues
+        timeout-minutes: 10
+        env:
+          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
+          FAST_DISCOVERY: "true"
+          CACHE_VALIDITY_DAYS: "7"
+        run: |
+          echo "=== Discovering beginner-friendly issues ==="
+          python main.py discover --limit 15 --labels "good first issue,beginner-friendly,first-timers-only"
+        continue-on-error: true
+      
+      - name: Discover help wanted issues
+        timeout-minutes: 10
+        env:
+          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
+          FAST_DISCOVERY: "true"
+          CACHE_VALIDITY_DAYS: "7"
+        run: |
+          echo "=== Discovering help wanted issues ==="
+          python main.py discover --limit 15 --labels "help wanted,contributions welcome,up-for-grabs"
+        continue-on-error: true
+      
+      - name: Discover Python issues
+        timeout-minutes: 10
+        env:
+          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
+          FAST_DISCOVERY: "true"
+          CACHE_VALIDITY_DAYS: "7"
+        run: |
+          echo "=== Discovering Python issues ==="
+          python main.py discover --limit 10 --language python --labels "good first issue"
+        continue-on-error: true
+      
+      - name: Discover JavaScript/TypeScript issues
+        timeout-minutes: 10
+        env:
+          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
+          FAST_DISCOVERY: "true"
+          CACHE_VALIDITY_DAYS: "7"
+        run: |
+          echo "=== Discovering JavaScript/TypeScript issues ==="
+          python main.py discover --limit 10 --language javascript --labels "good first issue"
+        continue-on-error: true
+      
+      - name: Clean up stale issues
+        timeout-minutes: 5
         env:
           PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
-          python main.py discover --limit 100
+          echo "=== Cleaning up stale (closed) issues ==="
+          python main.py cleanup-stale --limit 30
+        continue-on-error: true
+      
+      - name: Score issues against profile
+        timeout-minutes: 5
+        env:
+          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          # Check if profile exists
+          if [ -f "dev_profile.json" ]; then
+            python main.py score --top 20 --format json > top_matches.json || echo "Scoring completed with warnings"
+          else
+            echo "No profile found, skipping scoring"
+          fi
+        continue-on-error: true
       
       - name: Display results
         run: |
+          echo "=== Statistics ==="
           python main.py stats
+          echo ""
+          echo "=== Variety Statistics ==="
+          python main.py variety-stats
+          if [ -f "top_matches.json" ]; then
+            echo "Top matches saved to top_matches.json"
+          fi
       
       - name: Commit database changes
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add contribution_matcher.db
-          git diff --staged --quiet || (git commit -m "Update issue database [skip ci]" && git push)
+          if [ -f "top_matches.json" ]; then
+            git add top_matches.json
+          fi
+          git diff --staged --quiet || (git commit -m "Update issue database and top matches [skip ci]" && git push)
 

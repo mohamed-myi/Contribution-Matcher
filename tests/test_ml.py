@@ -10,7 +10,7 @@ import pytest
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.preprocessing import StandardScaler
 
-from contribution_matcher.scoring import extract_features, load_labeled_issues, predict_issue_quality, train_model
+from core.scoring import extract_features, load_labeled_issues, predict_issue_quality, train_model
 
 
 class TestExtractFeatures:
@@ -18,14 +18,14 @@ class TestExtractFeatures:
     
     def test_extract_features_with_profile(self, test_db, sample_profile, sample_issue_in_db):
         """Test extracting features when profile is available."""
-        from contribution_matcher.database import query_issues
+        from core.database import query_issues
         
         issues = query_issues()
         issue = issues[0]
         
-        features = extract_features(issue, sample_profile)
+        features = extract_features(issue, sample_profile, use_advanced=False)
         
-        assert len(features) == 15  # Should have 15 features
+        assert len(features) == 14  # Should have 14 base features
         assert all(isinstance(f, (int, float)) for f in features)
         
         # Feature 1: Number of technologies
@@ -36,14 +36,14 @@ class TestExtractFeatures:
     
     def test_extract_features_without_profile(self, test_db, sample_issue_in_db):
         """Test extracting features when profile is missing."""
-        from contribution_matcher.database import query_issues
+        from core.database import query_issues
         
         issues = query_issues()
         issue = issues[0]
         
-        features = extract_features(issue, None)
+        features = extract_features(issue, None, use_advanced=False)
         
-        assert len(features) == 15
+        assert len(features) == 14
         
         # Features 2-8 should be 0.0 without profile
         assert all(f == 0.0 for f in features[1:8])
@@ -54,7 +54,7 @@ class TestExtractFeatures:
     
     def test_extract_features_issue_type_encoding(self, test_db, sample_profile):
         """Test that issue types are properly encoded."""
-        from contribution_matcher.database import upsert_issue
+        from core.database import upsert_issue
         
         # Create issues with different types
         bug_id = upsert_issue(
@@ -68,21 +68,21 @@ class TestExtractFeatures:
             issue_type="feature",
         )
         
-        from contribution_matcher.database import query_issues
+        from core.database import query_issues
         issues = query_issues()
         bug_issue = [i for i in issues if i["id"] == bug_id][0]
         feature_issue = [i for i in issues if i["id"] == feature_id][0]
         
-        bug_features = extract_features(bug_issue, sample_profile)
-        feature_features = extract_features(feature_issue, sample_profile)
+        bug_features = extract_features(bug_issue, sample_profile, use_advanced=False)
+        feature_features = extract_features(feature_issue, sample_profile, use_advanced=False)
         
-        # Feature 12 is issue type encoding
+        # Feature 12 is issue type encoding (base features are 0-indexed)
         assert bug_features[11] == 1.0  # bug = 1.0
         assert feature_features[11] == 2.0  # feature = 2.0
     
     def test_extract_features_difficulty_encoding(self, test_db, sample_profile):
         """Test that difficulty levels are properly encoded."""
-        from contribution_matcher.database import upsert_issue
+        from core.database import upsert_issue
         
         beginner_id = upsert_issue(
             title="Beginner",
@@ -95,21 +95,21 @@ class TestExtractFeatures:
             difficulty="advanced",
         )
         
-        from contribution_matcher.database import query_issues
+        from core.database import query_issues
         issues = query_issues()
         beginner_issue = [i for i in issues if i["id"] == beginner_id][0]
         advanced_issue = [i for i in issues if i["id"] == advanced_id][0]
         
-        beginner_features = extract_features(beginner_issue, sample_profile)
-        advanced_features = extract_features(advanced_issue, sample_profile)
+        beginner_features = extract_features(beginner_issue, sample_profile, use_advanced=False)
+        advanced_features = extract_features(advanced_issue, sample_profile, use_advanced=False)
         
-        # Feature 13 is difficulty encoding
+        # Feature 13 is difficulty encoding (base features are 0-indexed)
         assert beginner_features[12] == 0.0  # beginner = 0.0
         assert advanced_features[12] == 2.0  # advanced = 2.0
     
     def test_extract_features_time_estimate_parsing(self, test_db, sample_profile):
         """Test that time estimates are properly parsed to hours."""
-        from contribution_matcher.database import upsert_issue
+        from core.database import upsert_issue
         
         hour_issue_id = upsert_issue(
             title="Hour task",
@@ -122,15 +122,15 @@ class TestExtractFeatures:
             time_estimate="2 days",
         )
         
-        from contribution_matcher.database import query_issues
+        from core.database import query_issues
         issues = query_issues()
         hour_issue = [i for i in issues if i["id"] == hour_issue_id][0]
         day_issue = [i for i in issues if i["id"] == day_issue_id][0]
         
-        hour_features = extract_features(hour_issue, sample_profile)
-        day_features = extract_features(day_issue, sample_profile)
+        hour_features = extract_features(hour_issue, sample_profile, use_advanced=False)
+        day_features = extract_features(day_issue, sample_profile, use_advanced=False)
         
-        # Feature 14 is time estimate in hours
+        # Feature 14 is time estimate in hours (base features are 0-indexed)
         assert hour_features[13] == 5.0
         assert day_features[13] == 16.0  # 2 days * 8 hours
 
@@ -161,8 +161,8 @@ class TestTrainModel:
     def test_train_model_minimum_samples(self, test_db, labeled_issues_for_ml):
         """Test training with minimum required samples."""
         # Create more labeled issues to meet minimum
-        from contribution_matcher.database import upsert_issue, update_issue_label
-        from contribution_matcher.database import query_issues
+        from core.database import upsert_issue, update_issue_label
+        from core.database import query_issues
         
         # Add more good and bad labels to reach 10 minimum
         for i in range(8):  # Already have 2, need 8 more
@@ -177,8 +177,8 @@ class TestTrainModel:
             label = "good" if i % 2 == 0 else "bad"
             update_issue_label(issue_id, label)
         
-        # Train with force flag (since we have < 200)
-        results = train_model(force=True)
+        # Train with force flag and legacy mode (since we have < 200)
+        results = train_model(force=True, legacy=True)
         
         assert "accuracy" in results
         assert "precision" in results
@@ -186,7 +186,7 @@ class TestTrainModel:
         assert "f1_score" in results
         assert 0 <= results["accuracy"] <= 1
         
-        # Verify model files were created
+        # Verify legacy model files were created
         assert os.path.exists("issue_classifier.pkl")
         assert os.path.exists("issue_scaler.pkl")
         
@@ -199,7 +199,7 @@ class TestTrainModel:
     def test_train_model_insufficient_samples(self, test_db):
         """Test training fails with insufficient samples."""
         # Create only 5 labeled issues (below minimum of 10)
-        from contribution_matcher.database import upsert_issue, update_issue_label
+        from core.database import upsert_issue, update_issue_label
         
         for i in range(5):
             issue_id = upsert_issue(
@@ -214,7 +214,7 @@ class TestTrainModel:
     
     def test_train_model_only_one_class(self, test_db):
         """Test training fails when only one label class exists."""
-        from contribution_matcher.database import upsert_issue, update_issue_label
+        from core.database import upsert_issue, update_issue_label
         
         # Create 10 issues, all labeled "good"
         for i in range(10):
@@ -236,7 +236,7 @@ class TestTrainModel:
         
         try:
             # Add more labels
-            from contribution_matcher.database import upsert_issue, update_issue_label
+            from core.database import upsert_issue, update_issue_label
             
             for i in range(8):
                 issue_id = upsert_issue(
@@ -250,7 +250,7 @@ class TestTrainModel:
                 label = "good" if i % 2 == 0 else "bad"
                 update_issue_label(issue_id, label)
             
-            results = train_model(force=True)
+            results = train_model(force=True, legacy=True)
             
             assert "accuracy" in results
             # Features 2-8 should be 0.0 without profile, but model should still train
@@ -271,7 +271,7 @@ class TestPredictIssueQuality:
     
     def test_predict_without_model(self, test_db, sample_profile, sample_issue_in_db):
         """Test prediction when no model exists."""
-        from contribution_matcher.database import query_issues
+        from core.database import query_issues
         
         issues = query_issues()
         issue = issues[0]
@@ -285,7 +285,7 @@ class TestPredictIssueQuality:
     def test_predict_with_model(self, test_db, labeled_issues_for_ml, sample_profile):
         """Test prediction with trained model."""
         # Train model first
-        from contribution_matcher.database import upsert_issue, update_issue_label
+        from core.database import upsert_issue, update_issue_label
         
         # Add more labels to meet minimum
         for i in range(8):
@@ -300,12 +300,12 @@ class TestPredictIssueQuality:
             label = "good" if i % 2 == 0 else "bad"
             update_issue_label(issue_id, label)
         
-        train_model(force=True)
+        train_model(force=True, legacy=True)
         
         try:
             # Create a test issue
-            from contribution_matcher.database import upsert_issue
-            from contribution_matcher.database import query_issues
+            from core.database import upsert_issue
+            from core.database import query_issues
             
             test_issue_id = upsert_issue(
                 title="Test Prediction",
@@ -330,4 +330,10 @@ class TestPredictIssueQuality:
                 os.remove("issue_classifier.pkl")
             if os.path.exists("issue_scaler.pkl"):
                 os.remove("issue_scaler.pkl")
+            if os.path.exists("issue_classifier_v2_xgb.pkl"):
+                os.remove("issue_classifier_v2_xgb.pkl")
+            if os.path.exists("issue_scaler_v2.pkl"):
+                os.remove("issue_scaler_v2.pkl")
+            if os.path.exists("feature_selector_v2.pkl"):
+                os.remove("feature_selector_v2.pkl")
 

@@ -11,7 +11,7 @@ from typing import List, Tuple
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from core.config import (
+from core.constants import (
     EXPERIENCE_MATCH_WEIGHT,
     FRESHNESS_WEIGHT,
     INTEREST_MATCH_WEIGHT,
@@ -33,13 +33,14 @@ from . import profile_service
 
 
 def get_model_dir() -> Path:
-    """Get the directory for storing ML models."""
+    """Return the filesystem directory for storing trained ML models."""
     base = Path(os.getenv("CONTRIBUTION_MATCHER_MODEL_DIR", "models"))
     base.mkdir(parents=True, exist_ok=True)
     return base
 
 
 def ensure_profile(db: Session, user: User) -> DevProfile:
+    """Fetch the user's profile or raise if it does not exist."""
     profile = profile_service.get_profile(db, user)
     if not profile:
         raise HTTPException(
@@ -50,10 +51,21 @@ def ensure_profile(db: Session, user: User) -> DevProfile:
 
 
 def issue_technologies(issue: Issue) -> List[str]:
+    """Return technology names attached to an issue."""
     return [tech.technology for tech in issue.technologies]
 
 
 def compute_breakdown_and_features(issue: Issue, profile: DevProfile) -> Tuple[dict, List[float]]:
+    """
+    Calculate rule-based breakdown scores and feature vector for scoring.
+
+    Args:
+        issue: Issue ORM object with metadata and technologies.
+        profile: User profile used for matching.
+
+    Returns:
+        Tuple of (breakdown dict, feature vector list).
+    """
     technologies = issue_technologies(issue)
     skills = profile.skills or []
 

@@ -2,7 +2,7 @@ import re
 from collections import Counter
 from typing import Dict, List, Optional, Tuple
 
-from core.config import KEYWORD_SKILLS, SKILL_CATEGORIES, POPULAR_LANGUAGES
+from core.constants import KEYWORD_SKILLS, POPULAR_LANGUAGES, SKILL_CATEGORIES
 
 
 def _normalize(text: str) -> str:

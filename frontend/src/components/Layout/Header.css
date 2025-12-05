@@ -4,7 +4,7 @@
   left: 0;
   right: 0;
   height: 64px;
-  background: rgba(42, 31, 28, 0.95);
+  background: rgba(0, 0, 0, 0.95);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
@@ -34,8 +34,19 @@
 }
 
 .header-logo-icon {
-  color: var(--primary);
-  font-size: var(--font-size-2xl);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  color: var(--text-primary);
+  background: var(--surface);
+  font-size: 1.2rem;
+  font-weight: 800;
+  border-radius: 50%;
+  border: 2px solid var(--text-primary);
+  letter-spacing: -0.02em;
+  margin-right: var(--space-6);
 }
 
 .header-logo-text {
@@ -72,7 +83,7 @@
 
 .header-nav-link.active {
   color: var(--primary);
-  background: rgba(203, 152, 79, 0.1);
+  background: rgba(216, 216, 216, 0.1);
 }
 
 /* User Section */
@@ -107,29 +118,4 @@
   }
 }
 
-/* Theme Toggle */
-.theme-toggle {
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  color: var(--primary);
-  font-size: var(--font-size-lg);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.theme-toggle:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: var(--primary);
-}
-
-.theme-icon {
-  width: 18px;
-  height: 18px;
-}
 

@@ -1,16 +1,16 @@
-# Contribution Matcher
+# MYI - Contribution Matcher
 
-Discovers GitHub issues and matches them to developer skills using hybrid scoring (rules + ML).
+Discovers GitHub issues and matches them to developer skills using hybrid scoring (rules + ML). Features a modern React frontend with optimized performance and a FastAPI backend with Redis caching.
 
 ## Quick Start
 
 ```bash
 git clone <repo-url> && cd contribution_matcher
+python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-cp docker/env.example .env  # Edit with GitHub credentials
+cp .env.example .env  # Edit with your credentials
 
 # Backend
-source venv/bin/activate
 uvicorn backend.app.main:app --reload
 
 # Frontend (separate terminal)
@@ -21,25 +21,53 @@ Visit http://localhost:5173
 
 ## Features
 
-- GitHub OAuth login
-- Issue discovery (good first issue, help wanted)
-- Smart matching (skills, experience, interests)
-- ML-enhanced scoring
-- Multiple profile sources (GitHub, resume PDF, manual)
+### Core
+- **GitHub OAuth** - Secure authentication via GitHub
+- **Issue Discovery** - Find "good first issue" and "help wanted" issues
+- **Smart Matching** - Score issues based on skills, experience, and interests
+- **Algorithm Training** - Train a personalized model from labeled preferences
+- **Profile Sources** - Create profile from GitHub repos, resume PDF, or manually
+- **Profile Tracking** - Tracks source (GitHub/Resume/Manual) with auto-resync
+
+### User Experience
+- **First Login Prompt** - New users prompted to sync profile from GitHub
+- **Auto-Resync** - GitHub-sourced profiles automatically resync on login
+- **Profile Source Indicator** - Shows where profile data originated
+- **Confirmation Dialogs** - Warns before overwriting profile data
+
+### Frontend (React 19 + Vite)
+- **Code Splitting** - Lazy-loaded pages for faster initial load
+- **React Query** - Automatic caching, deduplication, and background refresh
+- **Optimized Rendering** - Memoized components and batched state updates
+- **Link Prefetching** - Data loaded on hover for instant navigation
+- **GZip Compression** - Compressed API responses
+
+### Backend (FastAPI + SQLAlchemy)
+- **Connection Pooling** - Efficient database connections
+- **Response Caching** - Redis-backed caching for stats and metadata
+- **Bulk Operations** - Optimized batch queries (no N+1)
+- **Structured Logging** - JSON logs with request tracing
 
 ## Configuration
 
-**Required:**
-- `JWT_SECRET_KEY` (min 32 chars)
-- `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`
-- `PAT_TOKEN` (GitHub PAT)
+### Required
+```bash
+JWT_SECRET_KEY=        # Min 32 chars - python -c "import secrets; print(secrets.token_urlsafe(48))"
+GITHUB_CLIENT_ID=      # From GitHub OAuth App
+GITHUB_CLIENT_SECRET=  # From GitHub OAuth App
+PAT_TOKEN=             # GitHub Personal Access Token
+```
 
-**Optional:**
-- `DATABASE_URL` (default: `sqlite:///contribution_matcher.db`)
-- `REDIS_HOST` (default: `localhost`)
-- `TOKEN_ENCRYPTION_KEY` (Fernet key)
+### Optional
+```bash
+DATABASE_URL=sqlite:///contribution_matcher.db  # Or PostgreSQL
+REDIS_HOST=localhost
+REDIS_PORT=6379
+TOKEN_ENCRYPTION_KEY=  # Fernet key for secure token storage
+DEBUG=false
+```
 
-**Generate keys:**
+### Generate Keys
 ```bash
 # JWT secret
 python -c "import secrets; print(secrets.token_urlsafe(48))"
@@ -51,56 +79,188 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 ## CLI Commands
 
 ```bash
-python main.py discover --limit 100
-python main.py list --difficulty beginner --limit 10
-python main.py stats
-python main.py score --top 10
-python main.py create-profile --github your-username
-python main.py train-model  # After labeling 200+ issues
+python main.py discover --limit 100           # Discover issues from GitHub
+python main.py list --difficulty beginner     # List discovered issues
+python main.py stats                          # Show issue statistics
+python main.py score --top 10                 # Score and rank issues
+python main.py create-profile --github <user> # Create profile from GitHub
+python main.py train-model                    # Train algorithm (200+ labels required)
 ```
 
 ## API Endpoints
 
+### Authentication
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/auth/github` | GET | GitHub OAuth |
-| `/api/issues` | GET | List issues |
-| `/api/issues/discover` | POST | Discover new |
-| `/api/profile` | GET/PUT | Profile |
-| `/api/ml/train` | POST | Train model |
+| `/api/auth/login` | GET | Initiate GitHub OAuth |
+| `/api/auth/callback` | GET | OAuth callback |
+| `/api/auth/me` | GET | Current user info |
+| `/api/auth/logout` | POST | Invalidate session |
+
+### Issues
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/issues` | GET | List issues (paginated, filterable) |
+| `/api/issues/discover` | POST | Discover new issues |
+| `/api/issues/stats` | GET | Issue statistics (cached) |
+| `/api/issues/bookmarks` | GET | Bookmarked issues |
+| `/api/issues/{id}/bookmark` | POST/DELETE | Toggle bookmark |
+| `/api/issues/{id}/notes` | GET/POST | Issue notes |
+
+### Profile
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/profile` | GET | Get profile (includes source info) |
+| `/api/profile` | PUT | Update profile |
+| `/api/profile/from-github` | POST | Create/sync from GitHub |
+| `/api/profile/from-resume` | POST | Create from PDF resume |
+
+### Algorithm Training
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/ml/label/{id}` | POST | Label issue (like/dislike) |
+| `/api/ml/label-status` | GET | Labeling progress |
+| `/api/ml/unlabeled-issues` | GET | Issues to label |
+| `/api/ml/train` | POST | Train algorithm |
+| `/api/ml/model-info` | GET | Algorithm metrics |
+
+### Scoring
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/scoring/top-matches` | GET | Best matching issues |
+| `/api/scoring/score-all` | POST | Batch score issues |
+
+## Frontend Routes
+
+| Route | Page | Description |
+|-------|------|-------------|
+| `/dashboard` | Dashboard | Overview, stats, quick actions |
+| `/issues` | Issues | Browse and filter issues |
+| `/profile` | Profile | Manage developer profile |
+| `/algorithm-improvement` | Algorithm Improvement | Label issues and train algorithm |
 
 ## Docker
 
 ```bash
-cp docker/env.example .env  # Edit .env
+cp docker/env.example .env
 docker-compose up -d
 docker-compose exec api alembic upgrade head
 ```
 
-**Services:** `api` (FastAPI), `worker-discovery/scoring/ml` (Celery), `scheduler` (Celery beat), `postgres`, `redis`
+**Services:**
+- `api` - FastAPI application
+- `worker-discovery` - Issue discovery worker
+- `worker-scoring` - Score computation worker
+- `worker-ml` - Algorithm training worker
+- `scheduler` - Celery beat scheduler
+- `postgres` - PostgreSQL database
+- `redis` - Cache and message broker
 
-## Scoring
+## Scoring Algorithm
 
-**Rule-based (100 points):** Skill match 40%, Experience 20%, Repo quality 15%, Freshness 10%, Time match 10%, Interest 5%
+### Rule-Based (100 points)
+| Factor | Weight | Description |
+|--------|--------|-------------|
+| Skill Match | 40% | Technologies overlap with profile |
+| Experience | 20% | Difficulty vs experience level |
+| Repo Quality | 15% | Stars, activity, contributors |
+| Freshness | 10% | Issue age and repo activity |
+| Time Match | 10% | Estimated time vs availability |
+| Interest | 5% | Topic overlap with interests |
 
-**ML adjustment:** ±15 points based on labeled issue preferences
+### ML Enhancement
+- Trained on user's labeled issues (like/dislike)
+- XGBoost classifier with 50+ features
+- Adjusts base score +/- 15 points
+- Requires 200+ labeled issues
 
 ## Tech Stack
 
-Python 3.11, FastAPI, SQLAlchemy, Celery | React 19, Vite | SQLite/PostgreSQL | Redis | XGBoost, scikit-learn, Sentence-BERT
+### Backend
+- Python 3.11
+- FastAPI + Pydantic
+- SQLAlchemy 2.0 (async support)
+- Celery + Redis
+- XGBoost, scikit-learn
+- Sentence-BERT embeddings
+
+### Frontend
+- React 19
+- Vite (code splitting, HMR)
+- React Query (TanStack)
+- React Router
+- Axios
+
+### Infrastructure
+- SQLite (dev) / PostgreSQL (prod)
+- Redis (caching, task queue)
+- Docker Compose
+
+## Database Migrations
+
+```bash
+cd backend
+alembic upgrade head          # Apply migrations
+alembic revision -m "desc"    # Create migration
+alembic downgrade -1          # Rollback one
+```
 
 ## Testing
 
 ```bash
-pytest tests/ -v -p no:asyncio
+pytest tests/ -v
+pytest tests/backend/ -v      # Backend only
+pytest tests/ -k "test_name"  # Specific test
 ```
 
-## Documentation
+## Project Structure
 
-Documentation was generated by AI, given proper outlining and contextual guidelines. All documentationw as proofread by yours truly.
+```
+contribution_matcher/
+├── backend/
+│   ├── app/
+│   │   ├── routers/      # API endpoints
+│   │   ├── services/     # Business logic
+│   │   └── schemas.py    # Pydantic models
+│   └── alembic/          # Database migrations
+├── core/
+│   ├── api/              # GitHub API client
+│   ├── cache/            # Redis caching
+│   ├── models/           # SQLAlchemy models
+│   ├── repositories/     # Data access layer
+│   ├── scoring/          # Scoring engine
+│   └── services/         # Core services
+├── frontend/
+│   ├── src/
+│   │   ├── api/          # API client
+│   │   ├── components/   # React components
+│   │   ├── context/      # Auth context
+│   │   ├── hooks/        # Custom hooks
+│   │   └── pages/        # Page components
+│   └── vite.config.js
+├── workers/
+│   └── tasks/            # Celery tasks
+└── tests/
+```
 
-## Development Notes
+## Performance Optimizations
 
-Proof of concept. Most development done locally with minimal commits to maintain GitHub Actions workflow stability. Current priorities: issue discovery pipeline, ML training data collection, frontend polish, Celery deployment, production infrastructure.
+### Frontend
+- Lazy-loaded pages (React.lazy + Suspense)
+- Component memoization (React.memo)
+- Event handler optimization (useCallback)
+- React Query caching (stale-while-revalidate)
+- CSS containment and GPU acceleration
+- Vendor chunk splitting
 
-**Credits:** Mohamed Ibrahim
+### Backend
+- Connection pooling (QueuePool)
+- Query optimization (selectinload, bulk updates)
+- Response caching (Redis, 5-min TTL for stats)
+- GZip compression (500+ byte responses)
+- Batch bookmark lookups (2 queries vs N+1)
+
+## Credits
+
+Developed by Mohamed Ibrahim
+

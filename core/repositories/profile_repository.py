@@ -1,11 +1,7 @@
-"""
-Developer profile repository.
-"""
+"""Developer profile repository."""
 
 from datetime import datetime
 from typing import List, Optional
-
-from sqlalchemy.orm import Session
 
 from core.models import DevProfile
 
@@ -16,9 +12,6 @@ class ProfileRepository(BaseRepository[DevProfile]):
     """Repository for DevProfile operations."""
     
     model = DevProfile
-    
-    def __init__(self, session: Session):
-        super().__init__(session)
     
     def get_by_user_id(self, user_id: int) -> Optional[DevProfile]:
         """Get profile by user ID."""
@@ -39,13 +32,11 @@ class ProfileRepository(BaseRepository[DevProfile]):
     ) -> DevProfile:
         """
         Create or update a user's profile.
-        
         Only updates fields that are provided (not None).
         """
         profile = self.get_by_user_id(user_id)
         
         if profile:
-            # Update existing profile
             if skills is not None:
                 profile.skills = skills
             if experience_level is not None:
@@ -58,7 +49,6 @@ class ProfileRepository(BaseRepository[DevProfile]):
                 profile.time_availability_hours_per_week = time_availability_hours_per_week
             profile.updated_at = datetime.utcnow()
         else:
-            # Create new profile
             profile = DevProfile(
                 user_id=user_id,
                 skills=skills or [],
@@ -73,10 +63,5 @@ class ProfileRepository(BaseRepository[DevProfile]):
         return profile
     
     def has_profile(self, user_id: int) -> bool:
-        """Check if a user has a profile."""
-        return (
-            self.session.query(DevProfile)
-            .filter(DevProfile.user_id == user_id)
-            .first()
-        ) is not None
-
+        """Check if a user has a profile (efficient exists query)."""
+        return self.exists_where(user_id=user_id)

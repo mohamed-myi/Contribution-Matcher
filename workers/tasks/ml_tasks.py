@@ -1,22 +1,18 @@
 """
 ML model training tasks.
 
-These tasks handle:
-- Training user-specific ML models
-- Model evaluation and metrics
-- Model deployment (cache update)
-
+Handles training, evaluation, and maintenance of ML models.
 Queue: ml (single worker, resource intensive)
 """
 
-import logging
-import os
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from celery import shared_task
 from celery.exceptions import MaxRetriesExceededError
 
-logger = logging.getLogger(__name__)
+from core.logging import get_logger
+
+logger = get_logger("worker.ml")
 
 
 @shared_task(
@@ -50,7 +46,7 @@ def train_model_task(
     from core.services import ScoringService
     from core.cache import cache, CacheKeys
     
-    logger.info(f"Starting ML model training (user_id={user_id}, type={model_type})")
+    logger.info("training_started", user_id=user_id, model_type=model_type, use_hyperopt=use_hyperopt)
     
     try:
         # Import training function
@@ -66,7 +62,7 @@ def train_model_task(
             metrics = train_model()
         
         if metrics is None:
-            logger.warning("Training returned no metrics (insufficient data?)")
+            logger.warning("training_no_metrics", user_id=user_id)
             return {
                 "success": False,
                 "user_id": user_id,
@@ -77,7 +73,7 @@ def train_model_task(
         scoring_service = ScoringService()
         scoring_service.invalidate_model_cache()
         
-        logger.info(f"Model training completed. Accuracy: {metrics.get('accuracy', 'N/A')}")
+        logger.info("training_complete", accuracy=metrics.get('accuracy'))
         
         # Schedule score recomputation for affected users
         if user_id:
@@ -92,7 +88,7 @@ def train_model_task(
         }
         
     except Exception as exc:
-        logger.error(f"Model training failed: {exc}")
+        logger.error("training_failed", error=str(exc), error_type=type(exc).__name__)
         try:
             self.retry(exc=exc)
         except MaxRetriesExceededError:
@@ -125,7 +121,7 @@ def evaluate_model_task(
     Returns:
         Dictionary with evaluation metrics
     """
-    logger.info(f"Evaluating ML model (user_id={user_id})")
+    logger.info("evaluation_started", user_id=user_id)
     
     try:
         from core.scoring.ml_trainer import evaluate_model_performance
@@ -145,7 +141,7 @@ def evaluate_model_task(
         }
         
     except Exception as exc:
-        logger.error(f"Model evaluation failed: {exc}")
+        logger.error("evaluation_failed", error=str(exc))
         return {
             "success": False,
             "error": str(exc),
@@ -158,7 +154,7 @@ def evaluate_model_task(
     time_limit=900,
 )
 def generate_embeddings_task(
-    issue_ids: Optional[list] = None,
+    issue_ids: Optional[List[int]] = None,
     batch_size: int = 50,
 ) -> Dict:
     """
@@ -174,46 +170,34 @@ def generate_embeddings_task(
         Dictionary with results
     """
     from core.db import db
-    from core.models import Issue, IssueEmbedding
-    from core.scoring.feature_extractor import compute_bert_embedding
-    from core.database import upsert_issue_embedding
+    from core.models import Issue
+    from core.scoring.feature_extractor import get_text_embeddings
     
-    logger.info("Starting embedding generation")
+    logger.info("embedding_generation_started", batch_size=batch_size)
     
     try:
         with db.session() as session:
-            # Get issues without embeddings
+            # Get issues to process
             if issue_ids:
                 query = session.query(Issue).filter(Issue.id.in_(issue_ids))
             else:
-                # Get issues without embeddings
-                subquery = session.query(IssueEmbedding.issue_id)
-                query = session.query(Issue).filter(
-                    ~Issue.id.in_(subquery),
-                    Issue.is_active == True,
-                )
+                # Get active issues (embeddings are cached by get_text_embeddings)
+                query = session.query(Issue).filter(Issue.is_active == True)
             
-            issues = query.limit(batch_size * 10).all()  # Process up to 500
+            issues = query.limit(batch_size * 10).all()
         
         processed = 0
         for issue in issues:
             try:
-                # Compute embeddings
-                text = f"{issue.title or ''} {issue.body or ''}"
-                title_embedding, desc_embedding = compute_bert_embedding(text)
-                
-                # Store embeddings
-                upsert_issue_embedding(
-                    issue_id=issue.id,
-                    description_embedding=desc_embedding,
-                    title_embedding=title_embedding,
-                )
+                # Generate embeddings (auto-cached by get_text_embeddings)
+                issue_dict = {"id": issue.id, "title": issue.title, "body": issue.body}
+                get_text_embeddings(issue_dict)
                 processed += 1
                 
             except Exception as e:
-                logger.warning(f"Embedding failed for issue {issue.id}: {e}")
+                logger.warning("embedding_failed", issue_id=issue.id, error=str(e))
         
-        logger.info(f"Generated embeddings for {processed} issues")
+        logger.info("embedding_generation_complete", processed=processed)
         
         return {
             "processed": processed,
@@ -221,7 +205,7 @@ def generate_embeddings_task(
         }
         
     except Exception as exc:
-        logger.error(f"Embedding generation failed: {exc}")
+        logger.error("embedding_generation_failed", error=str(exc))
         return {"error": str(exc)}
 
 
@@ -243,7 +227,7 @@ def cleanup_old_models_task(keep_versions: int = 3) -> Dict:
     import glob
     from pathlib import Path
     
-    logger.info(f"Cleaning up old models, keeping {keep_versions} versions")
+    logger.info("cleanup_models_started", keep_versions=keep_versions)
     
     models_dir = Path("models")
     if not models_dir.exists():
@@ -271,11 +255,11 @@ def cleanup_old_models_task(keep_versions: int = 3) -> Dict:
             try:
                 f.unlink()
                 deleted += 1
-                logger.debug(f"Deleted old model: {f}")
+                logger.debug("deleted_model", path=str(f))
             except Exception as e:
-                logger.warning(f"Failed to delete {f}: {e}")
+                logger.warning("delete_model_failed", path=str(f), error=str(e))
     
-    logger.info(f"Deleted {deleted} old model files")
+    logger.info("cleanup_models_complete", deleted=deleted)
     
     return {"deleted": deleted}
 

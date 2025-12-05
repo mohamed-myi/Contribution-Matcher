@@ -37,7 +37,15 @@ class RepoMetadata(Base):
     cached_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     
     def is_stale(self, validity_days: int = 7) -> bool:
-        """Check if the cached metadata is older than validity_days."""
+        """
+        Determine whether cached metadata has exceeded its validity window.
+
+        Args:
+            validity_days: Number of days before cache should be refreshed.
+
+        Returns:
+            True if cache is older than validity_days; otherwise False.
+        """
         from datetime import timedelta
         if not self.cached_at:
             return True
@@ -45,7 +53,12 @@ class RepoMetadata(Base):
         return age > timedelta(days=validity_days)
     
     def to_dict(self) -> Dict:
-        """Convert to dictionary for compatibility with existing code."""
+        """
+        Serialize the repository metadata for downstream consumers.
+
+        Returns:
+            Dictionary of repository attributes and cache timestamp.
+        """
         return {
             "stars": self.stars,
             "forks": self.forks,

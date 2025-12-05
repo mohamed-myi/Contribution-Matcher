@@ -14,6 +14,7 @@ GITHUB_API_URL = "https://api.github.com"
 
 
 def get_oauth_authorize_url(state: str) -> str:
+    """Build GitHub OAuth authorize URL with client settings and state."""
     settings = get_settings()
     # Convert AnyHttpUrl to string to avoid serialization issues
     redirect_uri = str(settings.github_redirect_uri) if settings.github_redirect_uri else ""
@@ -28,6 +29,12 @@ def get_oauth_authorize_url(state: str) -> str:
 
 
 def exchange_code_for_token(code: str) -> str:
+    """
+    Exchange GitHub OAuth code for an access token.
+
+    Raises:
+        ValueError when token is missing in the response.
+    """
     settings = get_settings()
     # Convert AnyHttpUrl to string to avoid serialization issues
     redirect_uri = str(settings.github_redirect_uri) if settings.github_redirect_uri else None
@@ -47,6 +54,7 @@ def exchange_code_for_token(code: str) -> str:
 
 
 def get_github_user(access_token: str) -> Dict[str, Optional[str]]:
+    """Fetch GitHub user profile and primary email using the OAuth token."""
     headers = {
         "Authorization": f"Bearer {access_token}",
         "Accept": "application/vnd.github+json",

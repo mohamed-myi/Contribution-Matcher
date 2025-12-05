@@ -18,7 +18,12 @@ from .matching_service import get_model_dir
 
 
 def _load_user_model(user: User, db: Session) -> Optional[Tuple[UserMLModel, object]]:
-    """Load the latest trained ML model for a user."""
+    """
+    Load the most recent trained ML model for a user.
+
+    Returns:
+        Tuple of (UserMLModel record, loaded model) or None when unavailable.
+    """
     record = (
         db.query(UserMLModel)
         .filter(UserMLModel.user_id == user.id)
@@ -38,6 +43,16 @@ def _load_user_model(user: User, db: Session) -> Optional[Tuple[UserMLModel, obj
 
 
 def _ml_adjustment(model_tuple: Optional[Tuple[UserMLModel, object]], features: List[float]) -> float:
+    """
+    Compute ML-based adjustment to the rule-based score.
+
+    Args:
+        model_tuple: Optional (record, model) tuple from _load_user_model.
+        features: Feature vector for prediction.
+
+    Returns:
+        Adjustment value to apply to the total score.
+    """
     if not model_tuple:
         return 0.0
     _, model = model_tuple

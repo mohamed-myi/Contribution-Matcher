@@ -54,7 +54,7 @@ def extract_base_features(issue: Dict, profile_data: Optional[Dict] = None) -> L
             features.append(time_match.get('score', 0.0))
             interest_match = breakdown.get('interest_match', {})
             features.append(interest_match.get('score', 0.0))
-            from core.config import (
+            from core.constants import (
                 EXPERIENCE_MATCH_WEIGHT,
                 FRESHNESS_WEIGHT,
                 INTEREST_MATCH_WEIGHT,
@@ -116,20 +116,20 @@ def extract_base_features(issue: Dict, profile_data: Optional[Dict] = None) -> L
 
 
 def extract_features(issue: Dict, profile_data: Optional[Dict] = None, use_advanced: bool = True) -> List[float]:
-    '''
+    """
     Extract numerical features from an issue for ML training.
-    
-    This function extracts base features (14) and optionally advanced features (193),
-    for a total of 207 features.
-    
+
+    Combines base features (14) with optional advanced features (embeddings and
+    engineered values) for a total of 207 features when enabled.
+
     Args:
-        issue: Issue dictionary from database
-        profile_data: Optional profile data for calculating match scores
-        use_advanced: Whether to include advanced features (embeddings, interactions, etc.)
-        
+        issue: Issue dictionary from the database.
+        profile_data: Optional profile data for calculating match scores.
+        use_advanced: Include advanced features when True.
+
     Returns:
-        List of float values representing the issue's features (14 or 207)
-    '''
+        List of feature values (14 or 207 items).
+    """
     
     # Extract base features (11)
     base_features = extract_base_features(issue, profile_data)
@@ -148,12 +148,12 @@ def extract_features(issue: Dict, profile_data: Optional[Dict] = None, use_advan
 
 
 def load_labeled_issues() -> Tuple[List[Dict], List[str]]:
-    '''
+    """
     Load labeled issues from the database.
-    
+
     Returns:
-        Tuple of (issues list, labels list)
-    '''
+        Tuple of (issues, labels) where labels are normalized strings.
+    """
 
     with db_conn() as conn:
         cur = conn.cursor()
@@ -188,17 +188,17 @@ def load_labeled_issues() -> Tuple[List[Dict], List[str]]:
 
 
 def optimize_hyperparameters(X_train, y_train, tune_iterations: int = 50) -> Dict:
-    '''
+    """
     Optimize XGBoost hyperparameters using Bayesian optimization.
-    
+
     Args:
-        X_train: Training features
-        y_train: Training labels
-        tune_iterations: Number of optimization iterations
-        
+        X_train: Training feature matrix.
+        y_train: Training labels.
+        tune_iterations: Number of optimization iterations.
+
     Returns:
-        Dictionary of optimized hyperparameters
-    '''
+        Dictionary of tuned hyperparameters.
+    """
     try:
         from skopt import gp_minimize
         from skopt.space import Real, Integer
@@ -270,17 +270,17 @@ def optimize_hyperparameters(X_train, y_train, tune_iterations: int = 50) -> Dic
 
 
 def find_optimal_threshold(model, X_val, y_val) -> float:
-    '''
-    Find optimal decision threshold to maximize F1 score (balance precision and recall).
-    
+    """
+    Select the decision threshold that maximizes F1 score.
+
     Args:
-        model: Trained classifier
-        X_val: Validation features
-        y_val: Validation labels
-        
+        model: Trained classifier with predict_proba.
+        X_val: Validation feature matrix.
+        y_val: Validation labels.
+
     Returns:
-        Optimal threshold value
-    '''
+        Threshold value that maximizes F1 on validation data.
+    """
     y_pred_proba = model.predict_proba(X_val)[:, 1]
     
     best_threshold = 0.5
@@ -305,21 +305,21 @@ def train_xgboost_model(
     use_tuning: bool = True,
     tune_iterations: int = 50,
 ) -> Tuple:
-    '''
-    Train XGBoost model with optional stacking ensemble and hyperparameter optimization.
-    
+    """
+    Train an XGBoost-based model with optional stacking and tuning.
+
     Args:
-        X_train: Training features
-        y_train: Training labels
-        X_test: Test features
-        y_test: Test labels
-        use_stacking: Whether to use stacking ensemble
-        use_tuning: Whether to optimize hyperparameters
-        tune_iterations: Number of hyperparameter optimization iterations
-        
+        X_train: Training features.
+        y_train: Training labels.
+        X_test: Test features.
+        y_test: Test labels.
+        use_stacking: Enable stacking ensemble when True.
+        use_tuning: Enable hyperparameter optimization when True.
+        tune_iterations: Number of tuning iterations.
+
     Returns:
-        Tuple of (model, threshold, metrics)
-    '''
+        Tuple of (trained model, optimal threshold, metrics dictionary).
+    """
     try:
         import xgboost as xgb
         from lightgbm import LGBMClassifier
@@ -439,15 +439,15 @@ def train_xgboost_model(
 
 
 def train_legacy_model(force: bool = False) -> Dict:
-    '''
-    Train legacy GradientBoosting model (original implementation).
-    
+    """
+    Train the legacy GradientBoosting model implementation.
+
     Args:
-        force: If True, train even if you have less than 200 labeled issues
-        
+        force: Train even when labeled data is below the recommended threshold.
+
     Returns:
-        Dictionary with training metrics
-    '''
+        Dictionary containing training metrics and metadata.
+    """
     
     print("\n" + "=" * 80)
     print("STEP 1: LOADING LABELED ISSUES")
@@ -632,7 +632,20 @@ def train_model(
     tune_iterations: int = 50,
     legacy: bool = False,
 ) -> Dict:
-    """Train ML model to predict issue quality (good vs bad)."""
+    """
+    Train the ML model to predict issue quality (good vs bad).
+
+    Args:
+        force: Train even with low labeled data counts.
+        use_advanced: Include advanced feature set when True.
+        use_stacking: Use stacking ensemble when True.
+        use_tuning: Run hyperparameter tuning when True.
+        tune_iterations: Number of tuning iterations.
+        legacy: Train the legacy model instead of v2 when True.
+
+    Returns:
+        Dictionary containing evaluation metrics and artifacts metadata.
+    """
     
     if legacy:
         return train_legacy_model(force=force)
@@ -819,17 +832,19 @@ def train_model(
 
 
 def predict_issue_quality(issue: Dict, profile_data: Optional[Dict] = None) -> Tuple[float, float]:
-    '''
-    Predict whether an issue is "good" or "bad" using the trained ML model.
-    Auto-detects model version (v2 XGBoost or legacy GradientBoosting).
-    
+    """
+    Predict whether an issue is good or bad using the trained model.
+
+    Auto-detects the available model version (v2 or legacy) and applies the
+    corresponding feature pipeline.
+
     Args:
-        issue: Issue dictionary from database
-        profile_data: Optional profile data for calculating match scores
-        
+        issue: Issue dictionary from the database.
+        profile_data: Optional profile data for feature extraction.
+
     Returns:
-        Tuple of (probability_good, probability_bad)
-    '''
+        Tuple of (probability_good, probability_bad).
+    """
     
     # Try to load version 2 model first
     if os.path.exists(MODEL_PATH_V2) and os.path.exists(SCALER_PATH_V2) and os.path.exists(FEATURE_SELECTOR_PATH_V2):

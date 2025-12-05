@@ -29,6 +29,8 @@ def _get_connection() -> sqlite3.Connection:
 
 @contextmanager
 def db_conn():
+    """DEPRECATED: Use db.session() instead."""
+    warnings.warn("db_conn() is deprecated. Use db.session() instead.", DeprecationWarning, stacklevel=2)
     conn = _get_connection()
     try:
         yield conn
@@ -38,7 +40,8 @@ def db_conn():
 
 
 def init_db() -> None:
-    # Create tables if they do not already exist
+    """DEPRECATED: Use db.create_all_tables() for ORM models. Legacy SQLite schema only."""
+    warnings.warn("init_db() is deprecated. Use db.create_all_tables() for ORM models.", DeprecationWarning, stacklevel=2)
 
     with db_conn() as conn:
         cur = conn.cursor()
@@ -425,9 +428,8 @@ def query_issues(
     limit: int = 100,
     offset: int = 0,
 ) -> List[Dict]:
-    """
-    Query issues with optional filters.
-    """
+    """DEPRECATED: Use IssueRepository.list() instead."""
+    warnings.warn("query_issues() is deprecated. Use IssueRepository.list() instead.", DeprecationWarning, stacklevel=2)
     # Ensure limit and offset are integers
     if limit is None:
         limit = 100
@@ -464,20 +466,25 @@ def query_issues(
         results = []
         for row in cur.fetchall():
             issue = dict(zip(columns, row))
-            # Parse JSON fields
-            if issue.get('labels'):
-                issue['labels'] = json.loads(issue['labels'])
-            if issue.get('repo_languages'):
-                issue['repo_languages'] = json.loads(issue['repo_languages'])
-            if issue.get('repo_topics'):
-                issue['repo_topics'] = json.loads(issue['repo_topics'])
+            _parse_json_fields(issue)
             results.append(issue)
         
         return results
 
 
+def _parse_json_fields(issue: Dict) -> None:
+    """Safely parse JSON fields in an issue dict, handling malformed data."""
+    for field, default in [('labels', []), ('repo_languages', {}), ('repo_topics', [])]:
+        if issue.get(field):
+            try:
+                issue[field] = json.loads(issue[field])
+            except (json.JSONDecodeError, TypeError):
+                issue[field] = default
+
+
 def query_unlabeled_issues(limit: int = 100) -> List[Dict]:
-    """Query issues without labels for ML training data collection."""
+    """DEPRECATED: Use IssueRepository with label filter instead."""
+    warnings.warn("query_unlabeled_issues() is deprecated. Use IssueRepository instead.", DeprecationWarning, stacklevel=2)
     # Ensure limit is an integer
     if limit is None:
         limit = 100
@@ -494,12 +501,7 @@ def query_unlabeled_issues(limit: int = 100) -> List[Dict]:
         results = []
         for row in cur.fetchall():
             issue = dict(zip(columns, row))
-            if issue.get('labels'):
-                issue['labels'] = json.loads(issue['labels'])
-            if issue.get('repo_languages'):
-                issue['repo_languages'] = json.loads(issue['repo_languages'])
-            if issue.get('repo_topics'):
-                issue['repo_topics'] = json.loads(issue['repo_topics'])
+            _parse_json_fields(issue)
             results.append(issue)
         
         return results

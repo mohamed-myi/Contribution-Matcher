@@ -17,7 +17,7 @@ import numpy as np
 
 from core.cache import cache, cached, cached_model, CacheKeys
 from core.repositories import IssueRepository
-from core.config import (
+from core.constants import (
     CODE_FOCUSED_TYPES,
     EXPERIENCE_MATCH_WEIGHT,
     FRESHNESS_WEIGHT,
@@ -83,11 +83,15 @@ class ScoringService:
         memory_attr: str,
     ) -> Optional[Any]:
         """
-        Load a model component with 3-tier caching.
-        
-        1. Check in-memory cache
-        2. Check Redis cache
-        3. Load from disk and cache
+        Load a model artifact using a 3-tier cache (memory -> Redis -> disk).
+
+        Args:
+            cache_key: Redis cache key for the artifact.
+            file_path: Filesystem path to the pickled artifact.
+            memory_attr: Attribute name used for the in-memory cache slot.
+
+        Returns:
+            The loaded artifact or None when unavailable.
         """
         # Tier 1: In-memory
         cached_value = getattr(self, memory_attr, None)
@@ -121,7 +125,7 @@ class ScoringService:
     
     @property
     def model_v2(self) -> Optional[Any]:
-        """Lazy-loaded V2 XGBoost model."""
+        """Lazy-load and cache the v2 XGBoost model artifact."""
         return self._load_model_component(
             cache_key=CacheKeys.ML_MODEL,
             file_path=MODEL_PATH_V2,
@@ -130,7 +134,7 @@ class ScoringService:
     
     @property
     def scaler_v2(self) -> Optional[Any]:
-        """Lazy-loaded V2 scaler."""
+        """Lazy-load and cache the v2 feature scaler."""
         return self._load_model_component(
             cache_key=CacheKeys.ML_SCALER,
             file_path=SCALER_PATH_V2,
@@ -139,7 +143,7 @@ class ScoringService:
     
     @property
     def feature_selector_v2(self) -> Optional[Any]:
-        """Lazy-loaded V2 feature selector."""
+        """Lazy-load and cache the v2 feature selector."""
         return self._load_model_component(
             cache_key="ml:model:feature_selector",
             file_path=FEATURE_SELECTOR_PATH_V2,
@@ -148,7 +152,7 @@ class ScoringService:
     
     @property
     def model_legacy(self) -> Optional[Any]:
-        """Lazy-loaded legacy model."""
+        """Lazy-load and cache the legacy model."""
         return self._load_model_component(
             cache_key="ml:model:legacy",
             file_path=MODEL_PATH,
@@ -157,7 +161,7 @@ class ScoringService:
     
     @property
     def scaler_legacy(self) -> Optional[Any]:
-        """Lazy-loaded legacy scaler."""
+        """Lazy-load and cache the legacy scaler."""
         return self._load_model_component(
             cache_key="ml:model:legacy_scaler",
             file_path=SCALER_PATH,
@@ -165,7 +169,12 @@ class ScoringService:
         )
     
     def _get_model_version(self) -> str:
-        """Determine which model version to use."""
+        """
+        Determine the active model version based on available artifacts.
+
+        Returns:
+            Model version identifier: 'v2', 'legacy', or 'none'.
+        """
         if self._model_version is not None:
             return self._model_version
         
@@ -179,7 +188,7 @@ class ScoringService:
         return self._model_version
     
     def invalidate_model_cache(self) -> None:
-        """Invalidate all model caches (memory and Redis)."""
+        """Clear cached model artifacts from memory and Redis."""
         # Clear memory cache
         self._model_v2 = None
         self._scaler_v2 = None
@@ -202,10 +211,14 @@ class ScoringService:
         profile_data: Optional[Dict] = None,
     ) -> Tuple[float, float]:
         """
-        Predict issue quality using cached ML model.
-        
+        Predict issue quality using the available ML model with caching.
+
+        Args:
+            issue: Issue dictionary to score.
+            profile_data: Optional profile context for feature extraction.
+
         Returns:
-            Tuple of (probability_good, probability_bad)
+            Tuple of (probability_good, probability_bad).
         """
         # Import here to avoid circular imports
         from core.scoring.ml_trainer import extract_features
@@ -245,9 +258,16 @@ class ScoringService:
         profile: Dict,
     ) -> Dict:
         """
-        Calculate match score for an issue against a profile.
-        
-        Uses hybrid approach: rule-based scoring adjusted by ML predictions.
+        Calculate a match score for an issue against a profile.
+
+        Combines rule-based scoring with ML predictions to derive a bounded score.
+
+        Args:
+            issue: Issue dictionary including repo and metadata fields.
+            profile: User profile dictionary containing skills and preferences.
+
+        Returns:
+            Dictionary containing total score, rule-based score, ML probabilities, and breakdown.
         """
         from core.scoring.issue_scorer import get_match_breakdown
         
@@ -299,7 +319,15 @@ class ScoringService:
         }
     
     def _profile_hash(self, profile: Dict) -> str:
-        """Generate a hash of profile for cache key."""
+        """
+        Generate a compact hash for a profile to key cached results.
+
+        Args:
+            profile: Profile data used for scoring.
+
+        Returns:
+            Short hash string suitable for cache keys.
+        """
         # Use skills and experience level for hash (most impactful on scoring)
         key_parts = [
             ",".join(sorted(profile.get("skills", []))),
@@ -314,9 +342,15 @@ class ScoringService:
         limit: int = 10,
     ) -> List[Dict]:
         """
-        Get top matching issues with caching.
-        
-        Cache key includes profile hash to invalidate on profile changes.
+        Retrieve top matching issues for a user with caching.
+
+        Args:
+            user_id: Target user identifier.
+            profile: Profile data used for scoring.
+            limit: Maximum number of issues to return.
+
+        Returns:
+            List of issue dictionaries ordered by score.
         """
         cache_key = f"{CacheKeys.user_top_matches(user_id, limit)}:{self._profile_hash(profile)}"
         
@@ -363,9 +397,15 @@ class ScoringService:
         batch_size: int = 100,
     ) -> int:
         """
-        Batch score issues and update cached_score column.
-        
-        Returns number of issues scored.
+        Batch score issues for a user and persist cached scores.
+
+        Args:
+            user_id: Target user identifier.
+            profile: Profile data used for scoring.
+            batch_size: Number of issues to process per iteration.
+
+        Returns:
+            Count of issues scored.
         """
         if self.issue_repo is None:
             raise ValueError("IssueRepository required for batch_score_issues")
@@ -397,6 +437,14 @@ class ScoringService:
         return total_scored
     
     def invalidate_user_cache(self, user_id: int) -> int:
-        """Invalidate all cached scores for a user."""
+        """
+        Remove all cached scoring data for a user.
+
+        Args:
+            user_id: Target user identifier.
+
+        Returns:
+            Number of deleted cache entries.
+        """
         return cache.delete_pattern(CacheKeys.user_pattern(user_id))
 

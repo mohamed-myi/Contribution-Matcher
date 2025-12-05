@@ -34,6 +34,10 @@ JOB_DEFINITIONS = {
         "func": jobs.run_ml_training_job,
         "description": "Train ML model for all users",
     },
+    "cleanup_blacklist": {
+        "func": jobs.run_token_blacklist_cleanup,
+        "description": "Clean up expired tokens from blacklist (security maintenance)",
+    },
 }
 
 
@@ -75,6 +79,14 @@ def schedule_default_jobs() -> None:
         id="train_ml",
         replace_existing=True,
         misfire_grace_time=300,
+    )
+    # Security maintenance: clean up expired blacklisted tokens hourly
+    scheduler.add_job(
+        jobs.run_token_blacklist_cleanup,
+        _cron("0 * * * *"),  # Every hour at minute 0
+        id="cleanup_blacklist",
+        replace_existing=True,
+        misfire_grace_time=600,  # 10 minute grace period
     )
 
 

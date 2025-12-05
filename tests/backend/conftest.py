@@ -37,6 +37,10 @@ def test_app_client() -> Iterator[tuple[TestClient, sessionmaker]]:
         db = TestingSessionLocal()
         try:
             yield db
+            db.commit()  # Auto-commit on success like production
+        except Exception:
+            db.rollback()
+            raise
         finally:
             db.close()
 

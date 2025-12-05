@@ -18,7 +18,12 @@ from .issue import (
     IssueTechnology,
 )
 from .ml import UserMLModel
-from .profile import DevProfile
+from .profile import (
+    DevProfile,
+    PROFILE_SOURCE_GITHUB,
+    PROFILE_SOURCE_RESUME,
+    PROFILE_SOURCE_MANUAL,
+)
 from .repo import RepoMetadata
 from .user import TokenBlacklist, User
 
@@ -30,6 +35,9 @@ __all__ = [
     "TokenBlacklist",
     # Profile
     "DevProfile",
+    "PROFILE_SOURCE_GITHUB",
+    "PROFILE_SOURCE_RESUME",
+    "PROFILE_SOURCE_MANUAL",
     # Issue
     "Issue",
     "IssueTechnology",

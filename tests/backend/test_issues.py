@@ -2,6 +2,9 @@ from datetime import datetime
 
 from backend.app.models import Issue
 from backend.app.services import issue_service
+from core.api import github_api
+from core import parsing
+from core.parsing import skill_extractor
 
 
 def test_issue_discovery_persists_results(monkeypatch, authorized_client):
@@ -15,16 +18,17 @@ def test_issue_discovery_persists_results(monkeypatch, authorized_client):
         "labels": [{"name": "good first issue"}],
     }
 
+    # Patch at the source modules
     monkeypatch.setattr(
-        issue_service, "search_issues", lambda **kwargs: [fake_issue]
+        github_api, "search_issues", lambda **kwargs: [fake_issue]
     )
     monkeypatch.setattr(
-        issue_service,
+        github_api,
         "get_repo_metadata_from_api",
         lambda owner, name, use_cache=True: {"stars": 10, "forks": 1},
     )
     monkeypatch.setattr(
-        issue_service,
+        parsing,
         "parse_issue",
         lambda issue, repo: {
             "title": issue["title"],
@@ -47,7 +51,7 @@ def test_issue_discovery_persists_results(monkeypatch, authorized_client):
         },
     )
     monkeypatch.setattr(
-        issue_service,
+        skill_extractor,
         "analyze_job_text",
         lambda body: ("backend", [("python", "language")], {}),
     )

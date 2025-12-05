@@ -15,7 +15,8 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 from core.logging import get_logger
 from core.cache import cache, CacheKeys
-from core.config import get_settings, DISCOVERY_LABELS
+from core.config import get_settings
+from core.constants import DISCOVERY_LABELS
 
 logger = get_logger("github.service")
 
@@ -29,12 +30,12 @@ class RateLimitInfo:
     
     @property
     def is_low(self) -> bool:
-        """Check if rate limit is low (< 10%)."""
+        """Check if remaining allowance is below 10%."""
         return self.remaining < (self.limit * 0.1)
     
     @property
     def seconds_until_reset(self) -> int:
-        """Seconds until rate limit resets."""
+        """Return seconds until the GitHub rate limit resets."""
         delta = self.reset_at - datetime.utcnow()
         return max(0, int(delta.total_seconds()))
     
@@ -72,7 +73,12 @@ class GitHubService:
     # =========================================================================
     
     def get_rate_limit(self) -> Optional[RateLimitInfo]:
-        """Get current rate limit status from cache or API."""
+        """
+        Get current GitHub rate limit status using cache, then API as fallback.
+
+        Returns:
+            RateLimitInfo if retrieved, otherwise None when API/cache are unavailable.
+        """
         # Try cache first
         cached = cache.get_json(CacheKeys.GITHUB_RATE_LIMIT)
         if cached:
@@ -104,7 +110,13 @@ class GitHubService:
         return None
     
     def update_rate_limit(self, remaining: int, reset_timestamp: int) -> None:
-        """Update rate limit in cache (called after API requests)."""
+        """
+        Persist the most recent rate limit values in Redis cache.
+
+        Args:
+            remaining: Requests remaining in the current window.
+            reset_timestamp: Unix timestamp when the window resets.
+        """
         info = RateLimitInfo(
             remaining=remaining,
             limit=5000,  # Default
@@ -114,13 +126,13 @@ class GitHubService:
     
     def wait_for_rate_limit(self, max_wait: int = 300) -> bool:
         """
-        Wait for rate limit to reset if needed.
-        
+        Wait for the rate limit window to reset when nearing exhaustion.
+
         Args:
-            max_wait: Maximum seconds to wait
-            
+            max_wait: Maximum seconds to pause before aborting.
+
         Returns:
-            True if we can proceed, False if wait would exceed max_wait
+            True when it is safe to proceed; False if waiting would exceed max_wait.
         """
         info = self.get_rate_limit()
         if not info or not info.is_low:
@@ -154,22 +166,16 @@ class GitHubService:
         limit: int = 50,
     ) -> List[Dict]:
         """
-        Discover issues with enforced batch optimization.
-        
-        Pattern:
-        1. Search for issues
-        2. Collect unique repos
-        3. Batch fetch metadata (single GraphQL call)
-        4. Parse and return enriched issues
-        
+        Discover issues using a batch-first workflow to minimize GitHub API calls.
+
         Args:
-            labels: Labels to search for
-            language: Programming language filter
-            min_stars: Minimum repository stars
-            limit: Maximum issues to return
-            
+            labels: Optional list of labels to filter by.
+            language: Optional primary language filter.
+            min_stars: Minimum stars a repository must have to be included.
+            limit: Maximum number of issues to return.
+
         Returns:
-            List of parsed issue dictionaries with metadata
+            List of parsed issue dictionaries enriched with repository metadata.
         """
         from core.api.github_api import search_issues, batch_get_repo_metadata
         from core.parsing.issue_parser import parse_issue
@@ -284,14 +290,14 @@ class GitHubService:
         chunk_size: int = 50,
     ) -> Dict[str, str]:
         """
-        Check status of multiple issues efficiently using GraphQL.
-        
+        Fetch issue states in batches via GitHub GraphQL.
+
         Args:
-            issue_urls: List of GitHub issue URLs
-            chunk_size: Number of issues per GraphQL query
-            
+            issue_urls: GitHub issue URLs to check.
+            chunk_size: Maximum number of issues per GraphQL query.
+
         Returns:
-            Dictionary mapping URLs to status ('open', 'closed', 'unknown')
+            Mapping of issue URL to status value ('open', 'closed', or 'unknown').
         """
         import requests
         from core.api.github_api import GITHUB_GRAPHQL_ENDPOINT, _get_graphql_headers
@@ -378,14 +384,12 @@ class GitHubService:
     ) -> Dict[Tuple[str, str], Dict]:
         """
         Fetch multiple repositories via a single GraphQL query.
-        
-        More efficient than batch_get_repo_metadata for pure repo info.
-        
+
         Args:
-            repo_list: List of (owner, name) tuples
-            
+            repo_list: List of (owner, repo) tuples to retrieve.
+
         Returns:
-            Dictionary mapping repo tuples to metadata
+            Mapping of (owner, repo) to repository metadata.
         """
         from core.api.github_api import _graphql_batch_fetch_repos
         
@@ -397,12 +401,17 @@ class GitHubService:
     # =========================================================================
     
     def clear_session_cache(self) -> None:
-        """Clear the session-level cache."""
+        """Clear session-level repository caches for the service instance."""
         self._seen_repos.clear()
         self._repo_cache.clear()
     
     def get_session_stats(self) -> Dict[str, Any]:
-        """Get statistics about the current session."""
+        """
+        Summarize current session cache usage.
+
+        Returns:
+            Dictionary with counts of cached and seen repositories.
+        """
         return {
             "cached_repos": len(self._repo_cache),
             "seen_repos": len(self._seen_repos),
@@ -414,7 +423,12 @@ _github_service: Optional[GitHubService] = None
 
 
 def get_github_service() -> GitHubService:
-    """Get the GitHubService singleton."""
+    """
+    Retrieve the shared GitHubService instance.
+
+    Returns:
+        GitHubService singleton.
+    """
     global _github_service
     if _github_service is None:
         _github_service = GitHubService()

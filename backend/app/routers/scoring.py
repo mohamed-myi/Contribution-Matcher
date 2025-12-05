@@ -19,6 +19,7 @@ def score_all(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Score all issues for the current user and persist results."""
     results = scoring_service.score_all_issues(db, current_user)
     return {"scored": len(results), "issues": results}
 
@@ -29,6 +30,7 @@ def top_matches(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Return top-matching issues for the current user."""
     issues = scoring_service.get_top_matches(db, current_user, limit=limit)
     return TopMatchesResponse(issues=issues)
 
@@ -39,4 +41,5 @@ def score_single_issue(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Return detailed score breakdown for a single issue."""
     return scoring_service.get_score_for_issue(db, current_user, issue_id)

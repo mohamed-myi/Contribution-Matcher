@@ -12,6 +12,16 @@ from ..config import get_settings
 
 
 def create_access_token(data: Dict[str, Any], expires_minutes: int | None = None) -> str:
+    """
+    Create a signed JWT access token with expiration and JTI.
+
+    Args:
+        data: Claims to include in the token (e.g., {"sub": user_id}).
+        expires_minutes: Optional override for expiration window in minutes.
+
+    Returns:
+        Encoded JWT string.
+    """
     settings = get_settings()
     to_encode = data.copy()
     expire_delta = timedelta(
@@ -28,6 +38,18 @@ def create_access_token(data: Dict[str, Any], expires_minutes: int | None = None
 
 
 def decode_access_token(token: str) -> Dict[str, Any]:
+    """
+    Decode and validate a JWT access token.
+
+    Args:
+        token: Encoded JWT string.
+
+    Returns:
+        Decoded payload dict.
+
+    Raises:
+        ValueError: If token is invalid or signature/expiry check fails.
+    """
     settings = get_settings()
     try:
         payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])

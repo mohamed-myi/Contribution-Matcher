@@ -50,7 +50,7 @@ def score_user_issues_task(
     from core.services import ScoringService
     from core.cache import cache, CacheKeys
     
-    logger.info(f"Starting issue scoring for user {user_id}")
+    logger.info("scoring_started", user_id=user_id, batch_size=batch_size)
     
     try:
         with db.session() as session:
@@ -59,7 +59,7 @@ def score_user_issues_task(
             profile = profile_repo.get_by_user_id(user_id)
             
             if not profile:
-                logger.warning(f"No profile found for user {user_id}")
+                logger.warning("scoring_no_profile", user_id=user_id)
                 return {"scored": 0, "user_id": user_id, "error": "No profile"}
             
             profile_data = {
@@ -84,7 +84,7 @@ def score_user_issues_task(
         # Invalidate user cache
         cache.delete_pattern(CacheKeys.user_pattern(user_id))
         
-        logger.info(f"Scored {total_scored} issues for user {user_id}")
+        logger.info("scoring_complete", user_id=user_id, scored=total_scored)
         
         return {
             "scored": total_scored,
@@ -92,7 +92,7 @@ def score_user_issues_task(
         }
         
     except Exception as exc:
-        logger.error(f"Scoring failed for user {user_id}: {exc}")
+        logger.error("scoring_failed", user_id=user_id, error=str(exc))
         try:
             self.retry(exc=exc)
         except MaxRetriesExceededError:
@@ -127,7 +127,7 @@ def score_single_issue_task(
     from core.repositories import IssueRepository, ProfileRepository
     from core.services import ScoringService
     
-    logger.debug(f"Scoring issue {issue_id} for user {user_id}")
+    logger.debug("scoring_single_issue", issue_id=issue_id, user_id=user_id)
     
     try:
         with db.session() as session:
@@ -168,7 +168,7 @@ def score_single_issue_task(
         }
         
     except Exception as exc:
-        logger.error(f"Single issue scoring failed: {exc}")
+        logger.error("scoring_single_failed", issue_id=issue_id, error=str(exc))
         try:
             self.retry(exc=exc)
         except MaxRetriesExceededError:
@@ -205,7 +205,7 @@ def recompute_all_scores_task(
     from core.models import User
     from core.services import ScoringService
     
-    logger.info("Starting full score recomputation")
+    logger.info("recompute_all_started", user_ids=user_ids)
     
     try:
         # Invalidate ML model cache first (force reload)
@@ -232,10 +232,10 @@ def recompute_all_scores_task(
                 results.append(result)
                 
             except Exception as e:
-                logger.warning(f"Scoring failed for user {uid}: {e}")
+                logger.warning("recompute_user_failed", user_id=uid, error=str(e))
                 results.append({"user_id": uid, "error": str(e)})
         
-        logger.info(f"Recomputed {total_scored} scores for {len(user_ids)} users")
+        logger.info("recompute_all_complete", users=len(user_ids), total_scored=total_scored)
         
         return {
             "users_processed": len(user_ids),
@@ -244,7 +244,7 @@ def recompute_all_scores_task(
         }
         
     except Exception as exc:
-        logger.error(f"Full recomputation failed: {exc}")
+        logger.error("recompute_all_failed", error=str(exc))
         return {"error": str(exc)}
 
 
@@ -259,7 +259,7 @@ def on_profile_update_task(user_id: int) -> Dict:
     """
     from core.cache import cache, CacheKeys
     
-    logger.info(f"Profile updated for user {user_id}, invalidating caches")
+    logger.info("profile_updated_invalidating", user_id=user_id)
     
     # Invalidate user caches
     cache.delete_pattern(CacheKeys.user_pattern(user_id))

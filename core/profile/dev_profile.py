@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 from typing import Dict, List, Optional
 
-from core.config import GITHUB_API_BASE
+from core.constants import GITHUB_API_BASE
 import requests
 from dotenv import load_dotenv
 

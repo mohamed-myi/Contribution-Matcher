@@ -65,6 +65,12 @@ class Issue(Base):
     
     # Precomputed score cache (added for performance - Phase 1)
     cached_score: Mapped[Optional[float]] = mapped_column(Float)
+    
+    # Staleness tracking (Phase 2)
+    last_verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    close_reason: Mapped[Optional[str]] = mapped_column(String(32))  # 'completed', 'not_planned', 'merged', etc.
+    github_state: Mapped[Optional[str]] = mapped_column(String(16))  # 'open', 'closed'
 
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="issues")
@@ -88,7 +94,12 @@ class Issue(Base):
     )
     
     def to_dict(self) -> Dict:
-        """Convert to dictionary for API responses."""
+        """
+        Convert the issue record into a serializable dictionary.
+
+        Returns:
+            Dictionary compatible with API responses and scoring pipelines.
+        """
         return {
             "id": self.id,
             "title": self.title,
@@ -110,7 +121,27 @@ class Issue(Base):
             "is_active": self.is_active,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "cached_score": self.cached_score,
+            "last_verified_at": self.last_verified_at.isoformat() if self.last_verified_at else None,
+            "closed_at": self.closed_at.isoformat() if self.closed_at else None,
+            "close_reason": self.close_reason,
+            "github_state": self.github_state,
         }
+    
+    @property
+    def is_stale(self) -> bool:
+        """Check if issue needs re-verification (not verified in 7+ days)."""
+        if not self.last_verified_at:
+            return True
+        days_since_verified = (datetime.utcnow() - self.last_verified_at).days
+        return days_since_verified >= 7
+    
+    @property
+    def is_very_stale(self) -> bool:
+        """Check if issue is very stale (not verified in 30+ days)."""
+        if not self.last_verified_at:
+            return True
+        days_since_verified = (datetime.utcnow() - self.last_verified_at).days
+        return days_since_verified >= 30
 
 
 class IssueTechnology(Base):

@@ -4,16 +4,16 @@ import re
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
-from core.config import (
+from core.constants import (
     CODE_FOCUSED_TYPES,
     EXPERIENCE_MATCH_WEIGHT,
     FRESHNESS_WEIGHT,
     INTEREST_MATCH_WEIGHT,
     REPO_QUALITY_WEIGHT,
     SKILL_MATCH_WEIGHT,
-    TIME_MATCH_WEIGHT,
     TECHNOLOGY_FAMILIES,
     TECHNOLOGY_SYNONYMS,
+    TIME_MATCH_WEIGHT,
 )
 from core.database import get_issue_technologies, query_issues
 from core.profile import load_dev_profile
@@ -21,20 +21,28 @@ from core.scoring.ml_trainer import predict_issue_quality
 
 
 def _normalize_tech_name(tech: str) -> str:
-    '''
-    Normalize technology name for matching.
-    
-    Returns - Normalized technology name
-    '''
+    """
+    Normalize a technology name for consistent matching.
+
+    Args:
+        tech: Raw technology string.
+
+    Returns:
+        Normalized technology token.
+    """
     return tech.lower().strip().replace(" ", "-").replace("_", "-")
 
 
 def _get_tech_variants(tech: str) -> set:
-    '''
-    Get all variants and synonyms for a technology.
-    
-    Returns - Set of normalized technology variants
-    '''
+    """
+    Collect normalized variants and synonyms for a technology.
+
+    Args:
+        tech: Base technology string.
+
+    Returns:
+        Set of normalized technology variants.
+    """
     normalized = _normalize_tech_name(tech)
     variants = {normalized}
     
@@ -53,11 +61,16 @@ def _get_tech_variants(tech: str) -> set:
 
 
 def _skills_match_semantic(skill1: str, skill2: str) -> bool:
-    '''
-    Check if two skills match semantically (exact, synonym, or family relationship).
-    
-    Returns - True if skills match semantically
-    '''
+    """
+    Determine if two skills match via synonyms or family relationships.
+
+    Args:
+        skill1: First skill name.
+        skill2: Second skill name.
+
+    Returns:
+        True when skills are semantically equivalent.
+    """
     skill1_variants = _get_tech_variants(skill1)
     skill2_variants = _get_tech_variants(skill2)
     
@@ -76,12 +89,16 @@ def _skills_match_semantic(skill1: str, skill2: str) -> bool:
 
 
 def calculate_skill_match(user_skills: List[str], tech_stack: List[str]) -> Tuple[float, List[str], List[str]]:
-    '''
-    Compares user skills with tech stack and calculates match percentage using semantic matching.
-    Handles synonyms, technology families, and variations.
+    """
+    Compare user skills to a tech stack with semantic matching.
 
-    Returns - (match_percentage, matching_skills, missing_skills)
-    '''
+    Args:
+        user_skills: List of skills the user has.
+        tech_stack: Technologies required by the issue.
+
+    Returns:
+        Tuple of (match_percentage, matching_skills, missing_skills).
+    """
 
     if not tech_stack:
         return (100.0, [], [])
@@ -107,11 +124,16 @@ def calculate_skill_match(user_skills: List[str], tech_stack: List[str]) -> Tupl
 
 
 def calculate_experience_match(profile_level: str, issue_difficulty: Optional[str]) -> float:
-    '''
-    Calculate experience level match.
+    """
+    Score alignment between profile experience level and issue difficulty.
 
-    Returns - Score from 0-20 (20 = perfect match, 0 = mismatch)
-    '''
+    Args:
+        profile_level: User experience level.
+        issue_difficulty: Difficulty label from issue.
+
+    Returns:
+        Score from 0-20 where 20 indicates strong alignment.
+    """
 
     if not issue_difficulty:
         return 10.0  # Neutral score if no difficulty specified
@@ -152,11 +174,15 @@ def calculate_experience_match(profile_level: str, issue_difficulty: Optional[st
 
 
 def calculate_repo_quality(repo_metadata: Optional[Dict]) -> float:
-    '''
-    Calculate repository quality score.
+    """
+    Compute repository quality score from metadata.
 
-    Returns - Score from 0-15
-    '''
+    Args:
+        repo_metadata: Optional repository metadata dictionary.
+
+    Returns:
+        Score from 0-15 reflecting activity, popularity, and community size.
+    """
 
     if not repo_metadata:
         return 5.0  # Neutral if no metadata
@@ -207,11 +233,15 @@ def calculate_repo_quality(repo_metadata: Optional[Dict]) -> float:
 
 
 def calculate_freshness(issue_updated_at: Optional[str]) -> float:
-    '''
-    Calculate issue freshness score.
+    """
+    Calculate an issue freshness score from last updated timestamp.
 
-    Returns - Score from 0-10
-    '''
+    Args:
+        issue_updated_at: ISO timestamp string.
+
+    Returns:
+        Score from 0-10 weighted toward recently updated issues.
+    """
 
     if not issue_updated_at:
         return 1.0  # Default low score
@@ -233,11 +263,16 @@ def calculate_freshness(issue_updated_at: Optional[str]) -> float:
 
 
 def calculate_time_match(profile_availability: Optional[int], issue_time_estimate: Optional[str]) -> float:
-    '''
-    Calculate time availability match.
+    """
+    Compare estimated issue effort to user availability.
 
-    Returns - Score from 0-10
-    '''
+    Args:
+        profile_availability: Hours per week the user can spend.
+        issue_time_estimate: Time estimate string from the issue.
+
+    Returns:
+        Score from 0-10 where higher is a better fit.
+    """
 
     if not profile_availability or not issue_time_estimate:
         return 5.0  # Neutral if missing
@@ -280,11 +315,16 @@ def calculate_time_match(profile_availability: Optional[int], issue_time_estimat
 
 
 def calculate_interest_match(profile_interests: List[str], repo_topics: List[str]) -> float:
-    '''
-    Calculate interest match based on repo topics.
+    """
+    Score alignment between user interests and repository topics.
 
-    Returns - Score from 0-5
-    '''
+    Args:
+        profile_interests: User interest tags.
+        repo_topics: Repository topics.
+
+    Returns:
+        Score from 0-5 based on overlap count.
+    """
 
     if not profile_interests or not repo_topics:
         return 2.5  # Neutral if missing
@@ -306,11 +346,16 @@ def calculate_interest_match(profile_interests: List[str], repo_topics: List[str
 
 
 def get_match_breakdown(profile: Dict, issue_data: Dict) -> Dict:
-    '''
-    Get detailed breakdown of profile-issue match.
+    """
+    Compute detailed breakdown for matching a profile against an issue.
 
-    Returns - Dictionary with detailed match breakdown
-    '''
+    Args:
+        profile: Profile data including skills and availability.
+        issue_data: Issue data including technologies and metadata.
+
+    Returns:
+        Dictionary with component scores and supporting metadata.
+    """
 
     # Get issue technologies
     issue_id = issue_data.get("id")
@@ -389,12 +434,18 @@ def get_match_breakdown(profile: Dict, issue_data: Dict) -> Dict:
 
 
 def score_issue_against_profile(profile: Dict, issue_data: Dict) -> Dict:
-    '''
-    Calculate overall match score for profile against an issue.
-    Uses hybrid approach: rule-based scoring adjusted by ML predictions.
+    """
+    Calculate overall match score for a profile against a single issue.
 
-    Returns - Dictionary with score and breakdown
-    '''
+    Combines rule-based scoring with ML predictions to adjust the result.
+
+    Args:
+        profile: User profile dictionary.
+        issue_data: Issue dictionary to score.
+
+    Returns:
+        Dictionary containing score, breakdown, and metadata identifiers.
+    """
 
     breakdown = get_match_breakdown(profile, issue_data)
     
@@ -462,11 +513,17 @@ def score_profile_against_all_issues(
     issue_ids: Optional[List[int]] = None,
     limit: Optional[int] = None
 ) -> List[Dict]:
-    '''
-    Score profile against multiple issues.
+    """
+    Score a profile against multiple issues.
 
-    Returns - List of score dictionaries, sorted by score (descending)
-    '''
+    Args:
+        profile: Optional profile data; loaded from disk when omitted.
+        issue_ids: Optional list of issue IDs to restrict scoring.
+        limit: Optional limit for number of issues queried.
+
+    Returns:
+        List of score dictionaries sorted by score descending.
+    """
 
     if profile is None:
         profile = load_dev_profile()
@@ -503,11 +560,16 @@ def get_top_matches(
     profile: Optional[Dict] = None,
     limit: int = 10
 ) -> List[Dict]:
-    '''
-    Get top N matching issues for profile.
+    """
+    Retrieve the top matching issues for a profile.
 
-    Returns - List of top scoring issues
-    '''
+    Args:
+        profile: Optional profile data; loaded when omitted.
+        limit: Number of issues to return.
+
+    Returns:
+        List of top scoring issue dictionaries.
+    """
 
     all_scores = score_profile_against_all_issues(profile=profile)
     return all_scores[:limit]

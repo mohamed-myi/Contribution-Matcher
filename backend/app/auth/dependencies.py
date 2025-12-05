@@ -14,11 +14,19 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
 def is_token_blacklisted(db: Session, jti: str) -> bool:
-    """Check if a token JTI is in the blacklist."""
+    """Return True when the given JTI exists in the token blacklist."""
     return db.query(TokenBlacklist).filter(TokenBlacklist.token_jti == jti).first() is not None
 
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+    """
+    Resolve the authenticated user from a bearer token.
+
+    Steps:
+    1) Decode JWT and extract subject (user id) and jti.
+    2) Reject if token is blacklisted (revoked).
+    3) Load the user from DB or raise 401.
+    """
     try:
         payload = decode_access_token(token)
     except ValueError:

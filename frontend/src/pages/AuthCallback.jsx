@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../api/client';
 import { AuthLayout } from '../components/Layout';
 import { PageLoader } from '../components/common';
 import './AuthCallback.css';
@@ -10,16 +11,42 @@ export function AuthCallback() {
   const navigate = useNavigate();
   const { login } = useAuth();
   const [error, setError] = useState(null);
+  const isProcessing = useRef(false);
 
   useEffect(() => {
+    // Prevent double execution (React 18 Strict Mode runs effects twice)
+    if (isProcessing.current) return;
+    isProcessing.current = true;
+
+    const authCode = searchParams.get('code');
     const token = searchParams.get('token');
     const errorParam = searchParams.get('error');
 
     if (errorParam) {
-      setError(errorParam);
+      setError(errorParam === 'authentication_failed' 
+        ? 'Authentication failed. Please try again.' 
+        : errorParam);
       return;
     }
 
+    // New secure flow: exchange auth code for JWT token
+    if (authCode) {
+      api.exchangeAuthCode(authCode)
+        .then((response) => {
+          const jwtToken = response.data.access_token;
+          return login(jwtToken);
+        })
+        .then(() => {
+          navigate('/dashboard', { replace: true });
+        })
+        .catch((err) => {
+          console.error('Auth code exchange failed:', err);
+          setError('Failed to complete authentication. Please try again.');
+        });
+      return;
+    }
+
+    // Legacy fallback: direct token in URL (when Redis unavailable)
     if (token) {
       login(token)
         .then(() => {
@@ -29,9 +56,10 @@ export function AuthCallback() {
           console.error('Login failed:', err);
           setError('Failed to complete authentication');
         });
-    } else {
-      setError('No authentication token received');
+      return;
     }
+
+    setError('No authentication credentials received');
   }, [searchParams, login, navigate]);
 
   if (error) {

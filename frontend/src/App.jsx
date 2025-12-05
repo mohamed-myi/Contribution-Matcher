@@ -1,19 +1,35 @@
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { ThemeProvider } from './context/ThemeContext';
-import { Login, AuthCallback, Dashboard, Issues, Profile, MLTraining } from './pages';
 import { PageLoader } from './components/common';
+import { FirstLoginPrompt } from './components/FirstLoginPrompt';
+import { preloadRoutes } from './utils/routePreloader';
+import { createQueryClient, setupPersistentCache, warmCache } from './utils/queryClient';
+import { api } from './api/client';
 import './styles/global.css';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      retry: 1,
-    },
-  },
-});
+// Eager-loaded pages (critical auth path)
+import { Login, AuthCallback } from './pages';
+
+// Lazy-loaded pages (behind authentication)
+const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })));
+const Issues = lazy(() => import('./pages/Issues').then(m => ({ default: m.Issues })));
+const Profile = lazy(() => import('./pages/Profile').then(m => ({ default: m.Profile })));
+const MLTraining = lazy(() => import('./pages/MLTraining').then(m => ({ default: m.MLTraining })));
+const LabeledIssues = lazy(() => import('./pages/LabeledIssues').then(m => ({ default: m.LabeledIssues })));
+
+// Export lazy components for preloading
+export const lazyRoutes = {
+  Dashboard,
+  Issues,
+  Profile,
+  MLTraining,
+  LabeledIssues,
+};
+
+// Create React Query client with enhanced configuration
+const queryClient = createQueryClient();
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated, loading } = useAuth();
@@ -26,7 +42,12 @@ function ProtectedRoute({ children }) {
     return <Navigate to="/login" replace />;
   }
 
-  return children;
+  // Suspense boundary for lazy-loaded pages
+  return (
+    <Suspense fallback={<PageLoader message="Loading page..." />}>
+      {children}
+    </Suspense>
+  );
 }
 
 function PublicRoute({ children }) {
@@ -44,6 +65,24 @@ function PublicRoute({ children }) {
 }
 
 function AppRoutes() {
+  const { isAuthenticated } = useAuth();
+  
+  // Preload critical routes after authentication
+  useEffect(() => {
+    if (isAuthenticated) {
+      // Preload Dashboard and Issues (most accessed) after idle
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(() => {
+          preloadRoutes([Dashboard, Issues]);
+        }, { timeout: 2000 });
+      } else {
+        setTimeout(() => {
+          preloadRoutes([Dashboard, Issues]);
+        }, 2000);
+      }
+    }
+  }, [isAuthenticated]);
+  
   return (
     <Routes>
       {/* Public Routes */}
@@ -91,10 +130,18 @@ function AppRoutes() {
         } 
       />
       <Route 
-        path="/ml-training" 
+        path="/algorithm-improvement" 
         element={
           <ProtectedRoute>
             <MLTraining />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/algorithm-improvement/labeled" 
+        element={
+          <ProtectedRoute>
+            <LabeledIssues />
           </ProtectedRoute>
         } 
       />
@@ -106,17 +153,35 @@ function AppRoutes() {
 }
 
 function App() {
+  // Setup persistent cache on mount
+  useEffect(() => {
+    setupPersistentCache(queryClient);
+  }, []);
+  
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <BrowserRouter>
-          <AuthProvider>
-            <AppRoutes />
-          </AuthProvider>
-        </BrowserRouter>
-      </ThemeProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <CacheWarmer />
+          <FirstLoginPrompt />
+          <AppRoutes />
+        </AuthProvider>
+      </BrowserRouter>
     </QueryClientProvider>
   );
+}
+
+// Component to warm cache after authentication
+function CacheWarmer() {
+  const { isAuthenticated } = useAuth();
+  
+  useEffect(() => {
+    if (isAuthenticated) {
+      warmCache(queryClient, api, isAuthenticated);
+    }
+  }, [isAuthenticated]);
+  
+  return null;
 }
 
 export default App;

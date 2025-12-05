@@ -7,6 +7,7 @@ Includes security validation and rate limiting.
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from core.logging import configure_logging, get_logger, RequestLoggingMiddleware
@@ -55,6 +56,11 @@ def validate_security_on_startup():
             for warning in result.warnings:
                 logger.warning("security_warning", message=warning)
         
+        # Also check production config warnings
+        config_errors, config_warnings = settings.validate_production_config()
+        for warning in config_warnings:
+            logger.warning("config_warning", message=warning)
+        
         logger.info("security_validation_passed")
         return True
         
@@ -73,15 +79,34 @@ def validate_security_on_startup():
 def create_app() -> FastAPI:
     app = FastAPI(title=settings.app_name, debug=settings.debug)
 
-    # CORS middleware
+    # CORS middleware - restricted to specific methods and headers for security
     origins = [origin.strip() for origin in settings.cors_allowed_origins.split(",")]
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        # Only allow methods actually used by the API
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        # Only allow headers needed for API communication
+        allow_headers=[
+            "Authorization",
+            "Content-Type",
+            "Accept",
+            "Accept-Encoding",
+            "Origin",
+            "X-Requested-With",
+        ],
+        # Expose rate limit headers to frontend
+        expose_headers=[
+            "X-RateLimit-Limit",
+            "X-RateLimit-Remaining",
+            "X-RateLimit-Reset",
+            "Retry-After",
+        ],
     )
+    
+    # GZip compression for responses > 500 bytes
+    app.add_middleware(GZipMiddleware, minimum_size=500)
     
     # Request ID middleware (for tracing)
     app.add_middleware(RequestIDMiddleware)
@@ -95,15 +120,31 @@ def create_app() -> FastAPI:
     @app.on_event("startup")
     async def startup_event():
         """Initialize services on startup."""
+        import os
+        
         logger.info("app_startup", app_name=settings.app_name)
+        
+        # Determine if we're in a safe environment for bypassing security checks
+        # Both debug flag AND non-production ENV required to skip security validation
+        env = os.getenv("ENV", "development").lower()
+        is_production = env in ("production", "prod")
+        allow_security_bypass = settings.debug and not is_production
         
         # Validate security configuration
         try:
             validate_security_on_startup()
         except SecurityConfigError:
-            if not settings.debug:
+            if not allow_security_bypass:
+                # In production or non-debug mode, security errors are fatal
+                logger.error(
+                    "security_validation_failed_fatal",
+                    message="Security validation failed. Set valid secrets or use ENV=development with DEBUG=true to bypass.",
+                )
                 raise
-            logger.warning("security_validation_skipped_debug_mode")
+            logger.warning(
+                "security_validation_skipped",
+                message="Security validation bypassed (DEBUG=true and ENV!=production)",
+            )
         
         # Initialize database
         db.initialize(settings.database_url)
@@ -148,7 +189,31 @@ def create_app() -> FastAPI:
 
     @app.get("/health", tags=["health"])
     def health_check():
-        """Health check endpoint."""
+        """
+        Health check endpoint.
+        
+        Returns minimal information to avoid exposing infrastructure details.
+        Use /health/detailed for more info (requires debug mode).
+        """
+        # Only return basic status - no infrastructure details
+        return {"status": "ok"}
+
+    @app.get("/health/detailed", tags=["health"])
+    def health_check_detailed():
+        """
+        Detailed health check with infrastructure status.
+        
+        Only available in debug mode to prevent information disclosure.
+        """
+        import os
+        
+        env = os.getenv("ENV", "development").lower()
+        is_production = env in ("production", "prod")
+        
+        # Block detailed health info in production
+        if is_production or not settings.debug:
+            return {"error": "Detailed health info only available in debug mode"}
+        
         return {
             "status": "ok",
             "cache": cache.health_check() if cache.is_available else {"status": "unavailable"},
@@ -158,9 +223,18 @@ def create_app() -> FastAPI:
 
     @app.get("/security/status", tags=["health"])
     def security_status():
-        """Get security service status (requires auth in production)."""
-        if not settings.debug:
-            return {"error": "Only available in debug mode"}
+        """
+        Security service status.
+        
+        Only available in debug mode AND non-production to prevent information disclosure.
+        """
+        import os
+        
+        env = os.getenv("ENV", "development").lower()
+        is_production = env in ("production", "prod")
+        
+        if is_production or not settings.debug:
+            return {"error": "Security status only available in debug mode"}
         
         return {
             "jwt_configured": settings.jwt_secret_key != "CHANGE_ME",

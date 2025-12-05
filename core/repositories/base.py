@@ -1,9 +1,8 @@
-"""
-Base repository class with common CRUD operations.
-"""
+"""Base repository class with common CRUD operations."""
 
-from typing import Generic, List, Optional, Type, TypeVar
+from typing import Any, Dict, Generic, List, Optional, Type, TypeVar
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from core.db import Base
@@ -15,11 +14,9 @@ class BaseRepository(Generic[T]):
     """
     Base repository providing common CRUD operations.
     
-    Type parameter T is the SQLAlchemy model class.
-    
     Usage:
         class UserRepository(BaseRepository[User]):
-            pass
+            model = User
         
         repo = UserRepository(session)
         user = repo.get_by_id(1)
@@ -32,22 +29,17 @@ class BaseRepository(Generic[T]):
     
     def get_by_id(self, id: int) -> Optional[T]:
         """Get a single record by ID."""
-        return self.session.query(self.model).filter(self.model.id == id).first()
+        return self.session.get(self.model, id)
     
     def get_all(self, limit: int = 100, offset: int = 0) -> List[T]:
         """Get all records with pagination."""
-        return (
-            self.session.query(self.model)
-            .offset(offset)
-            .limit(limit)
-            .all()
-        )
+        return self.session.query(self.model).offset(offset).limit(limit).all()
     
     def create(self, **kwargs) -> T:
         """Create a new record."""
         instance = self.model(**kwargs)
         self.session.add(instance)
-        self.session.flush()  # Get ID without committing
+        self.session.flush()
         return instance
     
     def update(self, id: int, **kwargs) -> Optional[T]:
@@ -60,6 +52,18 @@ class BaseRepository(Generic[T]):
             self.session.flush()
         return instance
     
+    def bulk_update(self, ids: List[int], **kwargs) -> int:
+        """Bulk update multiple records with same values."""
+        if not ids:
+            return 0
+        result = (
+            self.session.query(self.model)
+            .filter(self.model.id.in_(ids))
+            .update(kwargs, synchronize_session=False)
+        )
+        self.session.flush()
+        return result
+    
     def delete(self, id: int) -> bool:
         """Delete a record by ID."""
         instance = self.get_by_id(id)
@@ -69,13 +73,24 @@ class BaseRepository(Generic[T]):
             return True
         return False
     
-    def count(self) -> int:
-        """Get total count of records."""
-        return self.session.query(self.model).count()
+    def count(self, **filters) -> int:
+        """Get count of records, optionally filtered."""
+        query = self.session.query(func.count(self.model.id))
+        for key, value in filters.items():
+            if hasattr(self.model, key):
+                query = query.filter(getattr(self.model, key) == value)
+        return query.scalar() or 0
     
     def exists(self, id: int) -> bool:
         """Check if a record exists."""
         return self.session.query(
             self.session.query(self.model).filter(self.model.id == id).exists()
         ).scalar()
-
+    
+    def exists_where(self, **filters) -> bool:
+        """Check if any record exists matching filters."""
+        query = self.session.query(self.model)
+        for key, value in filters.items():
+            if hasattr(self.model, key):
+                query = query.filter(getattr(self.model, key) == value)
+        return self.session.query(query.exists()).scalar()

@@ -46,6 +46,7 @@ class IssueResponse(BaseModel):
     repo_owner: Optional[str] = None
     repo_name: Optional[str] = None
     repo_stars: Optional[int] = None
+    repo_languages: Optional[dict] = None
     issue_number: Optional[int] = None
     description: Optional[str] = None
     technologies: List[str] = Field(default_factory=list)
@@ -53,6 +54,13 @@ class IssueResponse(BaseModel):
     repo_topics: List[str] = Field(default_factory=list)
     created_at: Optional[datetime] = None
     is_bookmarked: bool = False
+    # Staleness fields
+    last_verified_at: Optional[datetime] = None
+    closed_at: Optional[datetime] = None
+    close_reason: Optional[str] = None
+    github_state: Optional[str] = None
+    is_stale: bool = False
+    is_very_stale: bool = False
 
 
 class IssueDetailResponse(IssueResponse):
@@ -92,8 +100,20 @@ class ProfileResponse(BaseModel):
     interests: List[str] = Field(default_factory=list)
     preferred_languages: List[str] = Field(default_factory=list)
     time_availability: Optional[int] = None
+    profile_source: str = Field(default="manual", description="Origin of profile: github, resume, or manual")
+    last_github_sync: Optional[datetime] = Field(default=None, description="Timestamp of last GitHub sync")
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+
+
+class ProfileSourceInfo(BaseModel):
+    """Detailed information about profile source for UI display."""
+    source: str = Field(description="Profile source: github, resume, or manual")
+    is_from_github: bool = Field(default=False)
+    is_from_resume: bool = Field(default=False)
+    is_manual: bool = Field(default=True)
+    last_github_sync: Optional[datetime] = None
+    can_resync_github: bool = Field(default=True, description="Whether user can re-sync from GitHub")
 
 
 class ProfileUpdateRequest(BaseModel):
@@ -133,6 +153,32 @@ class LabelStatusResponse(BaseModel):
 
 class UnlabeledIssuesResponse(BaseModel):
     issues: List[IssueResponse]
+
+
+class LabeledIssueResponse(BaseModel):
+    """Issue with its label for the labeled issues management page."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    title: str
+    url: str
+    difficulty: Optional[str] = None
+    issue_type: Optional[str] = None
+    repo_owner: Optional[str] = None
+    repo_name: Optional[str] = None
+    repo_stars: Optional[int] = None
+    description: Optional[str] = None
+    technologies: List[str] = Field(default_factory=list)
+    label: str  # "good" or "bad"
+    labeled_at: Optional[datetime] = None
+
+
+class LabeledIssuesResponse(BaseModel):
+    """Response for labeled issues list."""
+    issues: List[LabeledIssueResponse]
+    total: int
+    good_count: int
+    bad_count: int
 
 
 class TrainModelRequest(BaseModel):

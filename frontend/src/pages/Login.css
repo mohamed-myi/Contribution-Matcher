@@ -11,9 +11,19 @@
 }
 
 .login-logo-icon {
-  font-size: 4rem;
-  color: var(--primary);
-  display: inline-block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+  color: var(--text-primary);
+  background: var(--surface);
+  font-size: 1.75rem;
+  font-weight: 800;
+  border-radius: 50%;
+  border: 2px solid var(--text-primary);
+  letter-spacing: -0.02em;
+  margin: 0 auto;
   animation: pulse 2s ease-in-out infinite;
 }
 

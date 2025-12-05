@@ -41,6 +41,37 @@
   color: var(--error);
 }
 
+/* Info Message (e.g., "Already synced from GitHub") */
+.profile-info-message {
+  padding: var(--space-4);
+  background: rgba(var(--primary-rgb), 0.1);
+  border: 1px solid rgba(var(--primary-rgb), 0.3);
+  border-radius: var(--radius-md);
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.profile-info-message p {
+  margin: 0 0 var(--space-1) 0;
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.profile-info-detail {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
 /* Empty State */
 .profile-empty {
   max-width: 500px;
@@ -94,10 +125,24 @@
 .tag-input-row {
   display: flex;
   gap: var(--space-2);
+  padding-right: var(--space-6);
+  margin-left: -12px;
+  margin-top: 6px;
 }
 
 .tag-input-row input {
   flex: 1;
+  height: 44px;
+}
+
+/* Square "Add" buttons matching input height */
+.tag-input-row .btn {
+  aspect-ratio: 1 / 1;
+  height: 44px;
+  width: 44px;
+  min-width: 44px;
+  padding: 0;
+  flex-shrink: 0;
 }
 
 .tag-list {
@@ -293,6 +338,172 @@
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* Profile Source Indicator */
+.profile-source-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.profile-sync-time {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
+/* Profile Create Options (Empty State) */
+.profile-create-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+}
+
+.profile-create-option {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  text-align: center;
+  transition: all var(--transition-fast);
+}
+
+.profile-create-option:hover {
+  border-color: var(--primary);
+  transform: translateY(-2px);
+}
+
+.profile-create-option .option-icon {
+  font-size: 2rem;
+  margin-bottom: var(--space-3);
+}
+
+.profile-create-option h4 {
+  margin: 0 0 var(--space-2) 0;
+  color: var(--text-primary);
+}
+
+.profile-create-option p {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  margin: 0 0 var(--space-4) 0;
+}
+
+/* Mini Resume Upload Zone (for create options) */
+.resume-upload-zone-mini {
+  padding: var(--space-3) var(--space-4);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  color: var(--text-secondary);
+}
+
+.resume-upload-zone-mini:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: rgba(var(--primary-rgb), 0.05);
+}
+
+.resume-upload-zone-mini.drag-active {
+  border-color: var(--primary);
+  background: rgba(var(--primary-rgb), 0.1);
+}
+
+/* Profile Confirmation Modal */
+.profile-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: var(--space-4);
+}
+
+.profile-modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  max-width: 450px;
+  width: 100%;
+  animation: modalSlideIn 0.2s ease-out;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.profile-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--border);
+}
+
+.profile-modal-header h3 {
+  margin: 0;
+  font-size: var(--font-size-lg);
+}
+
+.profile-modal-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: var(--space-1);
+  line-height: 1;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.profile-modal-close:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.profile-modal-body {
+  padding: var(--space-5);
+}
+
+.profile-modal-body p {
+  margin: 0 0 var(--space-3) 0;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.profile-modal-body p:last-child {
+  margin-bottom: 0;
+}
+
+.profile-modal-warning {
+  color: var(--warning) !important;
+  font-weight: 500;
+  padding: var(--space-3);
+  background: var(--warning-bg);
+  border-radius: var(--radius-md);
+  margin-top: var(--space-4) !important;
+}
+
+.profile-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.2);
 }
 
 /* Delete Account Section */

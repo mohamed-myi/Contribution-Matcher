@@ -4,6 +4,7 @@ Profile management service functions.
 
 import io
 import re
+from datetime import datetime
 from typing import Optional
 
 import httpx
@@ -11,12 +12,18 @@ import httpx
 from sqlalchemy.orm import Session
 
 from core.parsing.skill_extractor import analyze_job_text
+from core.models import (
+    PROFILE_SOURCE_GITHUB,
+    PROFILE_SOURCE_RESUME,
+    PROFILE_SOURCE_MANUAL,
+)
 
 from ..models import DevProfile, User
 from ..schemas import ProfileUpdateRequest
 
 
 def get_profile(db: Session, user: User) -> DevProfile | None:
+    """Fetch the profile for a user, or None if it does not exist."""
     return db.query(DevProfile).filter(DevProfile.user_id == user.id).one_or_none()
 
 
@@ -25,21 +32,42 @@ def update_profile(
     user: User,
     payload: ProfileUpdateRequest,
 ) -> DevProfile:
+    """
+    Update profile with user-provided data.
+    
+    When core profile fields (skills, experience_level, interests, preferred_languages)
+    are modified, the profile_source is changed to "manual" to indicate user customization.
+    """
     profile = get_profile(db, user)
+    is_new_profile = profile is None
+    
     if not profile:
         profile = DevProfile(user_id=user.id)
+        profile.profile_source = PROFILE_SOURCE_MANUAL
         db.add(profile)
 
+    # Track if core fields are being modified
+    core_fields_modified = False
+    
     if payload.skills is not None:
         profile.skills = payload.skills
+        core_fields_modified = True
     if payload.experience_level is not None:
         profile.experience_level = payload.experience_level
+        core_fields_modified = True
     if payload.interests is not None:
         profile.interests = payload.interests
+        core_fields_modified = True
     if payload.preferred_languages is not None:
         profile.preferred_languages = payload.preferred_languages
+        core_fields_modified = True
     if payload.time_availability is not None:
         profile.time_availability_hours_per_week = payload.time_availability
+        # Time availability is not a core field, doesn't change source
+    
+    # If core fields were modified on an existing profile, mark as manual
+    if core_fields_modified and not is_new_profile:
+        profile.profile_source = PROFILE_SOURCE_MANUAL
 
     db.commit()
     db.refresh(profile)
@@ -87,6 +115,10 @@ def create_profile_from_github(
     profile.preferred_languages = list(languages)[:10]
     profile.experience_level = profile.experience_level or "intermediate"
     profile.time_availability_hours_per_week = profile.time_availability_hours_per_week or 10
+    
+    # Track source and sync time
+    profile.profile_source = PROFILE_SOURCE_GITHUB
+    profile.last_github_sync = datetime.utcnow()
 
     db.commit()
     db.refresh(profile)
@@ -103,8 +135,22 @@ def serialize_profile(profile: DevProfile) -> dict:
         "interests": profile.interests or [],
         "preferred_languages": profile.preferred_languages or [],
         "time_availability": profile.time_availability_hours_per_week,
+        "profile_source": profile.profile_source or PROFILE_SOURCE_MANUAL,
+        "last_github_sync": profile.last_github_sync,
         "created_at": profile.created_at,
         "updated_at": profile.updated_at,
+    }
+
+
+def get_profile_source_info(profile: DevProfile) -> dict:
+    """Get detailed information about profile source for UI display."""
+    return {
+        "source": profile.profile_source or PROFILE_SOURCE_MANUAL,
+        "is_from_github": profile.is_from_github,
+        "is_from_resume": profile.is_from_resume,
+        "is_manual": profile.is_manual,
+        "last_github_sync": profile.last_github_sync,
+        "can_resync_github": True,  # Always allow re-syncing
     }
 
 
@@ -193,6 +239,11 @@ def create_profile_from_resume(
     profile.preferred_languages = preferred_languages
     profile.interests = profile.interests or []  # Keep existing interests
     profile.time_availability_hours_per_week = profile.time_availability_hours_per_week or 10
+    
+    # Track source (resume replaces any previous source)
+    profile.profile_source = PROFILE_SOURCE_RESUME
+    # Clear GitHub sync time since this is now a resume-based profile
+    profile.last_github_sync = None
     
     db.commit()
     db.refresh(profile)

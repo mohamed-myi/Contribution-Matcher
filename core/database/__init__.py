@@ -1,23 +1,20 @@
 """
-Unified Database Package.
+Database Package.
 
-Provides DatabaseManager (recommended) and legacy functions for backward compatibility.
-
-New API:
+New API (recommended):
     from core.database import db, get_db, Base
     db.initialize()
     with db.session() as session:
         issues = session.query(Issue).all()
 
-Legacy API (deprecated):
+Legacy API (deprecated, for backward compatibility):
     from core.database import upsert_issue, query_issues
 """
 
-# New API - DatabaseManager from the internal module
-from core._database_manager import Base, DatabaseManager, db, get_db
+# New API - from the consolidated db module
+from core.db import Base, DatabaseManager, db, get_db
 
-# Legacy API - Re-export all functions from the legacy module
-# These are deprecated but maintained for backward compatibility
+# Legacy API - deprecated but maintained for backward compatibility
 from core.database.database import (
     DB_PATH,
     db_conn,
@@ -47,7 +44,7 @@ __all__ = [
     "DatabaseManager",
     "db",
     "get_db",
-    # Legacy database functions
+    # Legacy (deprecated)
     "DB_PATH",
     "db_conn",
     "export_to_csv",

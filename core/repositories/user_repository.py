@@ -1,24 +1,21 @@
-"""
-User repository for authentication and user management.
-"""
+"""User repository for authentication and user management."""
 
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy.orm import Session
-
 from core.models import TokenBlacklist, User
+from core.security.encryption import get_encryption_service
+from core.logging import get_logger
 
 from .base import BaseRepository
+
+logger = get_logger("repository.user")
 
 
 class UserRepository(BaseRepository[User]):
     """Repository for User operations."""
     
     model = User
-    
-    def __init__(self, session: Session):
-        super().__init__(session)
     
     def get_by_github_id(self, github_id: str) -> Optional[User]:
         """Get user by GitHub ID."""
@@ -36,6 +33,40 @@ class UserRepository(BaseRepository[User]):
             .first()
         )
     
+    def _encrypt_token(self, token: str) -> str:
+        """
+        Encrypt a GitHub access token for secure storage.
+        
+        Falls back to plaintext if encryption is unavailable,
+        but logs a warning for security auditing.
+        """
+        encryption = get_encryption_service()
+        encrypted, was_encrypted = encryption.encrypt_if_available(token)
+        
+        if not was_encrypted:
+            logger.warning(
+                "token_stored_unencrypted",
+                message="GitHub token stored without encryption. Set TOKEN_ENCRYPTION_KEY for secure storage.",
+            )
+        
+        return encrypted
+    
+    def get_decrypted_token(self, user: User) -> Optional[str]:
+        """
+        Get the decrypted GitHub access token for a user.
+        
+        Args:
+            user: User model instance
+            
+        Returns:
+            Decrypted token or None if no token exists
+        """
+        if not user.github_access_token:
+            return None
+        
+        encryption = get_encryption_service()
+        return encryption.decrypt_if_encrypted(user.github_access_token)
+    
     def create_or_update_from_github(
         self,
         github_id: str,
@@ -47,28 +78,30 @@ class UserRepository(BaseRepository[User]):
         """
         Create or update a user from GitHub OAuth data.
         
-        Used during OAuth callback to ensure user exists.
+        The access_token is encrypted before storage if TOKEN_ENCRYPTION_KEY
+        is configured. This protects tokens at rest in the database.
         """
         user = self.get_by_github_id(github_id)
         
+        # Encrypt the token if provided
+        encrypted_token = self._encrypt_token(access_token) if access_token else None
+        
         if user:
-            # Update existing user
             user.github_username = github_username
             if email:
                 user.email = email
             if avatar_url:
                 user.avatar_url = avatar_url
-            if access_token:
-                user.github_access_token = access_token
+            if encrypted_token:
+                user.github_access_token = encrypted_token
             user.updated_at = datetime.utcnow()
         else:
-            # Create new user
             user = User(
                 github_id=github_id,
                 github_username=github_username,
                 email=email,
                 avatar_url=avatar_url,
-                github_access_token=access_token,
+                github_access_token=encrypted_token,
             )
             self.session.add(user)
         
@@ -76,10 +109,14 @@ class UserRepository(BaseRepository[User]):
         return user
     
     def update_access_token(self, user_id: int, access_token: str) -> bool:
-        """Update user's GitHub access token."""
+        """
+        Update user's GitHub access token.
+        
+        The token is encrypted before storage if TOKEN_ENCRYPTION_KEY is configured.
+        """
         user = self.get_by_id(user_id)
         if user:
-            user.github_access_token = access_token
+            user.github_access_token = self._encrypt_token(access_token)
             user.updated_at = datetime.utcnow()
             self.session.flush()
             return True
@@ -91,23 +128,13 @@ class TokenBlacklistRepository(BaseRepository[TokenBlacklist]):
     
     model = TokenBlacklist
     
-    def __init__(self, session: Session):
-        super().__init__(session)
-    
     def is_blacklisted(self, token_jti: str) -> bool:
         """Check if a token JTI is blacklisted."""
-        return (
-            self.session.query(TokenBlacklist)
-            .filter(TokenBlacklist.token_jti == token_jti)
-            .first()
-        ) is not None
+        return self.exists_where(token_jti=token_jti)
     
     def blacklist_token(self, token_jti: str, expires_at: datetime) -> TokenBlacklist:
         """Add a token to the blacklist."""
-        token = TokenBlacklist(
-            token_jti=token_jti,
-            expires_at=expires_at,
-        )
+        token = TokenBlacklist(token_jti=token_jti, expires_at=expires_at)
         self.session.add(token)
         self.session.flush()
         return token
@@ -121,4 +148,3 @@ class TokenBlacklistRepository(BaseRepository[TokenBlacklist]):
         )
         self.session.flush()
         return result
-

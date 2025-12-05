@@ -25,14 +25,15 @@ class IssueRepository(BaseRepository[Issue]):
     
     model = Issue
     
-    def __init__(self, session: Session):
-        super().__init__(session)
-    
     def get_by_id(self, issue_id: int, user_id: int) -> Optional[Issue]:
         """Get an issue by ID for a specific user."""
         return (
             self.session.query(Issue)
-            .filter(Issue.id == issue_id, Issue.user_id == user_id)
+            .filter(
+                Issue.id == issue_id,
+                Issue.user_id == user_id,
+                Issue.is_active == True,
+            )
             .first()
         )
     
@@ -50,13 +51,15 @@ class IssueRepository(BaseRepository[Issue]):
         filters: Dict,
         offset: int = 0,
         limit: int = 20,
+        skip_count: bool = False,
     ) -> Tuple[List[Issue], int, Set[int]]:
         """
         Get issues with bookmark status efficiently.
         
-        Uses 2 queries instead of N+1:
+        Uses 2-3 queries instead of N+1:
         1. Main query with eager loading
-        2. Batch fetch bookmark IDs
+        2. Optimized count (optional, uses subquery)
+        3. Batch fetch bookmark IDs
         
         Args:
             user_id: User ID
@@ -69,44 +72,73 @@ class IssueRepository(BaseRepository[Issue]):
                 - is_active: Filter by active status
             offset: Pagination offset
             limit: Pagination limit
+            skip_count: Skip total count query (for infinite scroll)
         
         Returns:
             Tuple of (issues, total_count, bookmarked_issue_ids)
         """
+        # Build base filter conditions (reused for both count and select)
+        base_conditions = [Issue.user_id == user_id]
+        
+        if filters.get("difficulty"):
+            base_conditions.append(Issue.difficulty == filters["difficulty"])
+        
+        if filters.get("issue_type"):
+            base_conditions.append(Issue.issue_type == filters["issue_type"])
+        
+        if filters.get("days_back"):
+            cutoff = datetime.utcnow() - timedelta(days=filters["days_back"])
+            base_conditions.append(Issue.created_at >= cutoff)
+        
+        if filters.get("is_active") is not None:
+            base_conditions.append(Issue.is_active == filters["is_active"])
+        
+        if filters.get("language"):
+            lang = filters["language"]
+            # Use JSON key extraction for proper language filtering
+            # This works with SQLite's JSON functions
+            base_conditions.append(
+                func.json_extract(Issue.repo_languages, f'$."{lang}"').isnot(None)
+            )
+        
+        if filters.get("min_stars"):
+            base_conditions.append(Issue.repo_stars >= filters["min_stars"])
+        
+        if filters.get("score_range"):
+            score_range = filters["score_range"]
+            if score_range == "high":
+                base_conditions.append(Issue.cached_score >= 80)
+            elif score_range == "medium":
+                base_conditions.append(Issue.cached_score >= 50)
+                base_conditions.append(Issue.cached_score < 80)
+            elif score_range == "low":
+                base_conditions.append(Issue.cached_score < 50)
+        
         # Build main query with eager loading
         query = (
             self.session.query(Issue)
             .options(selectinload(Issue.technologies))
-            .filter(Issue.user_id == user_id)
+            .filter(and_(*base_conditions))
         )
         
-        # Apply filters
-        if filters.get("difficulty"):
-            query = query.filter(Issue.difficulty == filters["difficulty"])
-        
+        # Technology filter requires join
         if filters.get("technology"):
             tech = filters["technology"]
             query = query.join(Issue.technologies).filter(
                 IssueTechnology.technology.ilike(f"%{tech}%")
             )
         
-        if filters.get("language"):
-            lang = filters["language"]
-            # Search in JSON repo_languages field
-            query = query.filter(Issue.repo_languages.contains(lang))
-        
-        if filters.get("issue_type"):
-            query = query.filter(Issue.issue_type == filters["issue_type"])
-        
-        if filters.get("days_back"):
-            cutoff = datetime.utcnow() - timedelta(days=filters["days_back"])
-            query = query.filter(Issue.created_at >= cutoff)
-        
-        if filters.get("is_active") is not None:
-            query = query.filter(Issue.is_active == filters["is_active"])
-        
-        # Get total count (before pagination)
-        total = query.count()
+        # Optimized count - use COUNT(*) with same filters but no eager loading
+        if skip_count:
+            total = -1  # Signal that count was skipped
+        else:
+            count_query = self.session.query(func.count(Issue.id)).filter(and_(*base_conditions))
+            if filters.get("technology"):
+                tech = filters["technology"]
+                count_query = count_query.join(Issue.technologies).filter(
+                    IssueTechnology.technology.ilike(f"%{tech}%")
+                )
+            total = count_query.scalar()
         
         # Get paginated results ordered by cached_score or created_at
         if filters.get("order_by") == "score":
@@ -235,12 +267,11 @@ class IssueRepository(BaseRepository[Issue]):
             .all()
         )
     
-    def update_cached_scores(
-        self,
-        scores: Dict[int, float],
-    ) -> int:
+    def update_cached_scores(self, scores: Dict[int, float]) -> int:
         """
         Bulk update cached_score for multiple issues.
+        
+        Uses efficient bulk update with CASE statement instead of individual updates.
         
         Args:
             scores: Dictionary mapping issue_id to score
@@ -251,17 +282,22 @@ class IssueRepository(BaseRepository[Issue]):
         if not scores:
             return 0
         
-        count = 0
-        for issue_id, score in scores.items():
-            result = (
-                self.session.query(Issue)
-                .filter(Issue.id == issue_id)
-                .update({"cached_score": score})
-            )
-            count += result
+        from sqlalchemy import case
+        
+        # Build CASE expression for bulk update
+        case_stmt = case(
+            {issue_id: score for issue_id, score in scores.items()},
+            value=Issue.id
+        )
+        
+        result = (
+            self.session.query(Issue)
+            .filter(Issue.id.in_(scores.keys()))
+            .update({"cached_score": case_stmt}, synchronize_session=False)
+        )
         
         self.session.flush()
-        return count
+        return result
     
     def mark_stale(
         self,

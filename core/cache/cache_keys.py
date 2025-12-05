@@ -45,10 +45,29 @@ class CacheKeys:
     GITHUB_RATE_LIMIT = "github:rate_limit"
     GITHUB_GRAPHQL_RATE_LIMIT = "github:graphql_rate_limit"
     
+    # OAuth State Keys
+    TTL_OAUTH_STATE = 60 * 10  # 10 minutes (OAuth state should expire quickly)
+    TTL_AUTH_CODE = 60  # 1 minute (auth codes should be exchanged immediately)
+    
+    @staticmethod
+    def oauth_state(state: str) -> str:
+        """Cache key for OAuth state validation."""
+        return f"oauth:state:{state}"
+    
+    @staticmethod
+    def auth_code(code: str) -> str:
+        """Cache key for temporary auth code (token exchange pattern)."""
+        return f"auth:code:{code}"
+    
     @staticmethod
     def user_scores(user_id: int) -> str:
         """Cache key for user's issue scores."""
         return f"user:{user_id}:scores"
+    
+    @staticmethod
+    def user_stats(user_id: int) -> str:
+        """Cache key for user's issue statistics."""
+        return f"user:{user_id}:stats"
     
     @staticmethod
     def user_top_matches(user_id: int, limit: int = 10) -> str:

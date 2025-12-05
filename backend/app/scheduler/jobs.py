@@ -1,5 +1,12 @@
 """
 Background job functions for the internal scheduler.
+
+Includes:
+- Issue discovery
+- Scoring
+- Feature cache refresh
+- ML training
+- Security maintenance (token blacklist cleanup)
 """
 
 from __future__ import annotations
@@ -8,6 +15,8 @@ import logging
 from typing import Iterable, Optional
 
 from sqlalchemy.orm import Session
+
+from core.repositories import TokenBlacklistRepository
 
 from ..config import get_settings
 from ..database import SessionLocal
@@ -64,4 +73,43 @@ def run_ml_training_job(user_id: Optional[int] = None, model_type: str = "logist
             logger.info("Training ML model (%s) for user %s", model_type, user.id)
             payload = TrainModelRequest(model_type=model_type)
             ml_service.train_model(db, user, payload)
+
+
+# =============================================================================
+# Security Maintenance Jobs
+# =============================================================================
+
+def run_token_blacklist_cleanup() -> None:
+    """
+    Clean up expired tokens from the blacklist table.
+    
+    This job should run periodically (e.g., hourly) to prevent the
+    token_blacklist table from growing unbounded. Expired tokens are
+    safe to delete since they can no longer be used anyway.
+    
+    Security Note:
+    - Tokens are blacklisted on logout to prevent reuse before expiry
+    - Once a token's expiry time has passed, it's invalid regardless
+    - This cleanup is purely for database hygiene, not security-critical
+    """
+    with SessionLocal() as db:
+        try:
+            repo = TokenBlacklistRepository(db)
+            deleted_count = repo.cleanup_expired()
+            db.commit()
+            
+            if deleted_count > 0:
+                logger.info(
+                    "Token blacklist cleanup completed",
+                    extra={"deleted_count": deleted_count}
+                )
+            else:
+                logger.debug("Token blacklist cleanup: no expired tokens found")
+                
+        except Exception as e:
+            logger.error(
+                "Token blacklist cleanup failed",
+                extra={"error": str(e)}
+            )
+            db.rollback()
 

@@ -104,16 +104,16 @@ class RedisCache:
             
             self._available = True
             self._initialized = True
-            logger.info(f"Redis connected: {settings.redis_host}:{settings.redis_port}")
+            logger.info("redis_connected", host=settings.redis_host, port=settings.redis_port)
             return True
             
         except (ConnectionError, TimeoutError) as e:
-            logger.warning(f"Redis connection failed: {e}. Caching disabled.")
+            logger.warning("redis_connection_failed", error=str(e))
             self._available = False
             self._initialized = True
             return False
         except Exception as e:
-            logger.warning(f"Redis initialization error: {e}. Caching disabled.")
+            logger.warning("redis_init_error", error=str(e))
             self._available = False
             self._initialized = True
             return False
@@ -159,7 +159,7 @@ class RedisCache:
                 return None
             return json.loads(data.decode("utf-8"))
         except (json.JSONDecodeError, ConnectionError, TimeoutError) as e:
-            logger.debug(f"Cache get error for {key}: {e}")
+            logger.debug("cache_get_error", key=key, error=str(e))
             return None
     
     def set_json(
@@ -187,7 +187,7 @@ class RedisCache:
             self.client.setex(key, ttl, serialized)
             return True
         except (TypeError, ConnectionError, TimeoutError) as e:
-            logger.debug(f"Cache set error for {key}: {e}")
+            logger.debug("cache_set_error", key=key, error=str(e))
             return False
     
     def get_json_or_compute(
@@ -239,7 +239,7 @@ class RedisCache:
                 return None
             return pickle.loads(data)
         except (pickle.UnpicklingError, ConnectionError, TimeoutError) as e:
-            logger.debug(f"Cache get_model error for {key}: {e}")
+            logger.debug("cache_get_model_error", key=key, error=str(e))
             return None
     
     def set_model(
@@ -267,7 +267,7 @@ class RedisCache:
             self.client.setex(key, ttl, serialized)
             return True
         except (pickle.PicklingError, ConnectionError, TimeoutError) as e:
-            logger.debug(f"Cache set_model error for {key}: {e}")
+            logger.debug("cache_set_model_error", key=key, error=str(e))
             return False
     
     # =========================================================================

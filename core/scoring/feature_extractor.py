@@ -14,7 +14,7 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 from sklearn.preprocessing import PolynomialFeatures
 
-from core.database import get_issue_embedding, upsert_issue_embedding
+# Embedding caching uses legacy database for now (embeddings table)
 
 
 # Global embedding model (lazy loaded)
@@ -23,11 +23,12 @@ _embedding_model_name = 'all-MiniLM-L6-v2'
 
 
 def _get_embedding_model():
-    '''
-    Lazy load the sentence transformer model.
-    
-    Returns - The loaded SentenceTransformer model
-    '''
+    """
+    Lazily load the sentence transformer model for embeddings.
+
+    Returns:
+        Loaded SentenceTransformer instance.
+    """
     global _embedding_model
     if _embedding_model is None:
         try:
@@ -42,52 +43,57 @@ def _get_embedding_model():
 
 
 def get_text_embeddings(issue: Dict) -> Tuple[np.ndarray, np.ndarray]:
-    '''
-    Generate BERT embeddings for issue description and title.
-    Uses cached embeddings from database if available.
-    
+    """
+    Generate BERT embeddings for an issue body and title with caching.
+
     Args:
-        issue: Issue dictionary from database
-        
+        issue: Issue dictionary containing body, title, and optional id.
+
     Returns:
-        Tuple of (description_embedding, title_embedding) - both 384-dimensional arrays
-    '''
+        Tuple of numpy arrays (description_embedding, title_embedding).
+    """
     issue_id = issue.get('id')
     
-    # Try to load from cache
+    # Try to load from cache (using legacy database for embeddings)
     if issue_id:
-        cached = get_issue_embedding(issue_id)
-        if cached is not None:
-            return cached
+        try:
+            from core.database.database import get_issue_embedding, upsert_issue_embedding
+            cached = get_issue_embedding(issue_id)
+            if cached is not None:
+                return cached
+        except ImportError:
+            pass
     
     # Generate embeddings
     model = _get_embedding_model()
     
-    # Get text content
     description = issue.get('body', '') or ''
     title = issue.get('title', '') or ''
     
-    # Generate embeddings (384 dimensions each)
     description_embedding = model.encode(description, convert_to_numpy=True)
     title_embedding = model.encode(title, convert_to_numpy=True)
     
     # Cache in database
     if issue_id:
-        upsert_issue_embedding(issue_id, description_embedding, title_embedding, _embedding_model_name)
+        try:
+            from core.database.database import upsert_issue_embedding
+            upsert_issue_embedding(issue_id, description_embedding, title_embedding, _embedding_model_name)
+        except ImportError:
+            pass
     
     return description_embedding, title_embedding
 
 
 def extract_interaction_features(base_features: List[float]) -> List[float]:
-    '''
-    Extract interaction features between key base features.
-    
+    """
+    Compute interaction features between key base features.
+
     Args:
-        base_features: List of 14 base features
-        
+        base_features: List of 14 base features.
+
     Returns:
-        List of 12 interaction features
-    '''
+        List of 12 interaction feature values.
+    """
     if len(base_features) < 11:
         return [0.0] * 12
     
@@ -136,15 +142,15 @@ def extract_interaction_features(base_features: List[float]) -> List[float]:
 
 
 def extract_polynomial_features(base_features: List[float]) -> List[float]:
-    '''
-    Extract polynomial features (degree 2) from key numeric features.
-    
+    """
+    Generate degree-2 polynomial features from selected numeric inputs.
+
     Args:
-        base_features: List of base features
-        
+        base_features: List of base features.
+
     Returns:
-        List of 27 polynomial features (6 original + 6 squared + 15 cross-products)
-    '''
+        List of 27 polynomial features (6 original, 6 squared, 15 cross terms).
+    """
     if len(base_features) < 8:
         return [0.0] * 27
     
@@ -168,16 +174,16 @@ def extract_polynomial_features(base_features: List[float]) -> List[float]:
 
 
 def _parse_date_to_days(date_value, default_days: float = 365.0) -> float:
-    '''
-    Parse a date value and return days since that date.
-    
+    """
+    Convert a date value to days elapsed from now.
+
     Args:
-        date_value: Date string or datetime object
-        default_days: Default days to return if parsing fails
-        
+        date_value: ISO string or datetime to parse.
+        default_days: Fallback days when parsing fails.
+
     Returns:
-        Days since the date
-    '''
+        Days elapsed since date_value.
+    """
     if not date_value:
         return default_days
     
@@ -193,15 +199,15 @@ def _parse_date_to_days(date_value, default_days: float = 365.0) -> float:
 
 
 def extract_temporal_features(issue: Dict) -> List[float]:
-    '''
-    Extract temporal features based on issue creation and update dates.
-    
+    """
+    Derive temporal features from issue creation and update timestamps.
+
     Args:
-        issue: Issue dictionary from database
-        
+        issue: Issue dictionary containing created_at and updated_at.
+
     Returns:
-        List of 5 temporal features
-    '''
+        List of five temporal feature values.
+    """
     days_since_created = _parse_date_to_days(issue.get('created_at'))
     days_since_updated = _parse_date_to_days(issue.get('updated_at'))
     
@@ -229,23 +235,18 @@ def extract_advanced_features(
     base_features: List[float],
     use_embeddings: bool = True,
 ) -> List[float]:
-    '''
-    Extract all advanced features (193 total).
-    
+    """
+    Extract advanced feature set (embeddings + engineered features).
+
     Args:
-        issue: Issue dictionary from database
-        profile_data: Optional profile data
-        base_features: List of 14 base features
-        use_embeddings: Whether to include text embeddings (default: True)
-        
+        issue: Issue dictionary from the database.
+        profile_data: Optional profile context for feature generation.
+        base_features: List of 14 base features.
+        use_embeddings: Include text embeddings when True.
+
     Returns:
-        List of 193 advanced features:
-        - Text embeddings: 100 (PCA-reduced description embeddings)
-        - Title embeddings: 50 (PCA-reduced title embeddings)
-        - Interaction features: 12
-        - Polynomial features: 27
-        - Temporal features: 4
-    '''
+        List of 193 advanced features combining embeddings and engineered values.
+    """
     advanced_features = []
     
     # Text embeddings (100 + 50 = 150 features)

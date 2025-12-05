@@ -8,9 +8,14 @@
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), 
+              box-shadow var(--transition-fast),
+              opacity var(--transition-fast);
   position: relative;
   overflow: hidden;
+  /* Performance: GPU-accelerated transitions */
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 .btn::before {
@@ -62,7 +67,7 @@
 }
 
 .btn-outline:hover:not(:disabled) {
-  background: rgba(203, 152, 79, 0.1);
+  background: rgba(216, 216, 216, 0.1);
 }
 
 .btn-ghost {
@@ -147,6 +152,6 @@
 /* Focus State */
 .btn:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(203, 152, 79, 0.4);
+  box-shadow: 0 0 0 3px rgba(216, 216, 216, 0.4);
 }
 

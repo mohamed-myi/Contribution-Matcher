@@ -1,22 +1,20 @@
 """
 Caching decorators for automatic cache management.
 
-Provides decorators that automatically:
-- Check cache before function execution
-- Cache results after computation
-- Handle cache failures gracefully
+Provides decorators that automatically check cache before execution,
+cache results after computation, and handle cache failures gracefully.
 """
 
 import functools
 import hashlib
 import json
-import logging
 from typing import Any, Callable, Optional, TypeVar, Union
 
 from core.cache.redis_client import cache
 from core.cache.cache_keys import CacheKeys
+from core.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger("cache.decorators")
 
 T = TypeVar("T")
 
@@ -94,11 +92,11 @@ def cached(
             # Try to get from cache
             cached_result = cache.get_json(cache_key)
             if cached_result is not None:
-                logger.debug(f"Cache hit: {cache_key}")
+                logger.debug("cache_hit", key=cache_key)
                 return cached_result
             
             # Compute result
-            logger.debug(f"Cache miss: {cache_key}")
+            logger.debug("cache_miss", key=cache_key)
             result = func(*args, **kwargs)
             
             # Cache the result (if not None)
@@ -164,18 +162,18 @@ def cached_model(
         def wrapper(*args, **kwargs) -> T:
             # Tier 1: Check in-memory cache
             if _memory_cache["model"] is not None:
-                logger.debug(f"Model cache hit (memory): {key}")
+                logger.debug("model_cache_hit", tier="memory", key=key)
                 return _memory_cache["model"]
             
             # Tier 2: Check Redis cache
             cached_model = cache.get_model(key)
             if cached_model is not None:
-                logger.debug(f"Model cache hit (Redis): {key}")
+                logger.debug("model_cache_hit", tier="redis", key=key)
                 _memory_cache["model"] = cached_model
                 return cached_model
             
             # Tier 3: Load from disk/compute
-            logger.info(f"Model cache miss, loading: {key}")
+            logger.info("model_cache_miss", key=key)
             load_fn = loader if loader else func
             model = load_fn(*args, **kwargs)
             

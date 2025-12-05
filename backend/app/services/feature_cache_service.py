@@ -41,6 +41,7 @@ class BreakdownResult:
 
 
 def _breakdown_from_cache(issue: Issue, cache: IssueFeatureCache) -> BreakdownResult:
+    """Rehydrate a cached breakdown into a BreakdownResult instance."""
     return BreakdownResult(
         issue_id=issue.id,
         total_score=cache.total_score or 0,
@@ -55,6 +56,7 @@ def _breakdown_from_cache(issue: Issue, cache: IssueFeatureCache) -> BreakdownRe
 
 
 def _feature_vector_from_cache(cache: IssueFeatureCache) -> List[float]:
+    """Deserialize the cached feature vector to a float list."""
     if not cache.feature_vector:
         return []
     if isinstance(cache.feature_vector, list):
@@ -69,6 +71,7 @@ def _store_cache(
     breakdown: BreakdownResult,
     feature_vector: List[float],
 ) -> None:
+    """Persist computed breakdown and features for an issue/profile pair."""
     cache = (
         db.query(IssueFeatureCache)
         .filter(IssueFeatureCache.issue_id == issue.id)
@@ -102,6 +105,12 @@ def get_breakdown_and_features(
     user: User,
     issue: Issue,
 ) -> Tuple[BreakdownResult, List[float]]:
+    """
+    Compute or retrieve cached breakdown and feature vector for an issue.
+
+    Uses cached results when profile/issue timestamps are fresh; otherwise
+    recomputes and updates the cache.
+    """
     profile = matching_service.ensure_profile(db, user)
     cache = (
         db.query(IssueFeatureCache)

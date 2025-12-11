@@ -16,6 +16,7 @@ ENV/
 
 # Model files
 *.pkl
+models/
 
 # Profile data
 dev_profile.json

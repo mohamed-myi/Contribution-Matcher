@@ -374,7 +374,6 @@ class TestListWorkflow:
             db.engine.dispose()
         db._initialized = False
         db.initialize(test_db_url)
-    
         args = Mock()
         args.difficulty = "beginner"
         args.issue_type = None

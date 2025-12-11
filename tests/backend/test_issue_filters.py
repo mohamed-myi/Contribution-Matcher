@@ -129,7 +129,7 @@ class TestDifficultyFilter:
         session.close()
 
         resp = client.get(
-            "/api/issues",
+            "/api/v1/issues",
             params={"difficulty": "beginner"},
             headers={"Authorization": "Bearer fake"},
         )
@@ -146,7 +146,7 @@ class TestDifficultyFilter:
         session.close()
 
         resp = client.get(
-            "/api/issues",
+            "/api/v1/issues",
             params={"difficulty": "intermediate"},
             headers={"Authorization": "Bearer fake"},
         )
@@ -163,7 +163,7 @@ class TestDifficultyFilter:
         session.close()
 
         resp = client.get(
-            "/api/issues",
+            "/api/v1/issues",
             params={"difficulty": "advanced"},
             headers={"Authorization": "Bearer fake"},
         )
@@ -183,7 +183,7 @@ class TestIssueTypeFilter:
         session.close()
 
         resp = client.get(
-            "/api/issues",
+            "/api/v1/issues",
             params={"issue_type": "bug"},
             headers={"Authorization": "Bearer fake"},
         )
@@ -200,7 +200,7 @@ class TestIssueTypeFilter:
         session.close()
 
         resp = client.get(
-            "/api/issues",
+            "/api/v1/issues",
             params={"issue_type": "feature"},
             headers={"Authorization": "Bearer fake"},
         )
@@ -216,7 +216,7 @@ class TestIssueTypeFilter:
         session.close()
 
         resp = client.get(
-            "/api/issues",
+            "/api/v1/issues",
             params={"issue_type": "documentation"},
             headers={"Authorization": "Bearer fake"},
         )
@@ -236,7 +236,7 @@ class TestLanguageFilter:
         session.close()
 
         resp = client.get(
-            "/api/issues",
+            "/api/v1/issues",
             params={"language": "Python"},
             headers={"Authorization": "Bearer fake"},
         )
@@ -253,7 +253,7 @@ class TestLanguageFilter:
         session.close()
 
         resp = client.get(
-            "/api/issues",
+            "/api/v1/issues",
             params={"language": "JavaScript"},
             headers={"Authorization": "Bearer fake"},
         )
@@ -269,7 +269,7 @@ class TestLanguageFilter:
         session.close()
 
         resp = client.get(
-            "/api/issues",
+            "/api/v1/issues",
             params={"language": "Go"},
             headers={"Authorization": "Bearer fake"},
         )
@@ -285,7 +285,7 @@ class TestLanguageFilter:
         session.close()
 
         resp = client.get(
-            "/api/issues",
+            "/api/v1/issues",
             params={"language": "Rust"},
             headers={"Authorization": "Bearer fake"},
         )
@@ -304,7 +304,7 @@ class TestMinStarsFilter:
         session.close()
 
         resp = client.get(
-            "/api/issues",
+            "/api/v1/issues",
             params={"min_stars": 100},
             headers={"Authorization": "Bearer fake"},
         )
@@ -321,7 +321,7 @@ class TestMinStarsFilter:
         session.close()
 
         resp = client.get(
-            "/api/issues",
+            "/api/v1/issues",
             params={"min_stars": 500},
             headers={"Authorization": "Bearer fake"},
         )
@@ -338,7 +338,7 @@ class TestMinStarsFilter:
         session.close()
 
         resp = client.get(
-            "/api/issues",
+            "/api/v1/issues",
             params={"min_stars": 1000},
             headers={"Authorization": "Bearer fake"},
         )
@@ -355,7 +355,7 @@ class TestMinStarsFilter:
         session.close()
 
         resp = client.get(
-            "/api/issues",
+            "/api/v1/issues",
             params={"min_stars": 10000},
             headers={"Authorization": "Bearer fake"},
         )
@@ -374,7 +374,7 @@ class TestScoreRangeFilter:
         session.close()
 
         resp = client.get(
-            "/api/issues",
+            "/api/v1/issues",
             params={"score_range": "high"},
             headers={"Authorization": "Bearer fake"},
         )
@@ -391,7 +391,7 @@ class TestScoreRangeFilter:
         session.close()
 
         resp = client.get(
-            "/api/issues",
+            "/api/v1/issues",
             params={"score_range": "medium"},
             headers={"Authorization": "Bearer fake"},
         )
@@ -408,7 +408,7 @@ class TestScoreRangeFilter:
         session.close()
 
         resp = client.get(
-            "/api/issues",
+            "/api/v1/issues",
             params={"score_range": "low"},
             headers={"Authorization": "Bearer fake"},
         )
@@ -429,7 +429,7 @@ class TestDaysBackFilter:
         session.close()
 
         resp = client.get(
-            "/api/issues",
+            "/api/v1/issues",
             params={"days_back": 7},
             headers={"Authorization": "Bearer fake"},
         )
@@ -444,7 +444,7 @@ class TestDaysBackFilter:
         session.close()
 
         resp = client.get(
-            "/api/issues",
+            "/api/v1/issues",
             params={"days_back": 14},
             headers={"Authorization": "Bearer fake"},
         )
@@ -459,7 +459,7 @@ class TestDaysBackFilter:
         session.close()
 
         resp = client.get(
-            "/api/issues",
+            "/api/v1/issues",
             params={"days_back": 30},
             headers={"Authorization": "Bearer fake"},
         )
@@ -478,7 +478,7 @@ class TestTechnologyFilter:
         session.close()
 
         resp = client.get(
-            "/api/issues",
+            "/api/v1/issues",
             params={"technology": "Python"},
             headers={"Authorization": "Bearer fake"},
         )
@@ -493,7 +493,7 @@ class TestTechnologyFilter:
         session.close()
 
         resp = client.get(
-            "/api/issues",
+            "/api/v1/issues",
             params={"technology": "React"},
             headers={"Authorization": "Bearer fake"},
         )
@@ -509,7 +509,7 @@ class TestTechnologyFilter:
 
         # Should match "React" with lowercase
         resp = client.get(
-            "/api/issues",
+            "/api/v1/issues",
             params={"technology": "react"},
             headers={"Authorization": "Bearer fake"},
         )
@@ -528,7 +528,7 @@ class TestCombinedFilters:
         session.close()
 
         resp = client.get(
-            "/api/issues",
+            "/api/v1/issues",
             params={"difficulty": "beginner", "issue_type": "bug"},
             headers={"Authorization": "Bearer fake"},
         )
@@ -545,7 +545,7 @@ class TestCombinedFilters:
         session.close()
 
         resp = client.get(
-            "/api/issues",
+            "/api/v1/issues",
             params={"language": "JavaScript", "min_stars": 1000},
             headers={"Authorization": "Bearer fake"},
         )
@@ -560,7 +560,7 @@ class TestCombinedFilters:
         session.close()
 
         resp = client.get(
-            "/api/issues",
+            "/api/v1/issues",
             params={
                 "difficulty": "beginner",
                 "score_range": "high",
@@ -581,7 +581,7 @@ class TestCombinedFilters:
         session.close()
 
         resp = client.get(
-            "/api/issues",
+            "/api/v1/issues",
             params={
                 "difficulty": "advanced",
                 "language": "Python",
@@ -605,7 +605,7 @@ class TestPagination:
 
         # Get first page
         resp = client.get(
-            "/api/issues",
+            "/api/v1/issues",
             params={"limit": 2, "offset": 0},
             headers={"Authorization": "Bearer fake"},
         )
@@ -616,7 +616,7 @@ class TestPagination:
 
         # Get second page
         resp = client.get(
-            "/api/issues",
+            "/api/v1/issues",
             params={"limit": 2, "offset": 2},
             headers={"Authorization": "Bearer fake"},
         )
@@ -632,7 +632,7 @@ class TestPagination:
         session.close()
 
         resp = client.get(
-            "/api/issues",
+            "/api/v1/issues",
             params={"difficulty": "beginner", "limit": 1, "offset": 0},
             headers={"Authorization": "Bearer fake"},
         )
@@ -642,7 +642,7 @@ class TestPagination:
         assert data["total"] == 2
 
         resp = client.get(
-            "/api/issues",
+            "/api/v1/issues",
             params={"difficulty": "beginner", "limit": 1, "offset": 1},
             headers={"Authorization": "Bearer fake"},
         )

@@ -54,7 +54,7 @@ def test_issue_discovery_persists_results(monkeypatch, authorized_client):
     )
 
     resp = client.post(
-        "/api/issues/discover",
+        "/api/v1/issues/discover",
         json={"labels": ["good first issue"], "limit": 1},
         headers={"Authorization": "Bearer fake"},
     )
@@ -99,7 +99,7 @@ def test_list_issues_filters_by_difficulty(monkeypatch, authorized_client):
     session.close()
 
     resp = client.get(
-        "/api/issues",
+        "/api/v1/issues",
         params={"difficulty": "beginner"},
         headers={"Authorization": "Bearer fake"},
     )

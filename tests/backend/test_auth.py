@@ -191,6 +191,9 @@ class TestAccountLockout:
         # Create a fresh lockout instance for testing
         lockout = AccountLockout()
         test_ip = "192.168.1.100"
+        
+        # Clear any existing state from previous test runs
+        lockout.clear(test_ip)
 
         # Initially not locked
         result = lockout.check(test_ip)
@@ -216,6 +219,9 @@ class TestAccountLockout:
 
         lockout = AccountLockout()
         test_ip = "192.168.1.101"
+        
+        # Clear any existing state from previous test runs
+        lockout.clear(test_ip)
 
         # Record 3 failures -> 1 minute lockout
         for _ in range(3):

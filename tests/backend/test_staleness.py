@@ -84,7 +84,7 @@ class TestStalenessStatsEndpoint:
         client, _, _ = authorized_client
 
         resp = client.get(
-            "/api/issues/staleness-stats",
+            "/api/v1/issues/staleness-stats",
             headers={"Authorization": "Bearer fake"},
         )
         assert resp.status_code == 200
@@ -124,7 +124,7 @@ class TestStalenessStatsEndpoint:
         session.close()
 
         resp = client.get(
-            "/api/issues/staleness-stats",
+            "/api/v1/issues/staleness-stats",
             headers={"Authorization": "Bearer fake"},
         )
         assert resp.status_code == 200
@@ -143,7 +143,7 @@ class TestVerifyStatusEndpoint:
         client, _, _ = authorized_client
 
         resp = client.post(
-            "/api/issues/99999/verify-status",
+            "/api/v1/issues/99999/verify-status",
             headers={"Authorization": "Bearer fake"},
         )
         assert resp.status_code == 404
@@ -158,7 +158,7 @@ class TestVerifyStatusEndpoint:
         session.close()
 
         resp = client.post(
-            f"/api/issues/{issue_id}/verify-status",
+            f"/api/v1/issues/{issue_id}/verify-status",
             headers={"Authorization": "Bearer fake"},
         )
         # Should return 502 for invalid URL
@@ -182,7 +182,7 @@ class TestIssueResponseIncludesStaleness:
         session.close()
 
         resp = client.get(
-            "/api/issues",
+            "/api/v1/issues",
             headers={"Authorization": "Bearer fake"},
         )
         assert resp.status_code == 200

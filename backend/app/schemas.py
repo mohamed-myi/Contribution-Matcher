@@ -3,7 +3,7 @@ Pydantic schemas for request and response validation.
 """
 
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
@@ -134,7 +134,7 @@ class ProfileUpdateRequest(BaseModel):
 class ScoreBreakdownResponse(BaseModel):
     issue_id: int
     total_score: float
-    breakdown: dict[str, float] = Field(default_factory=dict)
+    breakdown: dict[str, Any] = Field(default_factory=dict)
 
 
 class LabelRequest(BaseModel):

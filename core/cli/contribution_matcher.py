@@ -18,7 +18,6 @@ from core.api import (
 )
 from core.cache import CacheKeys, cache
 from core.cli.db_helpers import (
-    export_to_json,
     get_all_issue_urls,
     get_issue_technologies,
     get_labeling_statistics,

@@ -6,6 +6,8 @@ Supports both:
 - HttpOnly cookie (for browser-based frontends)
 """
 
+import secrets
+
 from fastapi import Cookie, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
@@ -16,6 +18,41 @@ from .jwt import decode_access_token
 
 # Standard OAuth2 scheme for backward compatibility
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token", auto_error=False)
+
+
+def validate_csrf(
+    request: Request,
+    access_token_cookie: str | None = Cookie(None, alias="access_token"),
+    csrf_token_cookie: str | None = Cookie(None, alias="csrf_token"),
+) -> None:
+    """
+    Enforce CSRF protection for cookie-authenticated requests.
+
+    Rules:
+    - If the request uses Authorization: Bearer <token>, CSRF is NOT required.
+      (This supports non-browser API clients.)
+    - If the request is authenticated via cookies (access_token cookie present),
+      require X-CSRF-Token header to match csrf_token cookie.
+    """
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        return
+
+    # Only enforce CSRF for cookie-authenticated requests.
+    # If there's no auth cookie, let auth dependencies return 401 instead of 403.
+    if not access_token_cookie:
+        return
+
+    csrf_header = request.headers.get("X-CSRF-Token")
+    if (
+        not csrf_token_cookie
+        or not csrf_header
+        or not secrets.compare_digest(csrf_token_cookie, csrf_header)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="CSRF token missing or invalid",
+        )
 
 
 def is_token_blacklisted(db: Session, jti: str) -> bool:

@@ -8,6 +8,8 @@ Provides centralized dependencies for:
 - Caching
 """
 
+import threading
+
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
@@ -71,11 +73,28 @@ def get_scoring_service(
 # Cache Dependencies
 # =============================================================================
 
+_cache_init_lock = threading.Lock()
+
+
+def ensure_cache_is_available() -> None:
+    """
+    Ensure the global Redis cache is initialized exactly once.
+
+    Important: we avoid calling cache.is_available here because that property may
+    call cache.initialize() without our lock when the cache is not yet initialized.
+    """
+    # Fast-path: if RedisCache has already initialized, don't take the lock.
+    if getattr(cache, "_initialized", False):
+        return
+
+    with _cache_init_lock:
+        if not getattr(cache, "_initialized", False):
+            cache.initialize()
+
 
 def get_cache():
     """Get Redis cache instance."""
-    if not cache.is_available:
-        cache.initialize()
+    ensure_cache_is_available()
     return cache
 
 

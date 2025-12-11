@@ -18,7 +18,7 @@ from core.cache import CacheKeys, cache
 from core.logging import get_logger
 from core.repositories import ProfileRepository
 
-from ..auth.dependencies import get_current_user
+from ..auth.dependencies import get_current_user, validate_csrf
 from ..database import get_db
 from ..models import DevProfile, User
 from ..schemas import ProfileResponse, ProfileUpdateRequest
@@ -185,7 +185,7 @@ def get_profile(
     return _profile_to_response(profile)
 
 
-@router.post("", response_model=ProfileResponse)
+@router.post("", response_model=ProfileResponse, dependencies=[Depends(validate_csrf)])
 def create_profile(
     payload: ProfileUpdateRequest,
     background_tasks: BackgroundTasks,
@@ -217,7 +217,7 @@ def create_profile(
     return _profile_to_response(profile)
 
 
-@router.post("/from-github", response_model=ProfileResponse)
+@router.post("/from-github", response_model=ProfileResponse, dependencies=[Depends(validate_csrf)])
 def create_profile_from_github(
     payload: GitHubProfileRequest | None = None,
     db: Session = Depends(get_db),
@@ -238,7 +238,7 @@ def create_profile_from_github(
     return _profile_to_response(profile)
 
 
-@router.put("", response_model=ProfileResponse)
+@router.put("", response_model=ProfileResponse, dependencies=[Depends(validate_csrf)])
 def update_profile(
     payload: ProfileUpdateRequest,
     background_tasks: BackgroundTasks,
@@ -270,7 +270,7 @@ def update_profile(
     return _profile_to_response(profile)
 
 
-@router.delete("")
+@router.delete("", dependencies=[Depends(validate_csrf)])
 def delete_profile(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -294,7 +294,7 @@ def delete_profile(
     return {"status": "deleted"}
 
 
-@router.post("/from-resume", response_model=ProfileResponse)
+@router.post("/from-resume", response_model=ProfileResponse, dependencies=[Depends(validate_csrf)])
 async def create_profile_from_resume(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -346,7 +346,7 @@ async def create_profile_from_resume(
     return _profile_to_response(profile)
 
 
-@router.post("/recompute-scores")
+@router.post("/recompute-scores", dependencies=[Depends(validate_csrf)])
 def recompute_scores(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),

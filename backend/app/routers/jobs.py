@@ -8,7 +8,7 @@ Security:
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from ..auth.dependencies import get_current_user
+from ..auth.dependencies import get_current_user, validate_csrf
 from ..config import get_settings
 from ..dependencies.rate_limit import enforce_rate_limit
 from ..models import User
@@ -43,7 +43,7 @@ def get_jobs(current_user: User = Depends(get_current_user)):
     return list_jobs()
 
 
-@router.post("/run")
+@router.post("/run", dependencies=[Depends(validate_csrf)])
 def run_job(
     request: JobRunRequest,
     current_user: User = Depends(get_current_user),
@@ -64,7 +64,7 @@ def run_job(
     return {"status": "scheduled", "user_id": user_id}
 
 
-@router.post("/reschedule")
+@router.post("/reschedule", dependencies=[Depends(validate_csrf)])
 def update_schedule(
     request: JobRescheduleRequest,
     current_user: User = Depends(get_current_user),

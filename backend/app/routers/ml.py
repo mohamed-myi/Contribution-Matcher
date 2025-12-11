@@ -5,7 +5,7 @@ Machine learning endpoints for labeling and training.
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from ..auth.dependencies import get_current_user
+from ..auth.dependencies import get_current_user, validate_csrf
 from ..database import get_db
 from ..models import User
 from ..schemas import (
@@ -24,7 +24,7 @@ from ..services import issue_service, ml_service
 router = APIRouter(prefix="/ml", tags=["ml"])
 
 
-@router.post("/label/{issue_id}")
+@router.post("/label/{issue_id}", dependencies=[Depends(validate_csrf)])
 def label_issue(
     issue_id: int,
     payload: LabelRequest,
@@ -116,7 +116,7 @@ def get_labeled_issues(
     )
 
 
-@router.delete("/label/{issue_id}")
+@router.delete("/label/{issue_id}", dependencies=[Depends(validate_csrf)])
 def remove_issue_label(
     issue_id: int,
     db: Session = Depends(get_db),
@@ -127,7 +127,7 @@ def remove_issue_label(
     return {"status": "ok"}
 
 
-@router.post("/train", response_model=ModelInfoResponse)
+@router.post("/train", response_model=ModelInfoResponse, dependencies=[Depends(validate_csrf)])
 def train_model(
     payload: TrainModelRequest | None = None,
     db: Session = Depends(get_db),
@@ -139,7 +139,7 @@ def train_model(
     return result
 
 
-@router.post("/evaluate")
+@router.post("/evaluate", dependencies=[Depends(validate_csrf)])
 def evaluate_model(
     payload: EvaluateModelRequest | None = None,
     db: Session = Depends(get_db),

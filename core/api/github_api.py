@@ -1,5 +1,6 @@
 """GitHub API client with rate limiting and caching."""
 
+import threading
 import time
 from datetime import datetime, timedelta
 
@@ -13,6 +14,7 @@ logger = get_logger("github")
 
 # Rate limit state (module-level for simplicity)
 _rate_limit = {"remaining": 5000, "reset": 0}
+_rate_limit_lock = threading.Lock()
 
 
 def _get_token() -> str | None:
@@ -36,8 +38,9 @@ def _get_headers(graphql: bool = False) -> dict[str, str]:
 def _update_rate_limit(response: requests.Response) -> None:
     """Update rate limit tracking from response headers."""
     if "X-RateLimit-Remaining" in response.headers:
-        _rate_limit["remaining"] = int(response.headers["X-RateLimit-Remaining"])
-        _rate_limit["reset"] = int(response.headers.get("X-RateLimit-Reset", 0))
+        with _rate_limit_lock:
+            _rate_limit["remaining"] = int(response.headers["X-RateLimit-Remaining"])
+            _rate_limit["reset"] = int(response.headers.get("X-RateLimit-Reset", 0))
 
 
 def _wait_for_rate_limit(max_wait: int = 300) -> bool:
@@ -50,15 +53,17 @@ def _wait_for_rate_limit(max_wait: int = 300) -> bool:
     Returns:
         True if it is safe to proceed; False if waiting would exceed max_wait.
     """
-    if _rate_limit["remaining"] >= 10:
+    with _rate_limit_lock:
+        remaining = _rate_limit["remaining"]
+        reset = _rate_limit["reset"]
+
+    if remaining >= 10:
         return True
 
-    if _rate_limit["reset"] > 0:
-        wait_time = min(_rate_limit["reset"] - int(time.time()) + 1, max_wait)
+    if reset > 0:
+        wait_time = min(reset - int(time.time()) + 1, max_wait)
         if wait_time > 0:
-            logger.info(
-                "rate_limit_wait", wait_seconds=wait_time, remaining=_rate_limit["remaining"]
-            )
+            logger.info("rate_limit_wait", wait_seconds=wait_time, remaining=remaining)
             time.sleep(wait_time)
             return True
     return False
@@ -86,8 +91,11 @@ def _make_request(
             logger.error("api_auth_failed", url=url)
         elif response.status_code == 403:
             # Rate limited - wait and retry once
-            if _rate_limit["reset"] > 0:
-                wait_time = min(_rate_limit["reset"] - int(time.time()) + 1, 300)
+            with _rate_limit_lock:
+                reset = _rate_limit["reset"]
+
+            if reset > 0:
+                wait_time = min(reset - int(time.time()) + 1, 300)
                 if wait_time > 0:
                     logger.info("rate_limited_retry", wait_seconds=wait_time)
                     time.sleep(wait_time)
@@ -127,12 +135,20 @@ def _graphql_batch_fetch_repos(
     for chunk_start in range(0, len(repo_list), chunk_size):
         chunk = repo_list[chunk_start : chunk_start + chunk_size]
 
-        # Build GraphQL query
+        # Build GraphQL query using variables (avoid string interpolation / injection).
+        variable_defs: list[str] = []
+        variables: dict[str, str] = {}
         query_parts = []
         for i, (owner, name) in enumerate(chunk):
+            owner_var = f"owner{i}"
+            name_var = f"name{i}"
+            variable_defs.append(f"${owner_var}: String!")
+            variable_defs.append(f"${name_var}: String!")
+            variables[owner_var] = owner
+            variables[name_var] = name
             query_parts.append(
                 f"""
-                repo_{i}: repository(owner: "{owner}", name: "{name}") {{
+                repo_{i}: repository(owner: ${owner_var}, name: ${name_var}) {{
                     owner {{ login }}
                     name
                     stargazerCount
@@ -150,13 +166,13 @@ def _graphql_batch_fetch_repos(
             """
             )
 
-        query = "query { " + " ".join(query_parts) + " }"
+        query = f"query({', '.join(variable_defs)}) {{ " + " ".join(query_parts) + " }"
 
         try:
             response = requests.post(
                 GITHUB_GRAPHQL_ENDPOINT,
                 headers=_get_headers(graphql=True),
-                json={"query": query},
+                json={"query": query, "variables": variables},
                 timeout=60,
             )
 
@@ -506,7 +522,9 @@ def batch_check_issue_status(issue_urls: list[str]) -> dict[str, str]:
         results[url] = status if status else "unknown"
         time.sleep(0.1)
 
-        if _rate_limit["remaining"] < 10:
+        with _rate_limit_lock:
+            remaining = _rate_limit["remaining"]
+        if remaining < 10:
             _wait_for_rate_limit(max_wait=60)
 
     return results

@@ -5,7 +5,7 @@ Scoring endpoints for issue matchmaking.
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from ..auth.dependencies import get_current_user
+from ..auth.dependencies import get_current_user, validate_csrf
 from ..database import get_db
 from ..models import User
 from ..schemas import ScoreBreakdownResponse, TopMatchesResponse
@@ -14,7 +14,7 @@ from ..services import scoring_service
 router = APIRouter(prefix="/scoring", tags=["scoring"])
 
 
-@router.post("/score-all")
+@router.post("/score-all", dependencies=[Depends(validate_csrf)])
 def score_all(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),

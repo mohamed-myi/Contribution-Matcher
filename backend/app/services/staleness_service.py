@@ -252,6 +252,7 @@ def get_stale_issues_count(db: Session, user_id: int) -> dict:
 def mark_issues_closed(
     db: Session,
     issue_ids: list[int],
+    user_id: int,
     close_reason: str = "manual",
 ) -> int:
     """
@@ -263,7 +264,7 @@ def mark_issues_closed(
 
     result = (
         db.query(Issue)
-        .filter(Issue.id.in_(issue_ids))
+        .filter(Issue.id.in_(issue_ids), Issue.user_id == user_id)
         .update(
             {
                 "is_active": False,

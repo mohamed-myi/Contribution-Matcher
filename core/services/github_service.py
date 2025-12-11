@@ -127,10 +127,10 @@ class GitHubService:
     def wait_for_rate_limit(self, max_wait: int = 300) -> bool:
         """
         Wait for the rate limit window to reset when nearing exhaustion.
-
+        
         Args:
             max_wait: Maximum seconds to pause before aborting.
-
+            
         Returns:
             True when it is safe to proceed; False if waiting would exceed max_wait.
         """
@@ -167,13 +167,13 @@ class GitHubService:
     ) -> List[Dict]:
         """
         Discover issues using a batch-first workflow to minimize GitHub API calls.
-
+        
         Args:
             labels: Optional list of labels to filter by.
             language: Optional primary language filter.
             min_stars: Minimum stars a repository must have to be included.
             limit: Maximum number of issues to return.
-
+            
         Returns:
             List of parsed issue dictionaries enriched with repository metadata.
         """
@@ -291,11 +291,11 @@ class GitHubService:
     ) -> Dict[str, str]:
         """
         Fetch issue states in batches via GitHub GraphQL.
-
+        
         Args:
             issue_urls: GitHub issue URLs to check.
             chunk_size: Maximum number of issues per GraphQL query.
-
+            
         Returns:
             Mapping of issue URL to status value ('open', 'closed', or 'unknown').
         """
@@ -384,10 +384,10 @@ class GitHubService:
     ) -> Dict[Tuple[str, str], Dict]:
         """
         Fetch multiple repositories via a single GraphQL query.
-
+        
         Args:
             repo_list: List of (owner, repo) tuples to retrieve.
-
+            
         Returns:
             Mapping of (owner, repo) to repository metadata.
         """

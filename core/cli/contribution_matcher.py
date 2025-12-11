@@ -17,8 +17,8 @@ from core.config import get_settings
 from core.repositories import IssueRepository, ProfileRepository, RepoMetadataRepository
 from core.services import ScoringService
 from core.cache import cache, CacheKeys
-from core.database import (
-    init_db,
+from core.cli.db_helpers import (
+    init_database,
     replace_issue_technologies,
     upsert_issue,
     update_issue_label,
@@ -56,12 +56,9 @@ load_dotenv()
 
 
 def _init_database():
-    """Initialize database (legacy SQLite + new ORM)."""
+    """Initialize database using ORM."""
     try:
-        init_db()
-        settings = get_settings()
-        if not db.is_initialized:
-            db.initialize(settings.database_url)
+        init_database()
     except Exception as e:
         print(f"Error initializing database: {e}")
         raise

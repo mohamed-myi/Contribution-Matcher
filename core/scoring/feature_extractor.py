@@ -8,13 +8,12 @@ This module extracts advanced features for ML training, including:
 - Temporal features (freshness, days since creation)
 '''
 
+import pickle
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 from sklearn.preprocessing import PolynomialFeatures
-
-# Embedding caching uses legacy database for now (embeddings table)
 
 
 # Global embedding model (lazy loaded)
@@ -25,7 +24,7 @@ _embedding_model_name = 'all-MiniLM-L6-v2'
 def _get_embedding_model():
     """
     Lazily load the sentence transformer model for embeddings.
-
+    
     Returns:
         Loaded SentenceTransformer instance.
     """
@@ -42,26 +41,31 @@ def _get_embedding_model():
     return _embedding_model
 
 
-def get_text_embeddings(issue: Dict) -> Tuple[np.ndarray, np.ndarray]:
+def get_text_embeddings(issue: Dict, session=None) -> Tuple[np.ndarray, np.ndarray]:
     """
     Generate BERT embeddings for an issue body and title with caching.
 
     Args:
         issue: Issue dictionary containing body, title, and optional id.
-
+        session: Optional SQLAlchemy session for caching embeddings.
+    
     Returns:
         Tuple of numpy arrays (description_embedding, title_embedding).
     """
     issue_id = issue.get('id')
     
-    # Try to load from cache (using legacy database for embeddings)
-    if issue_id:
+    # Try to load from cache using ORM if session is provided
+    if issue_id and session:
         try:
-            from core.database.database import get_issue_embedding, upsert_issue_embedding
-            cached = get_issue_embedding(issue_id)
-            if cached is not None:
-                return cached
-        except ImportError:
+            from core.models import IssueEmbedding
+            cached = session.query(IssueEmbedding).filter(
+                IssueEmbedding.issue_id == issue_id
+            ).first()
+            if cached and cached.description_embedding and cached.title_embedding:
+                desc_emb = pickle.loads(cached.description_embedding)
+                title_emb = pickle.loads(cached.title_embedding)
+                return desc_emb, title_emb
+        except Exception:
             pass
     
     # Generate embeddings
@@ -73,12 +77,31 @@ def get_text_embeddings(issue: Dict) -> Tuple[np.ndarray, np.ndarray]:
     description_embedding = model.encode(description, convert_to_numpy=True)
     title_embedding = model.encode(title, convert_to_numpy=True)
     
-    # Cache in database
-    if issue_id:
+    # Cache in database if session provided
+    if issue_id and session:
         try:
-            from core.database.database import upsert_issue_embedding
-            upsert_issue_embedding(issue_id, description_embedding, title_embedding, _embedding_model_name)
-        except ImportError:
+            from core.models import IssueEmbedding
+            existing = session.query(IssueEmbedding).filter(
+                IssueEmbedding.issue_id == issue_id
+            ).first()
+            
+            desc_blob = pickle.dumps(description_embedding)
+            title_blob = pickle.dumps(title_embedding)
+            
+            if existing:
+                existing.description_embedding = desc_blob
+                existing.title_embedding = title_blob
+                existing.embedding_model = _embedding_model_name
+            else:
+                embedding = IssueEmbedding(
+                    issue_id=issue_id,
+                    description_embedding=desc_blob,
+                    title_embedding=title_blob,
+                    embedding_model=_embedding_model_name,
+                )
+                session.add(embedding)
+            session.flush()
+        except Exception:
             pass
     
     return description_embedding, title_embedding
@@ -87,10 +110,10 @@ def get_text_embeddings(issue: Dict) -> Tuple[np.ndarray, np.ndarray]:
 def extract_interaction_features(base_features: List[float]) -> List[float]:
     """
     Compute interaction features between key base features.
-
+    
     Args:
         base_features: List of 14 base features.
-
+        
     Returns:
         List of 12 interaction feature values.
     """
@@ -144,10 +167,10 @@ def extract_interaction_features(base_features: List[float]) -> List[float]:
 def extract_polynomial_features(base_features: List[float]) -> List[float]:
     """
     Generate degree-2 polynomial features from selected numeric inputs.
-
+    
     Args:
         base_features: List of base features.
-
+        
     Returns:
         List of 27 polynomial features (6 original, 6 squared, 15 cross terms).
     """
@@ -176,11 +199,11 @@ def extract_polynomial_features(base_features: List[float]) -> List[float]:
 def _parse_date_to_days(date_value, default_days: float = 365.0) -> float:
     """
     Convert a date value to days elapsed from now.
-
+    
     Args:
         date_value: ISO string or datetime to parse.
         default_days: Fallback days when parsing fails.
-
+        
     Returns:
         Days elapsed since date_value.
     """
@@ -201,10 +224,10 @@ def _parse_date_to_days(date_value, default_days: float = 365.0) -> float:
 def extract_temporal_features(issue: Dict) -> List[float]:
     """
     Derive temporal features from issue creation and update timestamps.
-
+    
     Args:
         issue: Issue dictionary containing created_at and updated_at.
-
+        
     Returns:
         List of five temporal feature values.
     """
@@ -234,16 +257,18 @@ def extract_advanced_features(
     profile_data: Optional[Dict],
     base_features: List[float],
     use_embeddings: bool = True,
+    session=None,
 ) -> List[float]:
     """
     Extract advanced feature set (embeddings + engineered features).
-
+    
     Args:
         issue: Issue dictionary from the database.
         profile_data: Optional profile context for feature generation.
         base_features: List of 14 base features.
         use_embeddings: Include text embeddings when True.
-
+        session: Optional SQLAlchemy session for embedding caching.
+        
     Returns:
         List of 193 advanced features combining embeddings and engineered values.
     """
@@ -252,7 +277,7 @@ def extract_advanced_features(
     # Text embeddings (100 + 50 = 150 features)
     if use_embeddings:
         try:
-            description_emb, title_emb = get_text_embeddings(issue)
+            description_emb, title_emb = get_text_embeddings(issue, session=session)
             
             # For now, use first 100 dims of description and first 50 dims of title
             # PCA projection will be applied during training

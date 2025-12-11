@@ -3,20 +3,31 @@ Issue scoring tasks.
 
 These tasks handle:
 - Scoring issues against user profiles
-- Batch score updates
+- Batch score updates with configurable batch sizes
+- Feature cache warming
 - Cache invalidation on profile changes
 
-Queue: scoring (parallelized with multiple workers)
+Queue: scoring (high priority, parallelized with multiple workers)
+
+Performance optimizations:
+- Batch sizes: 100-500 issues per batch
+- Bulk DB operations to reduce roundtrips
+- Pipeline Redis operations for cache updates
 """
 
 from typing import Dict, List, Optional
 
-from celery import shared_task
+from celery import shared_task, group, chord
 from celery.exceptions import MaxRetriesExceededError
 
 from core.logging import get_logger
 
 logger = get_logger("worker.scoring")
+
+# Batch processing configuration
+DEFAULT_BATCH_SIZE = 100
+LARGE_BATCH_SIZE = 500
+PARALLEL_BATCH_COUNT = 5  # Number of parallel batches
 
 
 @shared_task(
@@ -268,4 +279,206 @@ def on_profile_update_task(user_id: int) -> Dict:
     score_user_issues_task.delay(user_id)
     
     return {"user_id": user_id, "status": "recomputation_scheduled"}
+
+
+@shared_task(
+    bind=True,
+    name="workers.tasks.scoring_tasks.warm_feature_cache",
+    max_retries=2,
+    soft_time_limit=300,  # 5 minutes
+    time_limit=600,  # 10 minutes
+)
+def warm_feature_cache_task(
+    self,
+    user_id: int,
+    batch_size: int = DEFAULT_BATCH_SIZE,
+) -> Dict:
+    """
+    Pre-compute and cache feature vectors for scoring.
+    
+    Warms the feature cache for a user's issues to speed up
+    subsequent scoring operations.
+    
+    Args:
+        user_id: User ID
+        batch_size: Number of issues per batch
+    
+    Returns:
+        Dictionary with warming results
+    """
+    from core.db import db
+    from core.models import Issue, IssueFeatureCache
+    from core.repositories import ProfileRepository
+    
+    logger.info("feature_cache_warming_started", user_id=user_id)
+    
+    try:
+        with db.session() as session:
+            # Get profile
+            profile_repo = ProfileRepository(session)
+            profile = profile_repo.get_by_user_id(user_id)
+            
+            if not profile:
+                return {"warmed": 0, "error": "No profile"}
+            
+            profile_updated_at = profile.updated_at
+            
+            # Get issues without cached features or with stale cache
+            issues = session.query(Issue).outerjoin(
+                IssueFeatureCache,
+                Issue.id == IssueFeatureCache.issue_id
+            ).filter(
+                Issue.user_id == user_id,
+                Issue.is_active == True,
+            ).filter(
+                # No cache or cache is stale (profile updated after cache)
+                (IssueFeatureCache.id == None) |
+                (IssueFeatureCache.profile_updated_at < profile_updated_at)
+            ).limit(batch_size).all()
+            
+            if not issues:
+                logger.info("feature_cache_already_warm", user_id=user_id)
+                return {"warmed": 0, "user_id": user_id, "status": "already_warm"}
+            
+            # Pre-compute features
+            from core.scoring.ml_trainer import extract_features
+            
+            profile_data = {
+                "skills": profile.skills or [],
+                "experience_level": profile.experience_level,
+                "interests": profile.interests or [],
+                "preferred_languages": profile.preferred_languages or [],
+                "time_availability_hours_per_week": profile.time_availability_hours_per_week,
+            }
+            
+            warmed_count = 0
+            for issue in issues:
+                try:
+                    issue_dict = issue.to_dict()
+                    features = extract_features(
+                        issue_dict,
+                        profile_data,
+                        use_advanced=False,  # Base features only for cache
+                        session=session
+                    )
+                    
+                    # Store in feature cache
+                    existing_cache = session.query(IssueFeatureCache).filter(
+                        IssueFeatureCache.issue_id == issue.id
+                    ).first()
+                    
+                    if existing_cache:
+                        existing_cache.feature_vector = {"base": features}
+                        existing_cache.profile_updated_at = profile_updated_at
+                        existing_cache.issue_updated_at = issue.updated_at
+                    else:
+                        cache_entry = IssueFeatureCache(
+                            issue_id=issue.id,
+                            profile_updated_at=profile_updated_at,
+                            issue_updated_at=issue.updated_at,
+                            feature_vector={"base": features},
+                        )
+                        session.add(cache_entry)
+                    
+                    warmed_count += 1
+                    
+                except Exception as e:
+                    logger.warning("feature_cache_issue_failed", issue_id=issue.id, error=str(e))
+            
+            session.flush()
+        
+        logger.info("feature_cache_warming_complete", user_id=user_id, warmed=warmed_count)
+        
+        return {
+            "warmed": warmed_count,
+            "user_id": user_id,
+        }
+        
+    except Exception as exc:
+        logger.error("feature_cache_warming_failed", user_id=user_id, error=str(exc))
+        try:
+            self.retry(exc=exc)
+        except MaxRetriesExceededError:
+            return {"warmed": 0, "error": str(exc)}
+
+
+@shared_task(
+    bind=True,
+    name="workers.tasks.scoring_tasks.batch_score_parallel",
+    max_retries=1,
+    soft_time_limit=1800,  # 30 minutes
+    time_limit=3600,  # 1 hour
+)
+def batch_score_parallel_task(
+    self,
+    user_id: int,
+    total_issues: int = 10000,
+) -> Dict:
+    """
+    Score large numbers of issues in parallel batches.
+    
+    Divides work into multiple parallel batches for faster processing.
+    Useful for initial scoring of 10K+ issues.
+    
+    Args:
+        user_id: User ID
+        total_issues: Total number of issues to score
+    
+    Returns:
+        Aggregated results from all batches
+    """
+    from core.db import db
+    from core.models import Issue
+    
+    logger.info("batch_score_parallel_started", user_id=user_id, total=total_issues)
+    
+    try:
+        # Count actual issues
+        with db.session() as session:
+            actual_count = session.query(Issue).filter(
+                Issue.user_id == user_id,
+                Issue.is_active == True,
+            ).count()
+        
+        total_to_process = min(total_issues, actual_count)
+        batch_size = max(100, total_to_process // PARALLEL_BATCH_COUNT)
+        
+        # Create parallel tasks
+        batch_tasks = []
+        for offset in range(0, total_to_process, batch_size):
+            batch_tasks.append(
+                score_user_issues_task.si(
+                    user_id,
+                    batch_size=min(batch_size, total_to_process - offset),
+                )
+            )
+        
+        if not batch_tasks:
+            return {"scored": 0, "batches": 0}
+        
+        # Execute in parallel using group
+        job = group(batch_tasks)
+        result = job.apply_async()
+        
+        # Wait for all to complete
+        all_results = result.get(timeout=1800)
+        
+        total_scored = sum(r.get("scored", 0) for r in all_results if isinstance(r, dict))
+        
+        logger.info(
+            "batch_score_parallel_complete",
+            user_id=user_id,
+            batches=len(batch_tasks),
+            total_scored=total_scored,
+        )
+        
+        return {
+            "scored": total_scored,
+            "batches": len(batch_tasks),
+            "results": all_results,
+        }
+        
+    except Exception as exc:
+        logger.error("batch_score_parallel_failed", user_id=user_id, error=str(exc))
+        return {"error": str(exc)}
 

@@ -216,7 +216,7 @@ class ScoringService:
         Args:
             issue: Issue dictionary to score.
             profile_data: Optional profile context for feature extraction.
-
+        
         Returns:
             Tuple of (probability_good, probability_bad).
         """
@@ -259,7 +259,7 @@ class ScoringService:
     ) -> Dict:
         """
         Calculate a match score for an issue against a profile.
-
+        
         Combines rule-based scoring with ML predictions to derive a bounded score.
 
         Args:
@@ -343,7 +343,7 @@ class ScoringService:
     ) -> List[Dict]:
         """
         Retrieve top matching issues for a user with caching.
-
+        
         Args:
             user_id: Target user identifier.
             profile: Profile data used for scoring.
@@ -398,7 +398,7 @@ class ScoringService:
     ) -> int:
         """
         Batch score issues for a user and persist cached scores.
-
+        
         Args:
             user_id: Target user identifier.
             profile: Profile data used for scoring.

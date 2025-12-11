@@ -15,9 +15,46 @@ from core.constants import (
     TECHNOLOGY_SYNONYMS,
     TIME_MATCH_WEIGHT,
 )
-from core.database import get_issue_technologies, query_issues
 from core.profile import load_dev_profile
 from core.scoring.ml_trainer import predict_issue_quality
+
+
+def _get_issue_technologies_orm(issue_id: int, session) -> List[Tuple[str, Optional[str]]]:
+    """Get technologies for an issue using ORM."""
+    from core.models import IssueTechnology
+    results = session.query(IssueTechnology).filter(
+        IssueTechnology.issue_id == issue_id
+    ).all()
+    return [(r.technology, r.technology_category) for r in results]
+
+
+def _query_issues_orm(session, user_id: int = None, limit: int = 100) -> List[Dict]:
+    """Query issues using ORM and return as dictionaries."""
+    from core.models import Issue
+    query = session.query(Issue).filter(Issue.is_active == True)
+    if user_id:
+        query = query.filter(Issue.user_id == user_id)
+    query = query.order_by(Issue.created_at.desc()).limit(limit)
+    return [issue.to_dict() for issue in query.all()]
+
+
+def _get_repo_metadata_orm(repo_owner: str, repo_name: str, session) -> Optional[Dict]:
+    """Get repository metadata using ORM."""
+    from core.models import RepoMetadata
+    metadata = session.query(RepoMetadata).filter(
+        RepoMetadata.repo_owner == repo_owner,
+        RepoMetadata.repo_name == repo_name
+    ).first()
+    if metadata:
+        return {
+            "stars": metadata.stars,
+            "forks": metadata.forks,
+            "languages": metadata.languages,
+            "topics": metadata.topics,
+            "last_commit_date": metadata.last_commit_date,
+            "contributor_count": metadata.contributor_count,
+        }
+    return None
 
 
 def _normalize_tech_name(tech: str) -> str:
@@ -26,7 +63,7 @@ def _normalize_tech_name(tech: str) -> str:
 
     Args:
         tech: Raw technology string.
-
+    
     Returns:
         Normalized technology token.
     """
@@ -39,7 +76,7 @@ def _get_tech_variants(tech: str) -> set:
 
     Args:
         tech: Base technology string.
-
+    
     Returns:
         Set of normalized technology variants.
     """
@@ -67,7 +104,7 @@ def _skills_match_semantic(skill1: str, skill2: str) -> bool:
     Args:
         skill1: First skill name.
         skill2: Second skill name.
-
+    
     Returns:
         True when skills are semantically equivalent.
     """
@@ -345,13 +382,14 @@ def calculate_interest_match(profile_interests: List[str], repo_topics: List[str
         return 1.0
 
 
-def get_match_breakdown(profile: Dict, issue_data: Dict) -> Dict:
+def get_match_breakdown(profile: Dict, issue_data: Dict, session=None) -> Dict:
     """
     Compute detailed breakdown for matching a profile against an issue.
 
     Args:
         profile: Profile data including skills and availability.
         issue_data: Issue data including technologies and metadata.
+        session: Optional SQLAlchemy session for database queries.
 
     Returns:
         Dictionary with component scores and supporting metadata.
@@ -359,8 +397,8 @@ def get_match_breakdown(profile: Dict, issue_data: Dict) -> Dict:
 
     # Get issue technologies
     issue_id = issue_data.get("id")
-    if issue_id:
-        issue_techs_tuples = get_issue_technologies(issue_id)
+    if issue_id and session:
+        issue_techs_tuples = _get_issue_technologies_orm(issue_id, session)
         issue_technologies = [tech for tech, _ in issue_techs_tuples]
     else:
         issue_technologies = []
@@ -380,9 +418,10 @@ def get_match_breakdown(profile: Dict, issue_data: Dict) -> Dict:
     
     # Get repo metadata
     repo_metadata = {}
-    if issue_data.get("repo_owner") and issue_data.get("repo_name"):
-        from core.database import get_repo_metadata
-        repo_metadata = get_repo_metadata(issue_data["repo_owner"], issue_data["repo_name"]) or {}
+    if issue_data.get("repo_owner") and issue_data.get("repo_name") and session:
+        repo_metadata = _get_repo_metadata_orm(
+            issue_data["repo_owner"], issue_data["repo_name"], session
+        ) or {}
     
     repo_quality_score = calculate_repo_quality(repo_metadata)
     
@@ -433,7 +472,7 @@ def get_match_breakdown(profile: Dict, issue_data: Dict) -> Dict:
     }
 
 
-def score_issue_against_profile(profile: Dict, issue_data: Dict) -> Dict:
+def score_issue_against_profile(profile: Dict, issue_data: Dict, session=None) -> Dict:
     """
     Calculate overall match score for a profile against a single issue.
 
@@ -442,12 +481,13 @@ def score_issue_against_profile(profile: Dict, issue_data: Dict) -> Dict:
     Args:
         profile: User profile dictionary.
         issue_data: Issue dictionary to score.
+        session: Optional SQLAlchemy session for database queries.
 
     Returns:
         Dictionary containing score, breakdown, and metadata identifiers.
     """
 
-    breakdown = get_match_breakdown(profile, issue_data)
+    breakdown = get_match_breakdown(profile, issue_data, session=session)
     
     # Calculate weighted score (rule-based)
     skill_score = (breakdown["skills"]["match_percentage"] / 100.0) * SKILL_MATCH_WEIGHT
@@ -511,7 +551,9 @@ def score_issue_against_profile(profile: Dict, issue_data: Dict) -> Dict:
 def score_profile_against_all_issues(
     profile: Optional[Dict] = None,
     issue_ids: Optional[List[int]] = None,
-    limit: Optional[int] = None
+    limit: Optional[int] = None,
+    session=None,
+    user_id: int = None,
 ) -> List[Dict]:
     """
     Score a profile against multiple issues.
@@ -520,6 +562,8 @@ def score_profile_against_all_issues(
         profile: Optional profile data; loaded from disk when omitted.
         issue_ids: Optional list of issue IDs to restrict scoring.
         limit: Optional limit for number of issues queried.
+        session: Optional SQLAlchemy session for database queries.
+        user_id: Optional user ID for filtering issues.
 
     Returns:
         List of score dictionaries sorted by score descending.
@@ -528,23 +572,26 @@ def score_profile_against_all_issues(
     if profile is None:
         profile = load_dev_profile()
     
-    # Query issues
-    if issue_ids:
-        issues = []
-        for issue_id in issue_ids:
-            issue_list = query_issues(limit=1)
-            for issue in query_issues():
-                if issue.get("id") == issue_id:
-                    issues.append(issue)
-                    break
+    # Query issues using ORM if session provided
+    if session:
+        if issue_ids:
+            from core.models import Issue
+            issues = session.query(Issue).filter(
+                Issue.id.in_(issue_ids),
+                Issue.is_active == True,
+            ).all()
+            issues = [issue.to_dict() for issue in issues]
+        else:
+            issues = _query_issues_orm(session, user_id=user_id, limit=limit or 100)
     else:
-        issues = query_issues(limit=limit)
+        # Fallback: empty list when no session (legacy code path removed)
+        issues = []
     
     # Score each issue
     scores = []
     for issue in issues:
         try:
-            score_result = score_issue_against_profile(profile, issue)
+            score_result = score_issue_against_profile(profile, issue, session=session)
             scores.append(score_result)
         except Exception as e:
             print(f"Error scoring issue {issue.get('id')}: {e}")
@@ -558,7 +605,9 @@ def score_profile_against_all_issues(
 
 def get_top_matches(
     profile: Optional[Dict] = None,
-    limit: int = 10
+    limit: int = 10,
+    session=None,
+    user_id: int = None,
 ) -> List[Dict]:
     """
     Retrieve the top matching issues for a profile.
@@ -566,11 +615,15 @@ def get_top_matches(
     Args:
         profile: Optional profile data; loaded when omitted.
         limit: Number of issues to return.
+        session: Optional SQLAlchemy session for database queries.
+        user_id: Optional user ID for filtering issues.
 
     Returns:
         List of top scoring issue dictionaries.
     """
 
-    all_scores = score_profile_against_all_issues(profile=profile)
+    all_scores = score_profile_against_all_issues(
+        profile=profile, session=session, user_id=user_id
+    )
     return all_scores[:limit]
 

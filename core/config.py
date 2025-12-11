@@ -102,7 +102,7 @@ class Settings(BaseSettings):
     def validate_jwt_secret(cls, v: str) -> str:
         """Validate JWT secret - warns in dev, errors in production."""
         import os
-            import warnings
+        import warnings
         
         env = os.getenv("ENV", "development")
         is_production = env.lower() in ("production", "prod")
@@ -131,17 +131,17 @@ class Settings(BaseSettings):
         else:
             # In development, warn but allow
             if is_forbidden:
-            warnings.warn(
+                warnings.warn(
                     f"JWT_SECRET_KEY is set to a default value ('{v}'). "
                     "This is insecure - set a proper key for production.",
-                UserWarning,
-                stacklevel=2
-            )
+                    UserWarning,
+                    stacklevel=2
+                )
             elif is_too_short:
-            warnings.warn(
-                f"JWT_SECRET_KEY should be at least 32 characters (got {len(v)})",
-                UserWarning,
-                stacklevel=2
+                warnings.warn(
+                    f"JWT_SECRET_KEY should be at least 32 characters (got {len(v)})",
+                    UserWarning,
+                    stacklevel=2
             )
         
         return v

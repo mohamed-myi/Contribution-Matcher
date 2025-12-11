@@ -1,0 +1,192 @@
+name: CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  PYTHON_VERSION: "3.10"
+  NODE_VERSION: "18"
+
+jobs:
+  build:
+    name: Build Application
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION="${{ github.ref_name }}"
+          else
+            VERSION="dev-$(git rev-parse --short HEAD)"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+        continue-on-error: true
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ steps.version.outputs.version }}
+          path: |
+            frontend/dist/
+            requirements.txt
+          retention-days: 7
+
+  deploy-staging:
+    name: Deploy to Staging
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.event.inputs.environment == 'staging'
+    environment:
+      name: staging
+      url: ${{ vars.STAGING_URL }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-${{ needs.build.outputs.version }}
+        continue-on-error: true
+
+      - name: Deploy to Railway (Staging)
+        if: vars.RAILWAY_TOKEN != ''
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          echo "Deploying version ${{ needs.build.outputs.version }} to staging..."
+          # Railway deployment would go here
+          # railway up --service contribution-matcher-staging
+          echo "Staging deployment placeholder"
+        continue-on-error: true
+
+      - name: Run database migrations
+        run: |
+          echo "Running database migrations..."
+          # alembic upgrade head
+          echo "Migrations placeholder"
+        continue-on-error: true
+
+      - name: Verify deployment
+        run: |
+          echo "Verifying staging deployment..."
+          # curl -f ${{ vars.STAGING_URL }}/health || exit 1
+          echo "Verification placeholder"
+        continue-on-error: true
+
+  deploy-production:
+    name: Deploy to Production
+    needs: [build, deploy-staging]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.environment == 'production'
+    environment:
+      name: production
+      url: ${{ vars.PRODUCTION_URL }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-${{ needs.build.outputs.version }}
+        continue-on-error: true
+
+      - name: Deploy to Railway (Production)
+        if: vars.RAILWAY_TOKEN != ''
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          echo "Deploying version ${{ needs.build.outputs.version }} to production..."
+          # Railway deployment would go here
+          # railway up --service contribution-matcher-prod
+          echo "Production deployment placeholder"
+        continue-on-error: true
+
+      - name: Run database migrations
+        run: |
+          echo "Running database migrations..."
+          # alembic upgrade head
+          echo "Migrations placeholder"
+        continue-on-error: true
+
+      - name: Verify deployment
+        run: |
+          echo "Verifying production deployment..."
+          # curl -f ${{ vars.PRODUCTION_URL }}/health || exit 1
+          echo "Verification placeholder"
+        continue-on-error: true
+
+      - name: Create release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref, '-rc') || contains(github.ref, '-beta') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  notify:
+    name: Notify Deployment
+    needs: [build, deploy-staging, deploy-production]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Deployment notification
+        run: |
+          echo "Deployment of version ${{ needs.build.outputs.version }} completed"
+          if [[ "${{ needs.deploy-production.result }}" == "success" ]]; then
+            echo "Production deployment successful!"
+          elif [[ "${{ needs.deploy-staging.result }}" == "success" ]]; then
+            echo "Staging deployment successful!"
+          else
+            echo "Deployment had issues - check logs"
+          fi

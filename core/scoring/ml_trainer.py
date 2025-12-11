@@ -13,9 +13,16 @@ from sklearn.metrics import accuracy_score, confusion_matrix, f1_score, precisio
 from sklearn.model_selection import TimeSeriesSplit, train_test_split
 from sklearn.preprocessing import StandardScaler
 
-from core.database import db_conn
-from core.database import get_issue_technologies
 from core.profile import load_dev_profile
+
+
+def _get_issue_technologies_orm(issue_id: int, session) -> List[Tuple[str, Optional[str]]]:
+    """Get technologies for an issue using ORM."""
+    from core.models import IssueTechnology
+    results = session.query(IssueTechnology).filter(
+        IssueTechnology.issue_id == issue_id
+    ).all()
+    return [(r.technology, r.technology_category) for r in results]
 
 MODEL_PATH_V2 = "issue_classifier_v2_xgb.pkl"
 SCALER_PATH_V2 = "issue_scaler_v2.pkl"
@@ -24,15 +31,15 @@ MODEL_PATH = "issue_classifier.pkl"
 SCALER_PATH = "issue_scaler.pkl"
 
 
-def extract_base_features(issue: Dict, profile_data: Optional[Dict] = None) -> List[float]:
+def extract_base_features(issue: Dict, profile_data: Optional[Dict] = None, session=None) -> List[float]:
     """Extract base numerical features from an issue (14 features)."""
 
     from core.scoring.issue_scorer import get_match_breakdown
     
     features = []
     issue_id = issue.get('id')
-    if issue_id:
-        issue_techs_tuples = get_issue_technologies(issue_id)
+    if issue_id and session:
+        issue_techs_tuples = _get_issue_technologies_orm(issue_id, session)
         all_issue_technologies = [tech for tech, _ in issue_techs_tuples]
     else:
         all_issue_technologies = []
@@ -41,7 +48,7 @@ def extract_base_features(issue: Dict, profile_data: Optional[Dict] = None) -> L
     
     if profile_data:
         try:
-            breakdown = get_match_breakdown(profile_data, issue)
+            breakdown = get_match_breakdown(profile_data, issue, session=session)
             skills = breakdown.get('skills', {})
             features.append(skills.get('match_percentage', 0.0))
             exp = breakdown.get('experience', {})
@@ -115,24 +122,25 @@ def extract_base_features(issue: Dict, profile_data: Optional[Dict] = None) -> L
     return features
 
 
-def extract_features(issue: Dict, profile_data: Optional[Dict] = None, use_advanced: bool = True) -> List[float]:
+def extract_features(issue: Dict, profile_data: Optional[Dict] = None, use_advanced: bool = True, session=None) -> List[float]:
     """
     Extract numerical features from an issue for ML training.
-
+    
     Combines base features (14) with optional advanced features (embeddings and
     engineered values) for a total of 207 features when enabled.
-
+    
     Args:
         issue: Issue dictionary from the database.
         profile_data: Optional profile data for calculating match scores.
         use_advanced: Include advanced features when True.
-
+        session: Optional SQLAlchemy session for database queries.
+        
     Returns:
         List of feature values (14 or 207 items).
     """
     
     # Extract base features (11)
-    base_features = extract_base_features(issue, profile_data)
+    base_features = extract_base_features(issue, profile_data, session=session)
     
     if not use_advanced:
         return base_features
@@ -140,62 +148,61 @@ def extract_features(issue: Dict, profile_data: Optional[Dict] = None, use_advan
     # Extract advanced features (196)
     try:
         from core.scoring.feature_extractor import extract_advanced_features
-        advanced_features = extract_advanced_features(issue, profile_data, base_features, use_embeddings=True)
+        advanced_features = extract_advanced_features(issue, profile_data, base_features, use_embeddings=True, session=session)
         return base_features + advanced_features
     except ImportError:
         # Fallback if feature_extractor not available
         return base_features
 
 
-def load_labeled_issues() -> Tuple[List[Dict], List[str]]:
+def load_labeled_issues(session=None) -> Tuple[List[Dict], List[str]]:
     """
     Load labeled issues from the database.
-
+    
+    Args:
+        session: Optional SQLAlchemy session. If not provided, creates one.
+    
     Returns:
         Tuple of (issues, labels) where labels are normalized strings.
     """
-
-    with db_conn() as conn:
-        cur = conn.cursor()
-        
-        cur.execute(
-            """
-            SELECT * FROM issues
-            WHERE label IS NOT NULL AND label != ''
-            AND label IN ('good', 'bad')
-            """
-        )
-        rows = cur.fetchall()
-        
-        columns = [description[0] for description in cur.description]
+    from core.models import Issue
+    
+    close_session = False
+    if session is None:
+        from core.db import db
+        db.initialize()
+        session = db.get_session()
+        close_session = True
+    
+    try:
+        results = session.query(Issue).filter(
+            Issue.label.isnot(None),
+            Issue.label != '',
+            Issue.label.in_(['good', 'bad']),
+        ).all()
         
         issues = []
         labels = []
-        for row in rows:
-            issue = dict(zip(columns, row))
-            
-            # Parse JSON fields
-            if issue.get("labels"):
-                try:
-                    issue["labels"] = json.loads(issue["labels"])
-                except (json.JSONDecodeError, TypeError):
-                    issue["labels"] = []
-            
-            issues.append(issue)
-            labels.append(issue['label'].lower())
-    
-    return issues, labels
+        for issue in results:
+            issue_dict = issue.to_dict()
+            issues.append(issue_dict)
+            labels.append(issue.label.lower())
+        
+        return issues, labels
+    finally:
+        if close_session:
+            session.close()
 
 
 def optimize_hyperparameters(X_train, y_train, tune_iterations: int = 50) -> Dict:
     """
     Optimize XGBoost hyperparameters using Bayesian optimization.
-
+    
     Args:
         X_train: Training feature matrix.
         y_train: Training labels.
         tune_iterations: Number of optimization iterations.
-
+        
     Returns:
         Dictionary of tuned hyperparameters.
     """
@@ -272,12 +279,12 @@ def optimize_hyperparameters(X_train, y_train, tune_iterations: int = 50) -> Dic
 def find_optimal_threshold(model, X_val, y_val) -> float:
     """
     Select the decision threshold that maximizes F1 score.
-
+    
     Args:
         model: Trained classifier with predict_proba.
         X_val: Validation feature matrix.
         y_val: Validation labels.
-
+        
     Returns:
         Threshold value that maximizes F1 on validation data.
     """
@@ -307,7 +314,7 @@ def train_xgboost_model(
 ) -> Tuple:
     """
     Train an XGBoost-based model with optional stacking and tuning.
-
+    
     Args:
         X_train: Training features.
         y_train: Training labels.
@@ -316,7 +323,7 @@ def train_xgboost_model(
         use_stacking: Enable stacking ensemble when True.
         use_tuning: Enable hyperparameter optimization when True.
         tune_iterations: Number of tuning iterations.
-
+        
     Returns:
         Tuple of (trained model, optimal threshold, metrics dictionary).
     """
@@ -441,10 +448,10 @@ def train_xgboost_model(
 def train_legacy_model(force: bool = False) -> Dict:
     """
     Train the legacy GradientBoosting model implementation.
-
+    
     Args:
         force: Train even when labeled data is below the recommended threshold.
-
+        
     Returns:
         Dictionary containing training metrics and metadata.
     """
@@ -837,11 +844,11 @@ def predict_issue_quality(issue: Dict, profile_data: Optional[Dict] = None) -> T
 
     Auto-detects the available model version (v2 or legacy) and applies the
     corresponding feature pipeline.
-
+    
     Args:
         issue: Issue dictionary from the database.
         profile_data: Optional profile data for feature extraction.
-
+        
     Returns:
         Tuple of (probability_good, probability_bad).
     """

@@ -239,56 +239,40 @@ def save_dev_profile(profile: Dict, output_path: str = DEV_PROFILE_JSON, encrypt
     
     print(f"Profile saved to {output_path}")
     
-    # Save to database
+    # Save to database using ORM
     try:
-        from core.database import db_conn
-        import json as json_module
+        from core.db import db
+        from core.models import DevProfile as DevProfileModel
+        from core.config import get_settings
         
-        with db_conn() as conn:
-            cur = conn.cursor()
-            
-            # Check if profile exists
-            cur.execute("SELECT id FROM dev_profile LIMIT 1")
-            existing = cur.fetchone()
-            
-            skills_json = json_module.dumps(profile.get("skills", []))
-            interests_json = json_module.dumps(profile.get("interests", []))
-            preferred_languages_json = json_module.dumps(profile.get("preferred_languages", []))
+        settings = get_settings()
+        if not db.is_initialized:
+            db.initialize(settings.database_url)
+        
+        with db.session() as session:
+            # Check if profile exists (for user_id=1, CLI default)
+            existing = session.query(DevProfileModel).filter(
+                DevProfileModel.user_id == 1
+            ).first()
             
             if existing:
                 # Update existing profile
-                cur.execute(
-                    """
-                    UPDATE dev_profile
-                    SET skills = ?, experience_level = ?, interests = ?,
-                        preferred_languages = ?, time_availability_hours_per_week = ?,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE id = ?
-                    """,
-                    (
-                        skills_json,
-                        profile.get("experience_level"),
-                        interests_json,
-                        preferred_languages_json,
-                        profile.get("time_availability_hours_per_week"),
-                        existing[0]
-                    )
-                )
+                existing.skills = profile.get("skills", [])
+                existing.experience_level = profile.get("experience_level", "beginner")
+                existing.interests = profile.get("interests", [])
+                existing.preferred_languages = profile.get("preferred_languages", [])
+                existing.time_availability_hours_per_week = profile.get("time_availability_hours_per_week")
             else:
                 # Insert new profile
-                cur.execute(
-                    """
-                    INSERT INTO dev_profile (skills, experience_level, interests, preferred_languages, time_availability_hours_per_week)
-                    VALUES (?, ?, ?, ?, ?)
-                    """,
-                    (
-                        skills_json,
-                        profile.get("experience_level"),
-                        interests_json,
-                        preferred_languages_json,
-                        profile.get("time_availability_hours_per_week")
-                    )
+                new_profile = DevProfileModel(
+                    user_id=1,  # CLI default user
+                    skills=profile.get("skills", []),
+                    experience_level=profile.get("experience_level", "beginner"),
+                    interests=profile.get("interests", []),
+                    preferred_languages=profile.get("preferred_languages", []),
+                    time_availability_hours_per_week=profile.get("time_availability_hours_per_week"),
                 )
+                session.add(new_profile)
     except Exception as e:
         print(f"Warning: Could not save profile to database: {e}")
 

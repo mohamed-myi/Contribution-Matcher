@@ -18,7 +18,7 @@ from core.cache import CacheKeys, cache
 from core.repositories import IssueRepository, ProfileRepository
 from core.services import ScoringService
 
-from ..auth.dependencies import get_current_user
+from ..auth.dependencies import get_current_user, validate_csrf
 from ..database import get_db
 from ..models import IssueBookmark, IssueLabel, IssueNote, User
 from ..schemas import (
@@ -82,7 +82,7 @@ class OrderByFilter(str, Enum):  # type: ignore[misc]
 # =============================================================================
 
 
-@router.post("/discover", response_model=IssueListResponse)
+@router.post("/discover", response_model=IssueListResponse, dependencies=[Depends(validate_csrf)])
 def discover_issues(
     request: IssueDiscoverRequest,
     db: Session = Depends(get_db),
@@ -96,7 +96,7 @@ def discover_issues(
     )
 
 
-@router.post("/discover/async")
+@router.post("/discover/async", dependencies=[Depends(validate_csrf)])
 def discover_issues_async(
     request: IssueDiscoverRequest,
     current_user: User = Depends(get_current_user),
@@ -310,7 +310,7 @@ def get_staleness_stats(
     return staleness_service.get_stale_issues_count(db, current_user.id)
 
 
-@router.post("/verify-bulk")
+@router.post("/verify-bulk", dependencies=[Depends(validate_csrf)])
 def bulk_verify_issues(
     limit: int = Query(50, le=100, description="Maximum issues to verify"),
     min_age_days: int = Query(7, ge=1, description="Only verify issues not checked in N days"),
@@ -433,7 +433,7 @@ def get_issue(
     return IssueDetailResponse(**issue_service.issue_to_detail_dict(issue, is_bookmarked))
 
 
-@router.post("/{issue_id}/bookmark")
+@router.post("/{issue_id}/bookmark", dependencies=[Depends(validate_csrf)])
 def bookmark_issue(
     issue_id: int,
     db: Session = Depends(get_db),
@@ -444,7 +444,7 @@ def bookmark_issue(
     return {"status": "bookmarked"}
 
 
-@router.delete("/{issue_id}/bookmark")
+@router.delete("/{issue_id}/bookmark", dependencies=[Depends(validate_csrf)])
 def remove_bookmark(
     issue_id: int,
     db: Session = Depends(get_db),
@@ -455,7 +455,7 @@ def remove_bookmark(
     return {"status": "removed"}
 
 
-@router.post("/{issue_id}/score")
+@router.post("/{issue_id}/score", dependencies=[Depends(validate_csrf)])
 def score_issue(
     issue_id: int,
     db: Session = Depends(get_db),
@@ -525,7 +525,9 @@ def get_issue_notes(
     return NotesListResponse(notes=[NoteResponse.model_validate(n) for n in notes])
 
 
-@router.post("/{issue_id}/notes", response_model=NoteResponse)
+@router.post(
+    "/{issue_id}/notes", response_model=NoteResponse, dependencies=[Depends(validate_csrf)]
+)
 def create_issue_note(
     issue_id: int,
     payload: NoteCreateRequest,
@@ -546,7 +548,7 @@ def create_issue_note(
     return NoteResponse.model_validate(note)
 
 
-@router.delete("/{issue_id}/notes/{note_id}")
+@router.delete("/{issue_id}/notes/{note_id}", dependencies=[Depends(validate_csrf)])
 def delete_issue_note(
     issue_id: int,
     note_id: int,
@@ -576,7 +578,7 @@ def delete_issue_note(
 # =============================================================================
 
 
-@router.post("/{issue_id}/verify-status")
+@router.post("/{issue_id}/verify-status", dependencies=[Depends(validate_csrf)])
 def verify_issue_status(
     issue_id: int,
     db: Session = Depends(get_db),

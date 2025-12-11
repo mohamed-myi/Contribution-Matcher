@@ -197,3 +197,52 @@ class TestIssueResponseIncludesStaleness:
         assert "is_very_stale" in issue
         assert issue["is_stale"] is True
         assert issue["github_state"] == "open"
+
+
+class TestMarkIssuesClosedAuthorization:
+    """Tests for authorization enforcement in mark_issues_closed."""
+
+    def test_mark_issues_closed_filters_by_user_id(self, authorized_client):
+        """
+        A user must not be able to close issues they don't own.
+
+        mark_issues_closed() should only update rows where Issue.user_id matches.
+        """
+        _, current_user_fn, session_factory = authorized_client
+        current_user = current_user_fn()
+
+        from backend.app.services import staleness_service
+
+        session = session_factory()
+        try:
+            # Create one issue for current user, one for another user
+            issue_a = create_test_issue(
+                session,
+                user_id=current_user.id,
+                url="https://github.com/test/repo/issues/100",
+                github_state="open",
+            )
+            issue_b = create_test_issue(
+                session,
+                user_id=current_user.id + 999,
+                url="https://github.com/test/repo/issues/200",
+                github_state="open",
+            )
+
+            updated = staleness_service.mark_issues_closed(
+                db=session,
+                issue_ids=[issue_a.id, issue_b.id],
+                user_id=current_user.id,
+                close_reason="manual",
+            )
+            assert updated == 1
+
+            session.refresh(issue_a)
+            session.refresh(issue_b)
+
+            assert issue_a.is_active is False
+            assert issue_a.github_state == "closed"
+            assert issue_b.is_active is True
+            assert issue_b.github_state == "open"
+        finally:
+            session.close()

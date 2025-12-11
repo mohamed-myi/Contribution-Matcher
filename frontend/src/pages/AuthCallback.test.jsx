@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { screen, waitFor } from '@testing-library/react';
 import { AuthCallback } from './AuthCallback';
 import { renderWithProviders } from '../test/test-utils';
 import { api } from '../api/client';
@@ -11,39 +10,58 @@ vi.mock('../api/client', () => ({
   },
 }));
 
-const mockNavigate = vi.fn();
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
-  return {
-    ...actual,
-    useNavigate: () => mockNavigate,
-  };
-});
+// Remove the navigate mock as renderWithProviders handles routing
 
 describe('AuthCallback Page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('shows loading state initially', () => {
-    render(
-      <MemoryRouter>
-        <AuthCallback />
-      </MemoryRouter>
+  it('shows loading state initially', async () => {
+    // Mock login to delay execution so we can see loading state
+    const mockLogin = vi.fn(() => new Promise(() => {})); // Never resolves
+    
+    renderWithProviders(
+      <AuthCallback />,
+      {
+        routerOptions: {
+          initialEntries: ['/auth/callback?code=test-code'],
+        },
+        authState: {
+          isAuthenticated: false,
+          loading: false,
+          user: null,
+          login: mockLogin,
+        },
+      }
     );
 
-    expect(screen.getByText('Completing authentication...')).toBeInTheDocument();
+    // The component should show loading while processing
+    await waitFor(() => {
+      expect(screen.getByText('Completing authentication...')).toBeInTheDocument();
+    }, { timeout: 1000 });
   });
 
   it('exchanges auth code and navigates to dashboard', async () => {
     api.exchangeAuthCode.mockResolvedValue({
       data: { access_token: 'jwt-token' },
     });
+    
+    const mockLogin = vi.fn().mockResolvedValue(undefined);
 
-    render(
-      <MemoryRouter initialEntries={['/auth/callback?code=test-code']}>
-        <AuthCallback />
-      </MemoryRouter>
+    renderWithProviders(
+      <AuthCallback />,
+      {
+        routerOptions: {
+          initialEntries: ['/auth/callback?code=test-code'],
+        },
+        authState: {
+          isAuthenticated: false,
+          loading: false,
+          user: null,
+          login: mockLogin,
+        },
+      }
     );
 
     await waitFor(() => {
@@ -52,10 +70,18 @@ describe('AuthCallback Page', () => {
   });
 
   it('shows error when error param is present', () => {
-    render(
-      <MemoryRouter initialEntries={['/auth/callback?error=authentication_failed']}>
-        <AuthCallback />
-      </MemoryRouter>
+    renderWithProviders(
+      <AuthCallback />,
+      {
+        routerOptions: {
+          initialEntries: ['/auth/callback?error=authentication_failed'],
+        },
+        authState: {
+          isAuthenticated: false,
+          loading: false,
+          user: null,
+        },
+      }
     );
 
     expect(screen.getByText('Authentication Failed')).toBeInTheDocument();
@@ -63,10 +89,18 @@ describe('AuthCallback Page', () => {
   });
 
   it('shows error when no credentials received', async () => {
-    render(
-      <MemoryRouter initialEntries={['/auth/callback']}>
-        <AuthCallback />
-      </MemoryRouter>
+    renderWithProviders(
+      <AuthCallback />,
+      {
+        routerOptions: {
+          initialEntries: ['/auth/callback'],
+        },
+        authState: {
+          isAuthenticated: false,
+          loading: false,
+          user: null,
+        },
+      }
     );
 
     await waitFor(() => {
@@ -77,10 +111,18 @@ describe('AuthCallback Page', () => {
   it('handles exchange errors', async () => {
     api.exchangeAuthCode.mockRejectedValue(new Error('Exchange failed'));
 
-    render(
-      <MemoryRouter initialEntries={['/auth/callback?code=test-code']}>
-        <AuthCallback />
-      </MemoryRouter>
+    renderWithProviders(
+      <AuthCallback />,
+      {
+        routerOptions: {
+          initialEntries: ['/auth/callback?code=test-code'],
+        },
+        authState: {
+          isAuthenticated: false,
+          loading: false,
+          user: null,
+        },
+      }
     );
 
     await waitFor(() => {

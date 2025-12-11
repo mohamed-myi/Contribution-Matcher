@@ -21,33 +21,38 @@ on:
 
 env:
   PYTHON_VERSION: "3.10"
-  NODE_VERSION: "18"
+  NODE_VERSION: "20"
 
 jobs:
   check-ci:
     name: Check CI Status
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_run'
     outputs:
       ci-passed: ${{ steps.check.outputs.passed }}
     steps:
       - name: Check CI workflow result
         id: check
         run: |
-          if [[ "${{ github.event.workflow_run.conclusion }}" == "success" ]]; then
-            echo "passed=true" >> $GITHUB_OUTPUT
+          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
+            if [[ "${{ github.event.workflow_run.conclusion }}" == "success" ]]; then
+              echo "passed=true" >> $GITHUB_OUTPUT
+            else
+              echo "passed=false" >> $GITHUB_OUTPUT
+            fi
           else
-            echo "passed=false" >> $GITHUB_OUTPUT
+            # For push and workflow_dispatch, CI check is not applicable
+            echo "passed=true" >> $GITHUB_OUTPUT
           fi
 
   build:
     name: Build Application
     needs: [check-ci]
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     if: |
       (github.event_name == 'workflow_run' && needs.check-ci.outputs.ci-passed == 'true') ||
-      github.event_name == 'push' ||
-      github.event_name == 'workflow_dispatch'
+      (github.event_name == 'push') ||
+      (github.event_name == 'workflow_dispatch')
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -104,6 +109,7 @@ jobs:
     name: Deploy to Staging
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     if: github.ref == 'refs/heads/main' || github.event.inputs.environment == 'staging'
     environment:
       name: staging
@@ -143,6 +149,7 @@ jobs:
     name: Deploy to Production
     needs: [build, deploy-staging]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.environment == 'production'
     environment:
       name: production

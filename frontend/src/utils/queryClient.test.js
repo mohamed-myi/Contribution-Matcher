@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { waitFor } from '@testing-library/react';
 import { QueryClient } from '@tanstack/react-query';
 import {
   createQueryClient,
@@ -49,12 +50,13 @@ describe('queryClient utilities', () => {
 
   describe('setupPersistentCache', () => {
     it('loads cache from localStorage', () => {
+      const now = Date.now();
       const cachedData = {
-        timestamp: Date.now(),
+        timestamp: now,
         queries: [
           {
-            queryKey: ['profile', 'detail'],
-            state: { data: { id: 1 }, dataUpdatedAt: Date.now() },
+            queryKey: ['profile'],
+            state: { data: { id: 1 }, dataUpdatedAt: now },
           },
         ],
       };
@@ -62,7 +64,7 @@ describe('queryClient utilities', () => {
 
       setupPersistentCache(queryClient);
 
-      const cached = queryClient.getQueryData(['profile', 'detail']);
+      const cached = queryClient.getQueryData(['profile']);
       expect(cached).toEqual({ id: 1 });
     });
 
@@ -80,14 +82,26 @@ describe('queryClient utilities', () => {
 
       setupPersistentCache(queryClient);
 
-      expect(localStorage.getItem('CONTRIBUTION_MATCHER_CACHE')).toBe(null);
+      expect(localStorage.getItem('CONTRIBUTION_MATCHER_CACHE')).toBeFalsy();
     });
 
     it('saves cache on beforeunload', () => {
       setupPersistentCache(queryClient);
       
-      // Set some query data
-      queryClient.setQueryData(['profile', 'detail'], { id: 1 });
+      // Set some query data that matches the filter criteria
+      const now = Date.now();
+      queryClient.setQueryData(['profile'], { id: 1 });
+      // Manually update the query state to make it "success" and recent
+      const cache = queryClient.getQueryCache();
+      const query = cache.find({ queryKey: ['profile'] });
+      if (query) {
+        query.setState({
+          ...query.state,
+          status: 'success',
+          data: { id: 1 },
+          dataUpdatedAt: now,
+        });
+      }
 
       // Simulate beforeunload
       const event = new Event('beforeunload');
@@ -96,6 +110,9 @@ describe('queryClient utilities', () => {
       // Check that cache was saved
       const saved = localStorage.getItem('CONTRIBUTION_MATCHER_CACHE');
       expect(saved).toBeTruthy();
+      const parsed = JSON.parse(saved);
+      expect(parsed.queries).toBeDefined();
+      expect(parsed.queries.length).toBeGreaterThan(0);
     });
   });
 
@@ -104,12 +121,29 @@ describe('queryClient utilities', () => {
       api.getProfile.mockResolvedValue({ data: { id: 1 } });
       api.getIssueStats.mockResolvedValue({ data: { total: 100 } });
 
+      // Mock requestIdleCallback if it doesn't exist
+      const originalRequestIdleCallback = window.requestIdleCallback;
+      if (!window.requestIdleCallback) {
+        window.requestIdleCallback = (fn, options) => {
+          // Execute immediately in test environment
+          setTimeout(fn, 0);
+        };
+      }
+
       await warmCache(queryClient, api, true);
 
-      // Wait for prefetch to complete
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Wait for prefetch to complete (warmCache uses requestIdleCallback or setTimeout)
+      await new Promise(resolve => setTimeout(resolve, 50));
 
-      expect(api.getProfile).toHaveBeenCalled();
+      // Wait for the actual prefetch query to execute
+      await waitFor(() => {
+        expect(api.getProfile).toHaveBeenCalled();
+      }, { timeout: 1000 });
+
+      // Restore original if it existed
+      if (originalRequestIdleCallback) {
+        window.requestIdleCallback = originalRequestIdleCallback;
+      }
     });
 
     it('does not prefetch when not authenticated', async () => {
@@ -131,8 +165,9 @@ describe('queryClient utilities', () => {
 
     it('clears localStorage cache', () => {
       localStorage.setItem('CONTRIBUTION_MATCHER_CACHE', 'test');
+      expect(localStorage.getItem('CONTRIBUTION_MATCHER_CACHE')).toBe('test');
       clearCache(queryClient);
-      expect(localStorage.getItem('CONTRIBUTION_MATCHER_CACHE')).toBe(null);
+      expect(localStorage.getItem('CONTRIBUTION_MATCHER_CACHE')).toBeFalsy();
     });
   });
 });

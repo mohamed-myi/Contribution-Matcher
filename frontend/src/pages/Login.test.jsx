@@ -12,9 +12,13 @@ vi.mock('../api/client', () => ({
   },
 }));
 
-vi.mock('../context/AuthContext', () => ({
-  useAuth: vi.fn(),
-}));
+vi.mock('../context/AuthContext', async () => {
+  const actual = await vi.importActual('../context/AuthContext');
+  return {
+    ...actual,
+    useAuth: vi.fn(),
+  };
+});
 
 describe('Login Page', () => {
   beforeEach(() => {

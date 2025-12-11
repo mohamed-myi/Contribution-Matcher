@@ -325,18 +325,15 @@ def mock_requests_get():
 def init_test_db(test_db, monkeypatch):
     """Initialize the global db object with the test database URL."""
     test_db_path, _, _ = test_db
-    test_db_url = f"sqlite:///{test_db_path}"
-    
+    test_db_url = f"sqlite:///{test_db_path}" 
     # Set DATABASE_URL environment variable
     monkeypatch.setenv("DATABASE_URL", test_db_url)
-    
     # Reset and re-initialize the global db object
     from core.db import db
     if db.is_initialized:
         db.engine.dispose()
     db._initialized = False
-    db.initialize(test_db_url)
-    
+    db.initialize(test_db_url) 
     # Create a user with id=1 for CLI functions that default to user_id=1
     from core.models import User
     with db.session() as session:
@@ -350,9 +347,7 @@ def init_test_db(test_db, monkeypatch):
             )
             session.add(user)
             session.commit()
-    
-    yield test_db_url
-    
+    yield test_db_url    
     # Cleanup
     if db.is_initialized:
         db.engine.dispose()

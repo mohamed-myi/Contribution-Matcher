@@ -8,7 +8,7 @@ from backend.app.models import User
 def test_auth_login_redirects_to_github(test_app_client):
     """Test that /auth/login redirects to GitHub OAuth."""
     client, _ = test_app_client
-    resp = client.get("/api/auth/login", follow_redirects=False)
+    resp = client.get("/api/v1/auth/login", follow_redirects=False)
     # Should be a redirect to GitHub
     assert resp.status_code in (302, 307)
     location = resp.headers.get("location", "")
@@ -22,7 +22,7 @@ def test_auth_callback_rejects_missing_state(test_app_client):
     client, _ = test_app_client
 
     # Callback without state should be rejected
-    resp = client.get("/api/auth/callback", params={"code": "dummy"}, follow_redirects=False)
+    resp = client.get("/api/v1/auth/callback", params={"code": "dummy"}, follow_redirects=False)
     assert resp.status_code in (302, 307)
     location = resp.headers.get("location", "")
     # Should redirect to frontend with error
@@ -35,7 +35,7 @@ def test_auth_callback_rejects_invalid_state(test_app_client):
 
     # Callback with invalid state should be rejected
     resp = client.get(
-        "/api/auth/callback",
+        "/api/v1/auth/callback",
         params={"code": "dummy", "state": "invalid_state_token"},
         follow_redirects=False,
     )
@@ -70,7 +70,7 @@ def test_auth_callback_creates_user_with_valid_state(monkeypatch, test_app_clien
     )
 
     resp = client.get(
-        "/api/auth/callback",
+        "/api/v1/auth/callback",
         params={"code": "dummy", "state": "valid_test_state"},
         follow_redirects=False,
     )
@@ -121,7 +121,7 @@ def test_auth_callback_uses_code_exchange_when_redis_available(monkeypatch, test
     )
 
     resp = client.get(
-        "/api/auth/callback",
+        "/api/v1/auth/callback",
         params={"code": "dummy", "state": "valid_test_state"},
         follow_redirects=False,
     )
@@ -150,7 +150,7 @@ def test_auth_token_exchange_success(monkeypatch, test_app_client):
         lambda code: ("jwt_token_here", 123),
     )
     
-    resp = client.post("/api/auth/token", params={"code": "valid_auth_code"})
+    resp = client.post("/api/v1/auth/token", params={"code": "valid_auth_code"})
     assert resp.status_code == 200
     data = resp.json()
     assert data["access_token"] == "jwt_token_here"
@@ -168,14 +168,14 @@ def test_auth_token_exchange_invalid_code(monkeypatch, test_app_client):
         lambda code: (None, None),
     )
     
-    resp = client.post("/api/auth/token", params={"code": "invalid_code"})
+    resp = client.post("/api/v1/auth/token", params={"code": "invalid_code"})
     assert resp.status_code == 401
 
 
 def test_auth_me_protected(test_app_client):
     """Test that /auth/me requires authentication."""
     client, _ = test_app_client
-    resp = client.get("/api/auth/me")
+    resp = client.get("/api/v1/auth/me")
     assert resp.status_code == 401
 
 
@@ -286,7 +286,7 @@ class TestAccountLockout:
         
         # Attempt OAuth callback
         resp = client.get(
-            "/api/auth/callback",
+            "/api/v1/auth/callback",
             params={"code": "any_code", "state": "any_state"},
             follow_redirects=False,
         )

@@ -22,7 +22,8 @@ from ..config import get_settings
 from ..database import SessionLocal
 from ..models import User
 from ..schemas import IssueDiscoverRequest, TrainModelRequest
-from ..services import feature_cache_service, issue_service, ml_service, scoring_service
+from ..services import issue_service, ml_service, scoring_service
+from ..services.feature_cache_service import get_breakdown_and_features
 
 logger = logging.getLogger("backend.scheduler.jobs")
 
@@ -60,7 +61,7 @@ def run_feature_refresh_job(user_id: Optional[int] = None) -> None:
             logger.info("Refreshing feature cache for user %s", user.id)
             refreshed_user = db.query(User).filter(User.id == user.id).one()
             for issue in refreshed_user.issues:
-                feature_cache_service.get_breakdown_and_features(db, refreshed_user, issue)
+                get_breakdown_and_features(db, refreshed_user, issue)
 
 
 def run_ml_training_job(user_id: Optional[int] = None, model_type: str = "logistic_regression") -> None:

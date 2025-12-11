@@ -178,14 +178,7 @@ def upgrade() -> None:
         op.create_table(
             "token_blacklist",
             sa.Column("id", sa.Integer(), primary_key=True),
-            sa.Column("jti", sa.String(length=255), nullable=False, unique=True),
-            sa.Column("token_type", sa.String(length=50), nullable=False),
-            sa.Column(
-                "user_id",
-                sa.Integer(),
-                sa.ForeignKey("users.id", ondelete="CASCADE"),
-                nullable=True,
-            ),
+            sa.Column("token_jti", sa.String(length=256), nullable=False, unique=True),
             sa.Column("expires_at", sa.DateTime(), nullable=False),
             sa.Column("created_at", sa.DateTime(), server_default=sa.func.now()),
         )
@@ -193,7 +186,7 @@ def upgrade() -> None:
         op.create_index(
             "ix_token_blacklist_jti",
             "token_blacklist",
-            ["jti"],
+            ["token_jti"],
             unique=True,
         )
         

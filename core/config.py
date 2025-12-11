@@ -54,12 +54,15 @@ class Settings(BaseSettings):
     jwt_algorithm: str = Field(default="HS256")
     access_token_expire_minutes: int = Field(default=60 * 24)
     
-    # Token encryption (STRONGLY RECOMMENDED for production)
+    # Token encryption (REQUIRED for production with STRICT_SECURITY=true)
     # GitHub access tokens are encrypted at rest when this key is set
     # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     token_encryption_key: Optional[str] = Field(default=None, validation_alias="TOKEN_ENCRYPTION_KEY")
     require_encryption: bool = Field(default=False, validation_alias="REQUIRE_ENCRYPTION")
     strict_security: bool = Field(default=False, validation_alias="STRICT_SECURITY")
+    
+    # Environment setting - used to determine security requirements
+    env: str = Field(default="development", validation_alias="ENV")
     
     # Rate limiting
     auth_rate_limit: int = Field(default=5, validation_alias="AUTH_RATE_LIMIT")
@@ -96,6 +99,14 @@ class Settings(BaseSettings):
     # Discovery
     fast_discovery: bool = Field(default=True, validation_alias="FAST_DISCOVERY")
     cache_validity_days: int = Field(default=7, validation_alias="CACHE_VALIDITY_DAYS")
+    
+    # OAuth & Auth Security
+    oauth_state_ttl: int = Field(default=600, validation_alias="OAUTH_STATE_TTL")  # 10 minutes
+    auth_code_ttl: int = Field(default=60, validation_alias="AUTH_CODE_TTL")  # 1 minute
+    token_blacklist_cleanup_hours: int = Field(default=24, validation_alias="TOKEN_BLACKLIST_CLEANUP_HOURS")
+    
+    # Request limits
+    max_request_size_mb: int = Field(default=10, validation_alias="MAX_REQUEST_SIZE_MB")
 
     @field_validator("jwt_secret_key")
     @classmethod
@@ -151,6 +162,16 @@ class Settings(BaseSettings):
         """Parse CORS origins from comma-separated string."""
         return [origin.strip() for origin in self.cors_allowed_origins.split(",") if origin.strip()]
 
+    @property
+    def is_production(self) -> bool:
+        """Check if running in production environment."""
+        return self.env.lower() in ("production", "prod")
+    
+    @property
+    def encryption_required(self) -> bool:
+        """Check if encryption is required based on environment and settings."""
+        return self.require_encryption or self.strict_security or self.is_production
+    
     def validate_production_config(self) -> tuple[List[str], List[str]]:
         """
         Validate configuration for production deployment.
@@ -173,8 +194,13 @@ class Settings(BaseSettings):
         if not self.pat_token:
             errors.append("PAT_TOKEN is required for GitHub API access")
         
-        # Token encryption warning (strongly recommended)
-        if not self.token_encryption_key:
+        # Token encryption is required in production
+        if self.is_production and not self.token_encryption_key:
+            errors.append(
+                "TOKEN_ENCRYPTION_KEY is required in production. "
+                "Generate with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
+            )
+        elif not self.token_encryption_key:
             warnings.append(
                 "TOKEN_ENCRYPTION_KEY not set - GitHub access tokens will be stored "
                 "in plaintext. Set this key to encrypt tokens at rest."
@@ -185,6 +211,13 @@ class Settings(BaseSettings):
                 errors.append("TOKEN_ENCRYPTION_KEY required when STRICT_SECURITY=true")
             if "localhost" in self.cors_allowed_origins:
                 errors.append("CORS should not allow localhost in strict security mode")
+        
+        # Database validation - SQLite not allowed in production
+        if self.is_production and "sqlite" in self.database_url.lower():
+            errors.append(
+                "SQLite is not suitable for production. "
+                "Configure DATABASE_URL to use PostgreSQL."
+            )
         
         return errors, warnings
 

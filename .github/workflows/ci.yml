@@ -31,17 +31,14 @@ jobs:
 
       - name: Run ruff linter
         run: ruff check . --output-format=github
-        continue-on-error: true
 
       - name: Check black formatting
         run: black --check --diff .
-        continue-on-error: true
 
       - name: Run mypy type checking
         run: |
           pip install -r requirements.txt
-          mypy core/ --ignore-missing-imports --no-error-summary || true
-        continue-on-error: true
+          mypy core/ --ignore-missing-imports --no-error-summary
 
   backend-tests:
     name: Backend Tests
@@ -80,19 +77,19 @@ jobs:
           SECRET_KEY: test-secret-key-for-ci
           GITHUB_CLIENT_ID: test-client-id
           GITHUB_CLIENT_SECRET: test-client-secret
+          JWT_SECRET_KEY: test-jwt-secret-key-for-ci-minimum-32-chars
         run: |
           pytest tests/ \
             --cov=core \
             --cov=backend \
             --cov-report=xml \
             --cov-report=term-missing \
-            --cov-fail-under=50 \
+            --cov-fail-under=70 \
             -v \
             --tb=short \
             -x \
             -n auto \
             --ignore=tests/backend/
-        continue-on-error: true
 
       - name: Run backend API tests
         env:
@@ -101,14 +98,15 @@ jobs:
           SECRET_KEY: test-secret-key-for-ci
           GITHUB_CLIENT_ID: test-client-id
           GITHUB_CLIENT_SECRET: test-client-secret
+          JWT_SECRET_KEY: test-jwt-secret-key-for-ci-minimum-32-chars
         run: |
           pytest tests/backend/ \
             --cov=backend \
             --cov-report=xml \
             --cov-report=term-missing \
+            --cov-fail-under=70 \
             -v \
             --tb=short
-        continue-on-error: true
 
       - name: Upload coverage report
         uses: codecov/codecov-action@v3
@@ -138,15 +136,12 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-        continue-on-error: true
 
       - name: Run frontend tests
         run: npm test -- --passWithNoTests
-        continue-on-error: true
 
       - name: Build frontend
         run: npm run build
-        continue-on-error: true
 
   security-scan:
     name: Security Scan
@@ -165,7 +160,6 @@ jobs:
 
       - name: Run safety check
         run: safety check -r requirements.txt --output text
-        continue-on-error: true
 
   all-checks-pass:
     name: All Checks Pass
@@ -179,7 +173,7 @@ jobs:
              [[ "${{ needs.backend-tests.result }}" == "failure" ]] || \
              [[ "${{ needs.frontend-tests.result }}" == "failure" ]] || \
              [[ "${{ needs.security-scan.result }}" == "failure" ]]; then
-            echo "Some checks failed, but continuing for now during migration"
-            exit 0
+            echo "::error::One or more CI checks failed"
+            exit 1
           fi
           echo "All checks passed!"

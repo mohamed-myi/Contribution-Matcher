@@ -8,6 +8,10 @@ env/
 venv/
 ENV/
 .venv
+*.egg
+*.whl
+*.egg-info/
+*.pyc
 
 # Database
 *.db
@@ -17,14 +21,14 @@ ENV/
 # Model files
 *.pkl
 models/
-
+node_modules/
 # Profile data
 dev_profile.json
 
 # Resume files
 my_resume/
 *.pdf
-
+frontend/dist/
 
 .env
 .env.local

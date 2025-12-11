@@ -12,8 +12,8 @@ Refactored to use:
 import secrets
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
@@ -56,48 +56,47 @@ def _get_client_ip(request: Request) -> str:
 # OAuth State Management (CSRF Protection)
 # =============================================================================
 
-import threading
 import time
 
-# In-memory fallback for OAuth state when Redis is unavailable
-_oauth_state_store: dict[str, float] = {}  # state -> expiry timestamp
-_oauth_state_lock = threading.Lock()
-_OAUTH_STATE_TTL = 600  # 10 minutes
 
-
-def _cleanup_expired_states() -> None:
-    """Remove expired states from in-memory store."""
-    now = time.time()
-    expired = [s for s, exp in _oauth_state_store.items() if exp < now]
-    for s in expired:
-        _oauth_state_store.pop(s, None)
+class OAuthStateError(Exception):
+    """Raised when Redis is unavailable for OAuth state management."""
+    pass
 
 
 def _store_oauth_state(state: str) -> bool:
     """
     Store OAuth state for CSRF validation.
     
-    Uses Redis if available, otherwise falls back to in-memory storage.
-    This prevents CSRF attacks on the OAuth flow.
+    SECURITY: Requires Redis - no in-memory fallback to prevent security issues
+    in multi-instance deployments where state wouldn't be shared.
     
     Args:
         state: Random state token
         
     Returns:
-        True if stored successfully, False otherwise
+        True if stored successfully
+        
+    Raises:
+        OAuthStateError: If Redis is unavailable
     """
-    # Try Redis first
-    if cache.is_available:
-        cache_key = CacheKeys.oauth_state(state)
-        result = cache.set_json(cache_key, {"valid": True}, ttl=CacheKeys.TTL_OAUTH_STATE)
-        if result:
-            return True
+    if not cache.is_available:
+        logger.error(
+            "oauth_state_store_failed",
+            reason="Redis unavailable",
+            message="OAuth requires Redis for secure state management",
+        )
+        raise OAuthStateError(
+            "Authentication service temporarily unavailable. "
+            "Redis is required for secure OAuth state management."
+        )
     
-    # Fallback to in-memory storage
-    with _oauth_state_lock:
-        _cleanup_expired_states()
-        _oauth_state_store[state] = time.time() + _OAUTH_STATE_TTL
-        logger.debug("oauth_state_stored_memory", state_prefix=state[:8])
+    settings = get_settings()
+    cache_key = CacheKeys.oauth_state(state)
+    result = cache.set_json(cache_key, {"valid": True}, ttl=settings.oauth_state_ttl)
+    if not result:
+        raise OAuthStateError("Failed to store OAuth state")
+    
     return True
 
 
@@ -105,7 +104,7 @@ def _validate_and_consume_oauth_state(state: str) -> bool:
     """
     Validate OAuth state and consume it (one-time use).
     
-    Checks both Redis and in-memory storage.
+    SECURITY: Requires Redis - state validation is critical for CSRF protection.
     
     Args:
         state: State token from callback
@@ -116,22 +115,19 @@ def _validate_and_consume_oauth_state(state: str) -> bool:
     if not state:
         return False
     
-    # Try Redis first
-    if cache.is_available:
-        cache_key = CacheKeys.oauth_state(state)
-        data = cache.get_json(cache_key)
-        if data and data.get("valid"):
-            cache.delete(cache_key)
-            return True
+    if not cache.is_available:
+        logger.error(
+            "oauth_state_validate_failed",
+            reason="Redis unavailable",
+            message="Cannot validate OAuth state without Redis",
+        )
+        return False
     
-    # Check in-memory fallback
-    with _oauth_state_lock:
-        _cleanup_expired_states()
-        if state in _oauth_state_store:
-            expiry = _oauth_state_store.pop(state)
-            if expiry > time.time():
-                logger.debug("oauth_state_validated_memory", state_prefix=state[:8])
-                return True
+    cache_key = CacheKeys.oauth_state(state)
+    data = cache.get_json(cache_key)
+    if data and data.get("valid"):
+        cache.delete(cache_key)
+        return True
     
     return False
 
@@ -140,27 +136,13 @@ def _validate_and_consume_oauth_state(state: str) -> bool:
 # Auth Code Exchange (Prevents Token in URL)
 # =============================================================================
 
-# In-memory fallback for auth codes when Redis is unavailable
-_auth_code_store: dict[str, dict] = {}  # code -> {token, user_id, expiry}
-_auth_code_lock = threading.Lock()
-_AUTH_CODE_TTL = 60  # 1 minute
-
-
-def _cleanup_expired_auth_codes() -> None:
-    """Remove expired auth codes from in-memory store."""
-    now = time.time()
-    expired = [c for c, data in _auth_code_store.items() if data.get("expiry", 0) < now]
-    for c in expired:
-        _auth_code_store.pop(c, None)
-
 
 def _store_auth_code(code: str, token: str, user_id: int) -> bool:
     """
     Store a temporary auth code that can be exchanged for a JWT token.
     
-    Uses Redis if available, otherwise falls back to in-memory storage.
-    This prevents the JWT from being exposed in URL query parameters,
-    which could leak via browser history, server logs, or Referer headers.
+    SECURITY: Requires Redis - no in-memory fallback to ensure codes work
+    across multiple server instances and are properly expired.
     
     Args:
         code: Random auth code
@@ -168,28 +150,32 @@ def _store_auth_code(code: str, token: str, user_id: int) -> bool:
         user_id: User ID for logging
         
     Returns:
-        True if stored successfully, False otherwise
+        True if stored successfully
+        
+    Raises:
+        OAuthStateError: If Redis is unavailable
     """
-    # Try Redis first
-    if cache.is_available:
-        cache_key = CacheKeys.auth_code(code)
-        result = cache.set_json(
-            cache_key,
-            {"token": token, "user_id": user_id},
-            ttl=CacheKeys.TTL_AUTH_CODE,
+    if not cache.is_available:
+        logger.error(
+            "auth_code_store_failed",
+            reason="Redis unavailable",
+            user_id=user_id,
         )
-        if result:
-            return True
+        raise OAuthStateError(
+            "Authentication service temporarily unavailable. "
+            "Redis is required for secure token exchange."
+        )
     
-    # Fallback to in-memory storage
-    with _auth_code_lock:
-        _cleanup_expired_auth_codes()
-        _auth_code_store[code] = {
-            "token": token,
-            "user_id": user_id,
-            "expiry": time.time() + _AUTH_CODE_TTL,
-        }
-        logger.debug("auth_code_stored_memory", user_id=user_id)
+    settings = get_settings()
+    cache_key = CacheKeys.auth_code(code)
+    result = cache.set_json(
+        cache_key,
+        {"token": token, "user_id": user_id},
+        ttl=settings.auth_code_ttl,
+    )
+    if not result:
+        raise OAuthStateError("Failed to store auth code")
+    
     return True
 
 
@@ -197,7 +183,8 @@ def _exchange_auth_code(code: str) -> tuple[str | None, int | None]:
     """
     Exchange an auth code for a JWT token (one-time use).
     
-    Checks both Redis and in-memory storage.
+    SECURITY: Requires Redis - auth codes must be stored persistently
+    and consumed atomically to prevent replay attacks.
     
     Args:
         code: Auth code from callback redirect
@@ -208,22 +195,18 @@ def _exchange_auth_code(code: str) -> tuple[str | None, int | None]:
     if not code:
         return None, None
     
-    # Try Redis first
-    if cache.is_available:
-        cache_key = CacheKeys.auth_code(code)
-        data = cache.get_json(cache_key)
-        if data:
-            cache.delete(cache_key)
-            return data.get("token"), data.get("user_id")
+    if not cache.is_available:
+        logger.error(
+            "auth_code_exchange_failed",
+            reason="Redis unavailable",
+        )
+        return None, None
     
-    # Check in-memory fallback
-    with _auth_code_lock:
-        _cleanup_expired_auth_codes()
-        if code in _auth_code_store:
-            data = _auth_code_store.pop(code)
-            if data.get("expiry", 0) > time.time():
-                logger.debug("auth_code_exchanged_memory", user_id=data.get("user_id"))
-                return data.get("token"), data.get("user_id")
+    cache_key = CacheKeys.auth_code(code)
+    data = cache.get_json(cache_key)
+    if data:
+        cache.delete(cache_key)
+        return data.get("token"), data.get("user_id")
     
     return None, None
 
@@ -235,7 +218,7 @@ def login():
     
     Flow:
     1. User clicks login
-    2. Generate and store CSRF state token (Redis or in-memory)
+    2. Generate and store CSRF state token in Redis
     3. Redirect to GitHub with state
     4. User authorizes
     5. GitHub redirects to /auth/callback with state
@@ -243,13 +226,23 @@ def login():
     
     Security:
     - State token prevents CSRF attacks on OAuth flow
-    - State is stored in Redis (or in-memory fallback) with 10-minute TTL
+    - State is stored in Redis with 10-minute TTL (Redis required)
     - State is consumed on callback (one-time use)
+    
+    Raises:
+        HTTPException: If Redis is unavailable
     """
     state = secrets.token_urlsafe(32)  # 32 bytes = 256 bits of entropy
     
-    # Store state for validation in callback (uses in-memory fallback if Redis unavailable)
-    _store_oauth_state(state)
+    try:
+        # Store state for validation in callback (Redis required)
+        _store_oauth_state(state)
+    except OAuthStateError as e:
+        logger.error("login_redis_unavailable", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication service temporarily unavailable. Please try again later.",
+        )
     
     authorize_url = get_oauth_authorize_url(state)
     return RedirectResponse(url=authorize_url)
@@ -345,9 +338,16 @@ def oauth_callback(
         jwt_token = create_access_token({"sub": str(user.id)})
         
         # Generate short-lived auth code (prevents JWT exposure in URL)
-        # Uses Redis if available, otherwise in-memory fallback
+        # Redis is required for secure auth code storage
         auth_code = secrets.token_urlsafe(32)
-        _store_auth_code(auth_code, jwt_token, user.id)
+        try:
+            _store_auth_code(auth_code, jwt_token, user.id)
+        except OAuthStateError:
+            # Redis unavailable - redirect with error
+            logger.error("oauth_auth_code_store_failed", user_id=user.id)
+            return RedirectResponse(
+                url=f"{frontend_url}/auth/callback?error=service_unavailable"
+            )
         
         logger.info("oauth_login_success", user_id=user.id, username=user.github_username)
         return RedirectResponse(url=f"{frontend_url}/auth/callback?code={auth_code}")
@@ -367,7 +367,10 @@ def oauth_callback(
 
 
 @router.post("/token")
-def exchange_token(code: str = Query(...)):
+def exchange_token(
+    code: str = Query(...),
+    response: Response = None,
+):
     """
     Exchange an auth code for a JWT token.
     
@@ -377,14 +380,17 @@ def exchange_token(code: str = Query(...)):
     Security:
     - Auth code expires in 1 minute
     - Auth code is consumed on first use (cannot be replayed)
-    - JWT is never exposed in URLs or logs
+    - JWT is set as HttpOnly cookie (cannot be accessed by JavaScript)
+    - Also returns token in body for backward compatibility during migration
     
     Args:
         code: Auth code from OAuth callback redirect
         
     Returns:
-        JWT access token
+        JWT access token (in both cookie and response body)
     """
+    from fastapi.responses import Response
+    
     token, user_id = _exchange_auth_code(code)
     
     if not token:
@@ -395,7 +401,39 @@ def exchange_token(code: str = Query(...)):
         )
     
     logger.info("auth_code_exchanged", user_id=user_id)
-    return {"access_token": token, "token_type": "bearer"}
+    
+    # Create response with HttpOnly cookie
+    settings = get_settings()
+    is_production = settings.env.lower() in ("production", "prod")
+    
+    response = JSONResponse(
+        content={"access_token": token, "token_type": "bearer"},
+    )
+    
+    # Set HttpOnly cookie
+    response.set_cookie(
+        key="access_token",
+        value=token,
+        httponly=True,  # Cannot be accessed by JavaScript
+        secure=is_production,  # Only send over HTTPS in production
+        samesite="lax",  # CSRF protection
+        max_age=settings.access_token_expire_minutes * 60,
+        path="/",
+    )
+    
+    # Generate and set CSRF token (for forms that need it)
+    csrf_token = secrets.token_urlsafe(32)
+    response.set_cookie(
+        key="csrf_token",
+        value=csrf_token,
+        httponly=False,  # JavaScript needs to read this
+        secure=is_production,
+        samesite="lax",
+        max_age=settings.access_token_expire_minutes * 60,
+        path="/",
+    )
+    
+    return response
 
 
 @router.get("/me", response_model=UserResponse)
@@ -406,15 +444,34 @@ def current_user(user: User = Depends(get_current_user)) -> UserResponse:
 
 @router.post("/logout")
 def logout(
-    token: str = Depends(oauth2_scheme),
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     Invalidate the current JWT token.
     
-    Adds token to blacklist and clears user cache.
+    Adds token to blacklist, clears user cache, and removes auth cookies.
+    Supports both Bearer token and HttpOnly cookie authentication.
     """
+    settings = get_settings()
+    is_production = settings.env.lower() in ("production", "prod")
+    
+    # Get token from Authorization header or cookie
+    token = None
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+    else:
+        token = request.cookies.get("access_token")
+    
+    if not token:
+        # No token to blacklist, just clear cookies
+        response = JSONResponse(content={"status": "logged_out"})
+        response.delete_cookie(key="access_token", path="/", secure=is_production, samesite="lax")
+        response.delete_cookie(key="csrf_token", path="/", secure=is_production, samesite="lax")
+        return response
+    
     try:
         payload = decode_access_token(token)
         jti = payload.get("jti")
@@ -432,11 +489,25 @@ def logout(
         
         # Clear user cache
         cache.delete_pattern(CacheKeys.user_pattern(current_user.id))
-        
-        return {"status": "logged_out"}
     except Exception:
-        # Even if token is invalid, we return success
-        return {"status": "logged_out"}
+        pass  # Continue even if blacklist fails
+    
+    # Clear cookies
+    response = JSONResponse(content={"status": "logged_out"})
+    response.delete_cookie(
+        key="access_token",
+        path="/",
+        secure=is_production,
+        samesite="lax",
+    )
+    response.delete_cookie(
+        key="csrf_token",
+        path="/",
+        secure=is_production,
+        samesite="lax",
+    )
+    
+    return response
 
 
 @router.delete("/account")
@@ -463,16 +534,87 @@ def delete_account(
 
 @router.post("/refresh")
 def refresh_token(
-    token: str = Depends(oauth2_scheme),
+    request: Request,
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     Refresh JWT token.
     
-    Returns a new token with extended expiry.
+    SECURITY: Blacklists the old token before issuing a new one to prevent
+    token reuse attacks. If the old token is compromised, it cannot be used
+    again after refresh.
+    
+    Returns a new token with extended expiry (in both cookie and response body).
+    Supports both Bearer token and HttpOnly cookie authentication.
     """
+    settings = get_settings()
+    is_production = settings.env.lower() in ("production", "prod")
+    
+    # Get token from Authorization header or cookie
+    token = None
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+    else:
+        token = request.cookies.get("access_token")
+    
+    try:
+        # Decode old token to get JTI for blacklisting
+        if token:
+            payload = decode_access_token(token)
+            old_jti = payload.get("jti")
+        else:
+            old_jti = None
+        
+        if old_jti:
+            # Get token expiry for blacklist entry
+            expiry = get_token_expiry(token)
+            if not expiry:
+                expiry = datetime.now(timezone.utc)
+            
+            # Blacklist the old token BEFORE issuing new one
+            blacklist_repo = TokenBlacklistRepository(db)
+            blacklist_repo.blacklist_token(old_jti, expiry)
+            db.commit()
+            
+            logger.debug("refresh_old_token_blacklisted", jti=old_jti[:8])
+    except Exception as e:
+        # Log but continue - issuing new token is more important
+        logger.warning("refresh_blacklist_failed", error=str(e))
+    
+    # Issue new token
     new_token = create_access_token({"sub": str(current_user.id)})
-    return {"access_token": new_token, "token_type": "bearer"}
+    
+    # Create response with updated cookie
+    response = JSONResponse(
+        content={"access_token": new_token, "token_type": "bearer"},
+    )
+    
+    # Set new HttpOnly cookie
+    response.set_cookie(
+        key="access_token",
+        value=new_token,
+        httponly=True,
+        secure=is_production,
+        samesite="lax",
+        max_age=settings.access_token_expire_minutes * 60,
+        path="/",
+    )
+    
+    # Update CSRF token
+    csrf_token = secrets.token_urlsafe(32)
+    response.set_cookie(
+        key="csrf_token",
+        value=csrf_token,
+        httponly=False,
+        secure=is_production,
+        samesite="lax",
+        max_age=settings.access_token_expire_minutes * 60,
+        path="/",
+    )
+    
+    return response
 
 
 @router.get("/health")

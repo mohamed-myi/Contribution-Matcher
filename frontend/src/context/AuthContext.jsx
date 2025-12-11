@@ -10,8 +10,18 @@ const PROFILE_SOURCE = {
   MANUAL: 'manual',
 };
 
+/**
+ * Check if we have an auth cookie (csrf_token indicates we're authenticated)
+ * The access_token cookie is HttpOnly so we can't read it directly.
+ */
+function hasAuthCookie() {
+  return document.cookie.includes('csrf_token=');
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  // Token state is for backward compatibility during migration
+  // Primary auth is now via HttpOnly cookies
   const [token, setToken] = useState(() => localStorage.getItem('token'));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -59,13 +69,20 @@ export function AuthProvider({ children }) {
   }, [user, fetchProfile]);
 
   // Fetch current user
-  const fetchUser = useCallback(async () => {
-    if (!token) {
+  // Works with both cookie auth (primary) and localStorage token (fallback)
+  const fetchUser = useCallback(async (forceCheck = false) => {
+    // Check if we might be authenticated (cookie or token)
+    // With cookie-based auth, we should try if there's any indication of auth
+    const mightBeAuthenticated = hasAuthCookie() || token;
+    
+    // Skip if definitely not authenticated (unless forcing check)
+    if (!mightBeAuthenticated && !forceCheck) {
       setLoading(false);
       return;
     }
 
     try {
+      // This will use cookies (via withCredentials) or Authorization header (via interceptor)
       const response = await apiClient.get('/auth/me');
       setUser(response.data);
       setError(null);
@@ -111,17 +128,20 @@ export function AuthProvider({ children }) {
     checkProfileAndSync();
   }, [user, loading, fetchProfile, syncFromGitHub]);
 
-  // Login - save token and fetch user
+  // Login - save token (for backward compatibility) and fetch user
+  // The server also sets HttpOnly cookies, which are the primary auth mechanism
   // Returns a promise that resolves with the user or rejects with an error
   const login = useCallback(async (newToken) => {
-    localStorage.setItem('token', newToken);
-    setToken(newToken);
+    // Store in localStorage as fallback during migration
+    if (newToken) {
+      localStorage.setItem('token', newToken);
+      setToken(newToken);
+    }
     setLoading(true);
     
     try {
-      const response = await apiClient.get('/auth/me', {
-        headers: { Authorization: `Bearer ${newToken}` }
-      });
+      // This will now use the HttpOnly cookie (primary) or Authorization header (fallback)
+      const response = await apiClient.get('/auth/me');
       setUser(response.data);
       setError(null);
       return response.data; // Return user data so caller can await it
@@ -163,7 +183,9 @@ export function AuthProvider({ children }) {
     token,
     loading,
     error,
-    isAuthenticated: !!token && !!user,
+    // Authentication is based on user object presence
+    // Cookie-based auth may not have token in localStorage
+    isAuthenticated: !!user,
     login,
     logout,
     refreshUser: fetchUser,

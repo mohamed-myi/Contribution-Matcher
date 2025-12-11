@@ -51,12 +51,8 @@ def upgrade() -> None:
         postgresql_where=sa.text('is_active = true'),
     )
     
-    # Issues: User + Difficulty (for filtering)
-    op.create_index(
-        'ix_issues_user_difficulty',
-        'issues',
-        ['user_id', 'difficulty'],
-    )
+    # NOTE: ix_issues_user_difficulty already created in migration 20241130_0001
+    # Skipping duplicate index creation
     
     # Issues: User + Issue Type (for filtering)
     op.create_index(
@@ -115,12 +111,8 @@ def upgrade() -> None:
     # Label Indexes (for ML)
     # ==========================================================================
     
-    # IssueLabel: User + Label (for training data retrieval)
-    op.create_index(
-        'ix_issue_labels_user_label',
-        'issue_labels',
-        ['user_id', 'label'],
-    )
+    # NOTE: ix_issue_labels_user_label already created in migration 20241130_0001
+    # Skipping duplicate index creation
     
     # ==========================================================================
     # Feature Cache Indexes
@@ -219,12 +211,12 @@ def downgrade() -> None:
     # Drop indexes
     op.drop_index('ix_issues_last_verified', table_name='issues')
     op.drop_index('ix_issue_feature_cache_profile_updated', table_name='issue_feature_cache')
-    op.drop_index('ix_issue_labels_user_label', table_name='issue_labels')
+    # NOTE: ix_issue_labels_user_label created in 20241130_0001, not this migration
     op.drop_index('ix_issue_bookmarks_user_created', table_name='issue_bookmarks')
     op.drop_index('ix_issue_technologies_issue_tech', table_name='issue_technologies')
     op.drop_index('ix_issues_url_lookup', table_name='issues')
     op.drop_index('ix_issues_user_label', table_name='issues')
     op.drop_index('ix_issues_user_issue_type', table_name='issues')
-    op.drop_index('ix_issues_user_difficulty', table_name='issues')
+    # NOTE: ix_issues_user_difficulty created in 20241130_0001, not this migration
     op.drop_index('ix_issues_user_active_created', table_name='issues')
     op.drop_index('ix_issues_user_active_score', table_name='issues')

@@ -693,12 +693,14 @@ class RateLimiter:
             
         except Exception as e:
             logger.error("rate_limit_error", error=str(e))
-            # Fail open on errors
+            # SECURITY: Fail CLOSED on errors - deny the request rather than allowing unlimited access
+            # This prevents attackers from bypassing rate limits by causing Redis errors
             return RateLimitResult(
-                allowed=True,
-                remaining=config["limit"],
+                allowed=False,
+                remaining=0,
                 limit=config["limit"],
                 reset_at=int(time.time()) + config["window"],
+                retry_after=config["window"],
             )
     
     def record_failure(self, endpoint: str, identifier: str) -> None:

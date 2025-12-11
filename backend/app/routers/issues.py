@@ -7,7 +7,8 @@ Uses core repositories and services for database access.
 import csv
 import io
 import json
-from typing import Literal
+from enum import Enum
+from typing import Literal, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
@@ -34,6 +35,42 @@ from ..schemas import (
 from ..services import issue_service
 
 router = APIRouter(prefix="/issues", tags=["issues"])
+
+
+# =============================================================================
+# Filter Parameter Validation Enums
+# =============================================================================
+
+class DifficultyFilter(str, Enum):
+    """Valid difficulty filter values."""
+    beginner = "beginner"
+    intermediate = "intermediate"
+    advanced = "advanced"
+
+
+class IssueTypeFilter(str, Enum):
+    """Valid issue type filter values."""
+    bug = "bug"
+    feature = "feature"
+    documentation = "documentation"
+    testing = "testing"
+    refactoring = "refactoring"
+    enhancement = "enhancement"
+
+
+class ScoreRangeFilter(str, Enum):
+    """Valid score range filter values."""
+    high = "high"      # 80+
+    medium = "medium"  # 50-79
+    low = "low"        # <50
+
+
+class OrderByFilter(str, Enum):
+    """Valid order_by filter values."""
+    created_at = "created_at"
+    score = "score"
+    repo_stars = "repo_stars"
+    title = "title"
 
 
 # =============================================================================
@@ -111,31 +148,31 @@ def get_discovery_task_status(
 
 @router.get("", response_model=IssueListResponse)
 def list_issues(
-    difficulty: str = Query(None),
-    technology: str = Query(None),
-    language: str = Query(None),
-    repo_owner: str = Query(None),
-    issue_type: str = Query(None),
-    days_back: int = Query(None, description="Filter issues created within N days"),
-    min_stars: int = Query(None, ge=0, description="Minimum repository stars"),
-    score_range: str = Query(None, description="Score range: 'high' (80+), 'medium' (50-79), 'low' (<50)"),
-    limit: int = Query(20, le=100),
-    offset: int = Query(0, ge=0),
-    order_by: str = Query("created_at"),
+    difficulty: Optional[DifficultyFilter] = Query(None, description="Filter by difficulty level"),
+    technology: Optional[str] = Query(None, description="Filter by technology"),
+    language: Optional[str] = Query(None, description="Filter by programming language"),
+    repo_owner: Optional[str] = Query(None, description="Filter by repository owner"),
+    issue_type: Optional[IssueTypeFilter] = Query(None, description="Filter by issue type"),
+    days_back: Optional[int] = Query(None, ge=1, le=365, description="Filter issues created within N days"),
+    min_stars: Optional[int] = Query(None, ge=0, le=1000000, description="Minimum repository stars"),
+    score_range: Optional[ScoreRangeFilter] = Query(None, description="Score range: 'high' (80+), 'medium' (50-79), 'low' (<50)"),
+    limit: int = Query(20, ge=1, le=100, description="Number of results per page"),
+    offset: int = Query(0, ge=0, le=10000, description="Pagination offset"),
+    order_by: OrderByFilter = Query(OrderByFilter.created_at, description="Sort field"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """List issues with filtering and pagination."""
     filters = {
-        "difficulty": difficulty,
+        "difficulty": difficulty.value if difficulty else None,
         "technology": technology,
         "language": language,
         "repo_owner": repo_owner,
-        "issue_type": issue_type,
+        "issue_type": issue_type.value if issue_type else None,
         "days_back": days_back,
         "min_stars": min_stars,
-        "score_range": score_range,
-        "order_by": order_by,
+        "score_range": score_range.value if score_range else None,
+        "order_by": order_by.value,
         "is_active": True,
     }
     

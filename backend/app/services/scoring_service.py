@@ -13,8 +13,8 @@ from sqlalchemy.orm import Session
 
 from ..models import Issue, User, UserMLModel
 from ..schemas import IssueResponse, ScoreBreakdownResponse
-from . import feature_cache_service, issue_service
-from .matching_service import get_model_dir
+from . import issue_service
+from .feature_cache_service import get_breakdown_and_features, get_model_dir
 
 
 def _load_user_model(user: User, db: Session) -> Optional[Tuple[UserMLModel, object]]:
@@ -66,7 +66,7 @@ def _ml_adjustment(model_tuple: Optional[Tuple[UserMLModel, object]], features: 
 
 def score_issue(db: Session, user: User, issue: Issue) -> Tuple[IssueResponse, float, dict]:
     """Score a single issue and return (issue_response, total_score, breakdown_dict)."""
-    breakdown, features = feature_cache_service.get_breakdown_and_features(db, user, issue)
+    breakdown, features = get_breakdown_and_features(db, user, issue)
     model = _load_user_model(user, db)
     adjustment = _ml_adjustment(model, features)
     total_score = max(0.0, min(100.0, breakdown.total_score + adjustment))

@@ -175,23 +175,38 @@ class TokenEncryption:
             logger.error("decrypt_failed", error=str(e))
             raise EncryptionError(f"Decryption failed: {e}")
     
-    def encrypt_if_available(self, plaintext: str) -> tuple[str, bool]:
+    def encrypt_if_available(self, plaintext: str, require_encryption: bool = False) -> tuple[str, bool]:
         """
-        Encrypt if available, otherwise return original.
+        Encrypt if available, otherwise return original or raise error.
         
         Args:
             plaintext: The string to encrypt
+            require_encryption: If True, raise error when encryption unavailable
             
         Returns:
             Tuple of (result_string, was_encrypted)
+            
+        Raises:
+            EncryptionError: If require_encryption is True and encryption unavailable
         """
         if not self.is_available:
+            if require_encryption:
+                raise EncryptionError(
+                    "Encryption is required but not available. "
+                    "Set TOKEN_ENCRYPTION_KEY environment variable."
+                )
+            logger.warning(
+                "encrypt_fallback_plaintext",
+                message="Storing sensitive data in plaintext - encryption unavailable",
+            )
             return plaintext, False
         
         try:
             encrypted = self.encrypt(plaintext)
             return encrypted, True
         except EncryptionError:
+            if require_encryption:
+                raise
             return plaintext, False
     
     def decrypt_if_encrypted(self, value: str) -> str:

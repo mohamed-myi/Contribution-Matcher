@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Base API URLs derived from environment (falls back to local dev).
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-const API_URL = `${BASE_URL}/api`;
+const API_URL = `${BASE_URL}/api/v1`;
 
 // API Configuration
 const API_CONFIG = {
@@ -14,11 +14,16 @@ const API_CONFIG = {
 
 /**
  * Axios instance configured for the backend API with auth header injection,
- * sane timeouts, and gzip support.
+ * sane timeouts, gzip support, and cookie-based auth.
+ * 
+ * Authentication is handled via:
+ * - HttpOnly cookies (preferred for security)
+ * - Bearer token fallback (for backward compatibility)
  */
 export const apiClient = axios.create({
   baseURL: API_URL,
   timeout: API_CONFIG.timeout,
+  withCredentials: true, // Send cookies with requests
   headers: {
     'Content-Type': 'application/json',
     'Accept-Encoding': 'gzip, deflate', // Accept compressed responses
@@ -52,17 +57,41 @@ const retryRequest = async (error, retryCount = 0) => {
   return apiClient(config);
 };
 
-// Request interceptor to add auth token
+// Request interceptor to add auth token (fallback for backward compatibility)
+// Primary auth is via HttpOnly cookies (sent automatically with withCredentials: true)
 apiClient.interceptors.request.use(
   (config) => {
+    // Fallback: use localStorage token if cookie auth fails
+    // This maintains backward compatibility during migration
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // Add CSRF token for state-changing requests
+    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(config.method?.toUpperCase())) {
+      const csrfToken = getCookie('csrf_token');
+      if (csrfToken) {
+        config.headers['X-CSRF-Token'] = csrfToken;
+      }
+    }
+    
     return config;
   },
   (error) => Promise.reject(error)
 );
+
+/**
+ * Get a cookie value by name.
+ */
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) {
+    return parts.pop()?.split(';').shift();
+  }
+  return null;
+}
 
 // Response interceptor for error handling and retry
 apiClient.interceptors.response.use(

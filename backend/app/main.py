@@ -5,10 +5,15 @@ Uses structured logging from core.logging module.
 Includes security validation and rate limiting.
 """
 
-from fastapi import Depends, FastAPI, Request
+import time
+from typing import Callable
+
+from fastapi import Depends, FastAPI, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from core.logging import configure_logging, get_logger, RequestLoggingMiddleware
 from core.db import db
@@ -31,6 +36,33 @@ from .routers import ml as ml_router
 from .routers import profile as profile_router
 from .routers import scoring as scoring_router
 from .scheduler import shutdown_scheduler, start_scheduler
+
+
+class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
+    """Middleware to limit request body size."""
+    
+    def __init__(self, app, max_size_mb: int = 10):
+        super().__init__(app)
+        self.max_size = max_size_mb * 1024 * 1024  # Convert to bytes
+        self.max_size_mb = max_size_mb
+    
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        # Check Content-Length header if present
+        content_length = request.headers.get("content-length")
+        if content_length:
+            try:
+                if int(content_length) > self.max_size:
+                    return JSONResponse(
+                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        content={
+                            "error": "Request too large",
+                            "detail": f"Maximum request size is {self.max_size_mb}MB",
+                        },
+                    )
+            except ValueError:
+                pass
+        
+        return await call_next(request)
 
 
 # Configure structured logging
@@ -76,9 +108,73 @@ def validate_security_on_startup():
         raise
 
 
+def check_database_health(max_retries: int = 3, retry_delay: float = 2.0) -> bool:
+    """
+    Check database connectivity with retry logic.
+    
+    Args:
+        max_retries: Maximum number of connection attempts
+        retry_delay: Seconds to wait between retries
+        
+    Returns:
+        True if database is reachable
+        
+    Raises:
+        RuntimeError: If database is unreachable after all retries
+    """
+    from sqlalchemy import text
+    
+    for attempt in range(max_retries):
+        try:
+            # Use a simple query to test connectivity
+            with db.get_session() as session:
+                session.execute(text("SELECT 1"))
+            logger.info("database_health_check_passed", attempt=attempt + 1)
+            return True
+        except Exception as e:
+            logger.warning(
+                "database_health_check_failed",
+                attempt=attempt + 1,
+                max_retries=max_retries,
+                error=str(e),
+            )
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay * (attempt + 1))  # Exponential backoff
+    
+    raise RuntimeError(
+        f"Database unreachable after {max_retries} attempts. "
+        "Check DATABASE_URL configuration and database server status."
+    )
+
+
 def create_app() -> FastAPI:
+    import os
+    
+    # API version prefix
+    api_version = "v1"
+    api_prefix = f"{settings.api_prefix}/{api_version}"
+    
     app = FastAPI(title=settings.app_name, debug=settings.debug)
 
+    # Request size limit middleware (configurable via MAX_REQUEST_SIZE_MB)
+    app.add_middleware(RequestSizeLimitMiddleware, max_size_mb=settings.max_request_size_mb)
+    
+    # Trusted host middleware (only in production)
+    env = os.getenv("ENV", "development").lower()
+    is_production = env in ("production", "prod")
+    if is_production:
+        # Parse allowed hosts from CORS origins
+        allowed_hosts = []
+        for origin in settings.cors_allowed_origins.split(","):
+            origin = origin.strip()
+            # Extract hostname from URL
+            if "://" in origin:
+                host = origin.split("://")[1].split("/")[0].split(":")[0]
+                allowed_hosts.append(host)
+        
+        if allowed_hosts:
+            app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts)
+    
     # CORS middleware - restricted to specific methods and headers for security
     origins = [origin.strip() for origin in settings.cors_allowed_origins.split(",")]
     app.add_middleware(
@@ -95,6 +191,7 @@ def create_app() -> FastAPI:
             "Accept-Encoding",
             "Origin",
             "X-Requested-With",
+            "X-CSRF-Token",
         ],
         # Expose rate limit headers to frontend
         expose_headers=[
@@ -150,6 +247,9 @@ def create_app() -> FastAPI:
         db.initialize(settings.database_url)
         logger.info("database_initialized")
         
+        # Verify database connectivity with retry
+        check_database_health(max_retries=3, retry_delay=2.0)
+        
         # Initialize cache
         cache.initialize()
         if cache.is_available:
@@ -190,13 +290,59 @@ def create_app() -> FastAPI:
     @app.get("/health", tags=["health"])
     def health_check():
         """
-        Health check endpoint.
+        Health check endpoint (liveness probe).
         
         Returns minimal information to avoid exposing infrastructure details.
-        Use /health/detailed for more info (requires debug mode).
+        Use /health/ready for readiness checks, /health/detailed for debug info.
         """
         # Only return basic status - no infrastructure details
         return {"status": "ok"}
+
+    @app.get("/health/ready", tags=["health"])
+    def readiness_check():
+        """
+        Readiness check endpoint.
+        
+        Verifies that critical services (database, cache) are operational.
+        Used by load balancers and container orchestrators.
+        
+        Returns 200 if ready, 503 if not ready.
+        """
+        from sqlalchemy import text
+        
+        checks = {
+            "database": False,
+            "cache": False,
+        }
+        all_ready = True
+        
+        # Check database
+        try:
+            if db.is_initialized:
+                with db.get_session() as session:
+                    session.execute(text("SELECT 1"))
+                checks["database"] = True
+            else:
+                all_ready = False
+        except Exception:
+            all_ready = False
+        
+        # Check cache (Redis)
+        try:
+            if cache.is_available:
+                cache.client.ping()
+                checks["cache"] = True
+            # Cache being unavailable is not fatal - it's optional
+        except Exception:
+            pass  # Cache failures are warnings, not errors
+        
+        if not checks["database"]:
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={"status": "not_ready", "checks": checks},
+            )
+        
+        return {"status": "ready", "checks": checks}
 
     @app.get("/health/detailed", tags=["health"])
     def health_check_detailed():
@@ -247,31 +393,32 @@ def create_app() -> FastAPI:
     # Protected route dependencies
     protected_dependencies = [Depends(enforce_rate_limit)]
 
-    # Register routers
-    app.include_router(auth_router.router, prefix=settings.api_prefix)
+    # Register routers with versioned API prefix
+    # API is accessible at /api/v1/*
+    app.include_router(auth_router.router, prefix=api_prefix)
     app.include_router(
         issues_router.router,
-        prefix=settings.api_prefix,
+        prefix=api_prefix,
         dependencies=protected_dependencies,
     )
     app.include_router(
         profile_router.router,
-        prefix=settings.api_prefix,
+        prefix=api_prefix,
         dependencies=protected_dependencies,
     )
     app.include_router(
         scoring_router.router,
-        prefix=settings.api_prefix,
+        prefix=api_prefix,
         dependencies=protected_dependencies,
     )
     app.include_router(
         ml_router.router,
-        prefix=settings.api_prefix,
+        prefix=api_prefix,
         dependencies=protected_dependencies,
     )
     app.include_router(
         jobs_router.router,
-        prefix=settings.api_prefix,
+        prefix=api_prefix,
         dependencies=protected_dependencies,
     )
 

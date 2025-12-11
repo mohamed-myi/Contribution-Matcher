@@ -19,8 +19,8 @@ from sqlalchemy.orm import Session
 
 from ..models import Issue, IssueLabel, User, UserMLModel
 from ..schemas import EvaluateModelRequest, ModelInfoResponse, TrainModelRequest
-from . import feature_cache_service, issue_service
-from .matching_service import get_model_dir
+from . import issue_service
+from .feature_cache_service import get_breakdown_and_features, get_model_dir
 
 
 def label_issue(db: Session, user: User, issue_id: int, label: str) -> None:
@@ -185,7 +185,7 @@ def _build_training_dataset(db: Session, user: User) -> Tuple[np.ndarray, np.nda
     X: List[List[float]] = []
     y: List[int] = []
     for issue, label in labeled:
-        _, features = feature_cache_service.get_breakdown_and_features(db, user, issue)
+        _, features = get_breakdown_and_features(db, user, issue)
         X.append(features)
         y.append(1 if label.label == "good" else 0)
 

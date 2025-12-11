@@ -36,7 +36,7 @@ def upgrade() -> None:
             comment="Origin of profile data: github, resume, or manual",
         ),
     )
-    
+
     # Add last_github_sync column (nullable - only set for GitHub-sourced profiles)
     op.add_column(
         "dev_profile",
@@ -47,7 +47,7 @@ def upgrade() -> None:
             comment="Timestamp of last GitHub profile sync",
         ),
     )
-    
+
     # Create index on profile_source for filtering queries
     op.create_index(
         "ix_dev_profile_source",
@@ -60,8 +60,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     # Drop index
     op.drop_index("ix_dev_profile_source", table_name="dev_profile")
-    
+
     # Drop columns
     op.drop_column("dev_profile", "last_github_sync")
     op.drop_column("dev_profile", "profile_source")
-

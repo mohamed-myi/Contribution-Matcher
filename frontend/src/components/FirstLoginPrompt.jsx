@@ -30,7 +30,7 @@ export function FirstLoginPrompt() {
       await syncFromGitHub();
       dismissFirstLoginPrompt();
       // Optionally navigate to dashboard or stay on current page
-    } catch (err) {
+    } catch {
       setError('Failed to sync from GitHub. You can try again from the Profile page.');
     } finally {
       setSyncing(false);

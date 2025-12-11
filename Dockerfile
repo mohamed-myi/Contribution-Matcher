@@ -166,4 +166,3 @@ USER appuser
 
 ENTRYPOINT ["python", "main.py"]
 CMD ["--help"]
-

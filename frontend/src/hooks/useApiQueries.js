@@ -210,7 +210,7 @@ export function useBookmarkMutation() {
       return { issueId, isBookmarked: !isBookmarked };
     },
     // Optimistic update
-    onMutate: async ({ issueId, isBookmarked }) => {
+    onMutate: async () => {
       // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: queryKeys.issues.all });
       

@@ -6,7 +6,6 @@ def test_auth_login_redirects_to_github(monkeypatch, test_app_client):
     """Test that /auth/login redirects to GitHub OAuth."""
     # Mock Redis/cache to be available for OAuth state storage
     monkeypatch.setattr(auth_router, "_store_oauth_state", lambda state: True)  # noqa: ARG005
-    
     client, _ = test_app_client
     resp = client.get("/api/v1/auth/login", follow_redirects=False)
     # Should be a redirect to GitHub
@@ -68,7 +67,6 @@ def test_auth_callback_creates_user_with_valid_state(monkeypatch, test_app_clien
         "_validate_and_consume_oauth_state",
         lambda state: True,  # noqa: ARG005
     )
-    
     # Mock Redis/cache functions to be available for auth code storage
     monkeypatch.setattr(
         auth_router,

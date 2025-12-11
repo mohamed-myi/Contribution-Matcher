@@ -3,9 +3,9 @@ Developer profile SQLAlchemy model.
 """
 
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Integer, JSON, String
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
@@ -38,17 +38,17 @@ class DevProfile(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True)
-    skills: Mapped[List[str]] = mapped_column(JSON, default=list)
+    skills: Mapped[list[str]] = mapped_column(JSON, default=list)
     experience_level: Mapped[str] = mapped_column(String(50))
-    interests: Mapped[List[str]] = mapped_column(JSON, default=list)
-    preferred_languages: Mapped[List[str]] = mapped_column(JSON, default=list)
-    time_availability_hours_per_week: Mapped[Optional[int]] = mapped_column(Integer)
+    interests: Mapped[list[str]] = mapped_column(JSON, default=list)
+    preferred_languages: Mapped[list[str]] = mapped_column(JSON, default=list)
+    time_availability_hours_per_week: Mapped[int | None] = mapped_column(Integer)
 
     # Profile source tracking (default to GitHub for new users)
     profile_source: Mapped[str] = mapped_column(
         String(20), default=PROFILE_SOURCE_GITHUB, nullable=False
     )
-    last_github_sync: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    last_github_sync: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(

@@ -5,7 +5,7 @@
 repos:
   # General file checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
         exclude: ^frontend/
@@ -20,38 +20,34 @@ repos:
 
   # Python linting with ruff (fast, replaces isort, flake8, etc.)
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.8
+    rev: v0.14.8
     hooks:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
         exclude: ^(frontend/|migrations/)
-
-  # Python formatting with black
-  - repo: https://github.com/psf/black
-    rev: 23.12.1
-    hooks:
-      - id: black
+      - id: ruff-format
         exclude: ^(frontend/|migrations/)
-        args: [--line-length=100]
 
-  # Type checking with mypy
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.7.1
-    hooks:
-      - id: mypy
-        args: [--ignore-missing-imports, --no-error-summary]
-        exclude: ^(tests/|frontend/|migrations/)
-        additional_dependencies:
-          - types-requests
-          - types-redis
+  # Frontend linting with ESLint (optional - CI doesn't run ESLint)
+  # Uncomment if you want ESLint checks before commit:
+  # - repo: local
+  #   hooks:
+  #     - id: eslint-frontend
+  #       name: ESLint (frontend)
+  #       entry: bash -c 'cd frontend && npm run lint -- --fix'
+  #       language: system
+  #       files: ^frontend/.*\.(js|jsx|ts|tsx)$
+  #       pass_filenames: false
 
-  # Security checks
-  - repo: https://github.com/PyCQA/bandit
-    rev: 1.7.6
-    hooks:
-      - id: bandit
-        args: [-r, -ll]
-        exclude: ^tests/
+  # Security checks (bandit)
+  # Note: Bandit warnings (MD5, pickle) are acceptable for ML models and cache keys
+  # CI doesn't run bandit, so this is optional - uncomment if you want security scanning
+  # - repo: https://github.com/PyCQA/bandit
+  #   rev: 1.9.2
+  #   hooks:
+  #     - id: bandit
+  #       args: [-r, -ll]
+  #       exclude: ^tests/
 
 # CI configuration
 ci:

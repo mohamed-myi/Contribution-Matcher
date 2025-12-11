@@ -17,4 +17,3 @@ DO $$
 BEGIN
     RAISE NOTICE 'PostgreSQL initialized for Contribution Matcher';
 END $$;
-

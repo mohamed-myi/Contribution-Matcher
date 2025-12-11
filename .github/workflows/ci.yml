@@ -207,12 +207,15 @@ jobs:
         run: pip install pip-audit
 
       - name: Run pip-audit scan on requirements.txt
-        run: pip-audit -r requirements.txt
+        run: |
+          # Ignore ecdsa CVE-2024-23342: No fix available, using cryptography instead
+          pip-audit -r requirements.txt --ignore-vuln CVE-2024-23342
 
       - name: Run pip-audit scan on requirements-ml.txt
         run: |
           if [ -f requirements-ml.txt ]; then
-            pip-audit -r requirements-ml.txt
+            # Ignore ecdsa CVE-2024-23342: No fix available, using cryptography instead
+            pip-audit -r requirements-ml.txt --ignore-vuln CVE-2024-23342
           else
             echo "requirements-ml.txt not found, skipping"
           fi

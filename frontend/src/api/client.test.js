@@ -25,7 +25,6 @@ vi.mock('axios', () => {
 
 // Import after mock
 import { apiClient, api } from './client';
-import axios from 'axios';
 
 describe('apiClient', () => {
   beforeEach(() => {

@@ -5,9 +5,8 @@ Used for caching repository information to reduce GitHub API calls.
 """
 
 from datetime import datetime
-from typing import Dict, List, Optional
 
-from sqlalchemy import DateTime, Integer, JSON, String, UniqueConstraint
+from sqlalchemy import JSON, DateTime, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base
@@ -29,12 +28,12 @@ class RepoMetadata(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     repo_owner: Mapped[str] = mapped_column(String(255), index=True)
     repo_name: Mapped[str] = mapped_column(String(255), index=True)
-    stars: Mapped[Optional[int]] = mapped_column(Integer)
-    forks: Mapped[Optional[int]] = mapped_column(Integer)
-    languages: Mapped[Optional[Dict[str, int]]] = mapped_column(JSON)
-    topics: Mapped[Optional[List[str]]] = mapped_column(JSON)
-    last_commit_date: Mapped[Optional[str]] = mapped_column(String(64))
-    contributor_count: Mapped[Optional[int]] = mapped_column(Integer)
+    stars: Mapped[int | None] = mapped_column(Integer)
+    forks: Mapped[int | None] = mapped_column(Integer)
+    languages: Mapped[dict[str, int] | None] = mapped_column(JSON)
+    topics: Mapped[list[str] | None] = mapped_column(JSON)
+    last_commit_date: Mapped[str | None] = mapped_column(String(64))
+    contributor_count: Mapped[int | None] = mapped_column(Integer)
     cached_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     def is_stale(self, validity_days: int = 7) -> bool:
@@ -54,7 +53,7 @@ class RepoMetadata(Base):
         age = datetime.utcnow() - self.cached_at
         return age > timedelta(days=validity_days)
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """
         Serialize the repository metadata for downstream consumers.
 

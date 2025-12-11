@@ -3,15 +3,15 @@ Issue-related SQLAlchemy models.
 """
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     DateTime,
     Float,
     ForeignKey,
     Integer,
-    JSON,
     LargeBinary,
     String,
     Text,
@@ -40,48 +40,48 @@ class Issue(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     title: Mapped[str] = mapped_column(String(512))
     url: Mapped[str] = mapped_column(String(512))
-    body: Mapped[Optional[str]] = mapped_column(Text)
-    repo_owner: Mapped[Optional[str]] = mapped_column(String(255))
-    repo_name: Mapped[Optional[str]] = mapped_column(String(255))
-    repo_url: Mapped[Optional[str]] = mapped_column(String(512))
-    difficulty: Mapped[Optional[str]] = mapped_column(String(64))
-    issue_type: Mapped[Optional[str]] = mapped_column(String(64))
-    time_estimate: Mapped[Optional[str]] = mapped_column(String(64))
-    labels: Mapped[Optional[List[str]]] = mapped_column(JSON)
-    repo_stars: Mapped[Optional[int]] = mapped_column(Integer)
-    repo_forks: Mapped[Optional[int]] = mapped_column(Integer)
-    repo_languages: Mapped[Optional[Dict]] = mapped_column(JSON)
-    repo_topics: Mapped[Optional[List[str]]] = mapped_column(JSON)
-    last_commit_date: Mapped[Optional[str]] = mapped_column(String(64))
-    contributor_count: Mapped[Optional[int]] = mapped_column(Integer)
+    body: Mapped[str | None] = mapped_column(Text)
+    repo_owner: Mapped[str | None] = mapped_column(String(255))
+    repo_name: Mapped[str | None] = mapped_column(String(255))
+    repo_url: Mapped[str | None] = mapped_column(String(512))
+    difficulty: Mapped[str | None] = mapped_column(String(64))
+    issue_type: Mapped[str | None] = mapped_column(String(64))
+    time_estimate: Mapped[str | None] = mapped_column(String(64))
+    labels: Mapped[list[str] | None] = mapped_column(JSON)
+    repo_stars: Mapped[int | None] = mapped_column(Integer)
+    repo_forks: Mapped[int | None] = mapped_column(Integer)
+    repo_languages: Mapped[dict | None] = mapped_column(JSON)
+    repo_topics: Mapped[list[str] | None] = mapped_column(JSON)
+    last_commit_date: Mapped[str | None] = mapped_column(String(64))
+    contributor_count: Mapped[int | None] = mapped_column(Integer)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
-    label: Mapped[Optional[str]] = mapped_column(String(16))
-    labeled_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    label: Mapped[str | None] = mapped_column(String(16))
+    labeled_at: Mapped[datetime | None] = mapped_column(DateTime)
 
     # Precomputed score cache (added for performance - Phase 1)
-    cached_score: Mapped[Optional[float]] = mapped_column(Float)
+    cached_score: Mapped[float | None] = mapped_column(Float)
 
     # Staleness tracking (Phase 2)
-    last_verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    close_reason: Mapped[Optional[str]] = mapped_column(
+    last_verified_at: Mapped[datetime | None] = mapped_column(DateTime)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    close_reason: Mapped[str | None] = mapped_column(
         String(32)
     )  # 'completed', 'not_planned', 'merged', etc.
-    github_state: Mapped[Optional[str]] = mapped_column(String(16))  # 'open', 'closed'
+    github_state: Mapped[str | None] = mapped_column(String(16))  # 'open', 'closed'
 
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="issues")
-    technologies: Mapped[List["IssueTechnology"]] = relationship(
+    technologies: Mapped[list["IssueTechnology"]] = relationship(
         "IssueTechnology", back_populates="issue", cascade="all, delete-orphan"
     )
-    bookmarks: Mapped[List["IssueBookmark"]] = relationship(
+    bookmarks: Mapped[list["IssueBookmark"]] = relationship(
         "IssueBookmark", back_populates="issue", cascade="all, delete-orphan"
     )
-    labels_relationship: Mapped[List["IssueLabel"]] = relationship(
+    labels_relationship: Mapped[list["IssueLabel"]] = relationship(
         "IssueLabel", back_populates="issue", cascade="all, delete-orphan"
     )
     embeddings: Mapped["IssueEmbedding"] = relationship(
@@ -90,11 +90,11 @@ class Issue(Base):
     feature_cache: Mapped["IssueFeatureCache"] = relationship(
         "IssueFeatureCache", back_populates="issue", uselist=False, cascade="all, delete-orphan"
     )
-    notes: Mapped[List["IssueNote"]] = relationship(
+    notes: Mapped[list["IssueNote"]] = relationship(
         "IssueNote", back_populates="issue", cascade="all, delete-orphan"
     )
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """
         Convert the issue record into a serializable dictionary.
 
@@ -159,7 +159,7 @@ class IssueTechnology(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     issue_id: Mapped[int] = mapped_column(ForeignKey("issues.id", ondelete="CASCADE"))
     technology: Mapped[str] = mapped_column(String(255), index=True)
-    technology_category: Mapped[Optional[str]] = mapped_column(String(255))
+    technology_category: Mapped[str | None] = mapped_column(String(255))
 
     issue: Mapped[Issue] = relationship("Issue", back_populates="technologies")
 
@@ -214,8 +214,8 @@ class IssueEmbedding(Base):
     issue_id: Mapped[int] = mapped_column(
         ForeignKey("issues.id", ondelete="CASCADE"), unique=True, index=True
     )
-    description_embedding: Mapped[Optional[bytes]] = mapped_column(LargeBinary)
-    title_embedding: Mapped[Optional[bytes]] = mapped_column(LargeBinary)
+    description_embedding: Mapped[bytes | None] = mapped_column(LargeBinary)
+    title_embedding: Mapped[bytes | None] = mapped_column(LargeBinary)
     embedding_model: Mapped[str] = mapped_column(String(255), default="all-MiniLM-L6-v2")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
@@ -236,17 +236,17 @@ class IssueFeatureCache(Base):
     issue_id: Mapped[int] = mapped_column(
         ForeignKey("issues.id", ondelete="CASCADE"), unique=True, index=True
     )
-    profile_updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    issue_updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    profile_updated_at: Mapped[datetime | None] = mapped_column(DateTime)
+    issue_updated_at: Mapped[datetime | None] = mapped_column(DateTime)
     computed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    skill_match_pct: Mapped[Optional[float]] = mapped_column(Float)
-    experience_score: Mapped[Optional[float]] = mapped_column(Float)
-    repo_quality_score: Mapped[Optional[float]] = mapped_column(Float)
-    freshness_score: Mapped[Optional[float]] = mapped_column(Float)
-    time_match_score: Mapped[Optional[float]] = mapped_column(Float)
-    interest_match_score: Mapped[Optional[float]] = mapped_column(Float)
-    total_score: Mapped[Optional[float]] = mapped_column(Float)
-    feature_vector: Mapped[Optional[Dict]] = mapped_column(JSON)
+    skill_match_pct: Mapped[float | None] = mapped_column(Float)
+    experience_score: Mapped[float | None] = mapped_column(Float)
+    repo_quality_score: Mapped[float | None] = mapped_column(Float)
+    freshness_score: Mapped[float | None] = mapped_column(Float)
+    time_match_score: Mapped[float | None] = mapped_column(Float)
+    interest_match_score: Mapped[float | None] = mapped_column(Float)
+    total_score: Mapped[float | None] = mapped_column(Float)
+    feature_vector: Mapped[dict | None] = mapped_column(JSON)
 
     issue: Mapped[Issue] = relationship("Issue", back_populates="feature_cache")
 

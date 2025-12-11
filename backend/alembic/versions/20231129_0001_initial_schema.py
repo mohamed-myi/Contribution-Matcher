@@ -126,4 +126,3 @@ def downgrade() -> None:
     op.drop_table("issues")
     op.drop_table("dev_profile")
     op.drop_table("users")
-

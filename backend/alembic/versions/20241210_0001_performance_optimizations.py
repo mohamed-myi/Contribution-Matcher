@@ -26,15 +26,15 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Add performance optimization indexes."""
-    
+
     # Get connection to determine database type
     connection = op.get_bind()
     is_postgresql = connection.dialect.name == 'postgresql'
-    
+
     # ==========================================================================
     # Composite Indexes for Common Query Patterns
     # ==========================================================================
-    
+
     # Issues: User + Active + Score (for top matches)
     op.create_index(
         'ix_issues_user_active_score',
@@ -42,7 +42,7 @@ def upgrade() -> None:
         ['user_id', 'is_active', 'cached_score'],
         postgresql_where=sa.text('is_active = true'),
     )
-    
+
     # Issues: User + Active + Created (for recent issues)
     op.create_index(
         'ix_issues_user_active_created',
@@ -50,17 +50,17 @@ def upgrade() -> None:
         ['user_id', 'is_active', 'created_at'],
         postgresql_where=sa.text('is_active = true'),
     )
-    
+
     # NOTE: ix_issues_user_difficulty already created in migration 20241130_0001
     # Skipping duplicate index creation
-    
+
     # Issues: User + Issue Type (for filtering)
     op.create_index(
         'ix_issues_user_issue_type',
         'issues',
         ['user_id', 'issue_type'],
     )
-    
+
     # Issues: User + Label (for ML training data)
     op.create_index(
         'ix_issues_user_label',
@@ -68,25 +68,25 @@ def upgrade() -> None:
         ['user_id', 'label'],
         postgresql_where=sa.text("label IS NOT NULL"),
     )
-    
+
     # Issues: URL (for deduplication lookups)
     op.create_index(
         'ix_issues_url_lookup',
         'issues',
         ['url'],
     )
-    
+
     # ==========================================================================
     # Technology Indexes
     # ==========================================================================
-    
+
     # IssueTechnology: Issue + Technology (for tech filtering)
     op.create_index(
         'ix_issue_technologies_issue_tech',
         'issue_technologies',
         ['issue_id', 'technology'],
     )
-    
+
     # IssueTechnology: Technology lower case (for case-insensitive search)
     if is_postgresql:
         op.execute(
@@ -95,40 +95,40 @@ def upgrade() -> None:
             ON issue_technologies (LOWER(technology));
             """
         )
-    
+
     # ==========================================================================
     # Bookmark Indexes
     # ==========================================================================
-    
+
     # IssueBookmark: User + Created (for recent bookmarks)
     op.create_index(
         'ix_issue_bookmarks_user_created',
         'issue_bookmarks',
         ['user_id', 'created_at'],
     )
-    
+
     # ==========================================================================
     # Label Indexes (for ML)
     # ==========================================================================
-    
+
     # NOTE: ix_issue_labels_user_label already created in migration 20241130_0001
     # Skipping duplicate index creation
-    
+
     # ==========================================================================
     # Feature Cache Indexes
     # ==========================================================================
-    
+
     # IssueFeatureCache: Profile updated (for cache invalidation)
     op.create_index(
         'ix_issue_feature_cache_profile_updated',
         'issue_feature_cache',
         ['profile_updated_at'],
     )
-    
+
     # ==========================================================================
     # Staleness Indexes
     # ==========================================================================
-    
+
     # Issues: Last verified (for staleness checks)
     op.create_index(
         'ix_issues_last_verified',
@@ -136,18 +136,18 @@ def upgrade() -> None:
         ['last_verified_at'],
         postgresql_where=sa.text('is_active = true'),
     )
-    
+
     # ==========================================================================
     # Materialized View for Top Matches (PostgreSQL only)
     # ==========================================================================
-    
+
     if is_postgresql:
         # Create materialized view for top 100 matches per user
         # This dramatically speeds up the top-matches endpoint
         op.execute(
             """
             CREATE MATERIALIZED VIEW IF NOT EXISTS mv_top_matches AS
-            SELECT 
+            SELECT
                 i.id as issue_id,
                 i.user_id,
                 i.title,
@@ -160,7 +160,7 @@ def upgrade() -> None:
                 i.repo_stars,
                 i.created_at,
                 ROW_NUMBER() OVER (
-                    PARTITION BY i.user_id 
+                    PARTITION BY i.user_id
                     ORDER BY i.cached_score DESC NULLS LAST
                 ) as rank
             FROM issues i
@@ -168,21 +168,21 @@ def upgrade() -> None:
               AND i.cached_score IS NOT NULL;
             """
         )
-        
+
         # Create unique index for concurrent refresh
         op.execute(
             """
             CREATE UNIQUE INDEX ON mv_top_matches (user_id, issue_id);
             """
         )
-        
+
         # Create index for fast user lookup
         op.execute(
             """
             CREATE INDEX ON mv_top_matches (user_id, rank);
             """
         )
-        
+
         # Create function to refresh materialized view
         op.execute(
             """
@@ -198,16 +198,16 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Remove performance optimization indexes."""
-    
+
     connection = op.get_bind()
     is_postgresql = connection.dialect.name == 'postgresql'
-    
+
     # Drop materialized view (PostgreSQL only)
     if is_postgresql:
         op.execute("DROP FUNCTION IF EXISTS refresh_top_matches();")
         op.execute("DROP MATERIALIZED VIEW IF EXISTS mv_top_matches;")
         op.execute("DROP INDEX IF EXISTS ix_issue_technologies_tech_lower;")
-    
+
     # Drop indexes
     op.drop_index('ix_issues_last_verified', table_name='issues')
     op.drop_index('ix_issue_feature_cache_profile_updated', table_name='issue_feature_cache')

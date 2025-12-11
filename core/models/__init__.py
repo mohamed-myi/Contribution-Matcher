@@ -19,10 +19,10 @@ from .issue import (
 )
 from .ml import UserMLModel
 from .profile import (
-    DevProfile,
     PROFILE_SOURCE_GITHUB,
-    PROFILE_SOURCE_RESUME,
     PROFILE_SOURCE_MANUAL,
+    PROFILE_SOURCE_RESUME,
+    DevProfile,
 )
 from .repo import RepoMetadata
 from .user import TokenBlacklist, User

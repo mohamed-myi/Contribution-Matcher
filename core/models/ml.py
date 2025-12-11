@@ -3,9 +3,9 @@ Machine Learning related SQLAlchemy models.
 """
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Dict, Optional
+from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Integer, JSON, String, Text
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
@@ -28,10 +28,10 @@ class UserMLModel(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     model_type: Mapped[str] = mapped_column(String(50), default="logistic_regression")
     model_path: Mapped[str] = mapped_column(String(512))
-    scaler_path: Mapped[Optional[str]] = mapped_column(String(512))
-    metrics: Mapped[Optional[Dict]] = mapped_column(JSON)
-    evaluation_metrics: Mapped[Optional[Dict]] = mapped_column(JSON)
-    description: Mapped[Optional[str]] = mapped_column(Text)
+    scaler_path: Mapped[str | None] = mapped_column(String(512))
+    metrics: Mapped[dict | None] = mapped_column(JSON)
+    evaluation_metrics: Mapped[dict | None] = mapped_column(JSON)
+    description: Mapped[str | None] = mapped_column(Text)
     trained_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     user: Mapped["User"] = relationship("User", back_populates="ml_models")

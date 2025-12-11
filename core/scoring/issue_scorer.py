@@ -20,7 +20,7 @@ def _get_issue_technologies_orm(issue_id: int, session) -> list[tuple[str, str |
     try:
         results = session.query(IssueTechnology).filter(IssueTechnology.issue_id == issue_id).all()
         return [(r.technology, r.technology_category) for r in results]
-    except Exception as e:
+    except Exception:
         raise
 
 
@@ -290,11 +290,11 @@ def calculate_freshness(issue_updated_at: str | datetime | None) -> float:
         else:
             # Handle string: parse ISO format
             updated_date = datetime.fromisoformat(issue_updated_at.replace("Z", "+00:00"))
-        
+
         # Ensure timezone-aware datetime for comparison
         if updated_date.tzinfo is None:
             updated_date = updated_date.replace(tzinfo=timezone.utc)
-        
+
         now = datetime.now(updated_date.tzinfo)
         days_ago = (now - updated_date).days
 
@@ -492,7 +492,7 @@ def get_match_breakdown(profile: dict, issue_data: dict, session=None) -> dict:
             "repo_topics": issue_data.get("repo_topics", []),
         },
         }
-    except Exception as e:
+    except Exception:
         raise
 
 

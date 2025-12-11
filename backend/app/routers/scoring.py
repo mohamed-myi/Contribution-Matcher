@@ -34,7 +34,7 @@ def top_matches(
     try:
         issues = scoring_service.get_top_matches(db, current_user, limit=limit)
         return TopMatchesResponse(issues=issues)
-    except Exception as e:
+    except Exception:
         raise
 
 

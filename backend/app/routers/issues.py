@@ -267,7 +267,7 @@ def get_stats(
         cached_stats = cache.get_json(cache_key)
         if cached_stats is not None:
             return IssueStatsResponse(**cached_stats)
-    except Exception as e:
+    except Exception:
         pass
 
     # Compute stats
@@ -291,7 +291,7 @@ def get_stats(
         # Cache for 5 minutes
         cache.set_json(cache_key, result, CacheKeys.TTL_SHORT)
         return IssueStatsResponse(**result)
-    except Exception as e:
+    except Exception:
         raise
 
 

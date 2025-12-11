@@ -226,7 +226,7 @@ def cmd_list(args):
             output_format = str(output_format).lower()
         else:
             output_format = "text"
-    except:
+    except Exception:
         output_format = "text"
 
     verbose = getattr(args, "verbose", False)
@@ -488,7 +488,7 @@ def cmd_create_profile(args):
 
         languages_input = input("Enter preferred languages (comma-separated): ")
         preferred_languages = (
-            [l.strip() for l in languages_input.split(",")] if languages_input else []
+            [lang.strip() for lang in languages_input.split(",")] if languages_input else []
         )
 
         time_input = input("Time availability (hours per week) [optional]: ").strip()
@@ -553,7 +553,7 @@ def cmd_update_profile(args):
     current_langs = ", ".join(profile.get("preferred_languages", []))
     langs_input = input(f"Preferred languages (current: {current_langs}): ").strip()
     if langs_input:
-        profile["preferred_languages"] = [l.strip() for l in langs_input.split(",") if l.strip()]
+        profile["preferred_languages"] = [lang.strip() for lang in langs_input.split(",") if lang.strip()]
 
     # Update time availability
     current_time = profile.get("time_availability_hours_per_week")

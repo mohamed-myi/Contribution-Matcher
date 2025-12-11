@@ -14,16 +14,16 @@ For data operations, use the repository pattern:
 """
 
 # New API - from the consolidated db module
+from core.cli.db_helpers import (
+    get_labeling_statistics,
+    query_issues,
+    update_issue_label,
+    upsert_issue,
+)
 from core.db import Base, DatabaseManager, db, get_db
 
 # Re-export deprecated functions for test compatibility
 # TODO: Update tests to use repository pattern instead
-from core.cli.db_helpers import (
-    query_issues,
-    upsert_issue,
-    update_issue_label,
-    get_labeling_statistics,
-)
 
 __all__ = [
     "Base",

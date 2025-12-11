@@ -9,9 +9,11 @@ Configures Celery with:
 """
 
 from celery import Celery
+from celery.signals import worker_process_init
 from kombu import Exchange, Queue
 
 from core.config import get_settings
+from workers.schedules import apply_beat_schedule
 
 settings = get_settings()
 
@@ -189,7 +191,7 @@ celery_app.conf.update(
 )
 
 # Configure structured logging for Celery
-from celery.signals import worker_process_init
+
 
 
 @worker_process_init.connect
@@ -205,7 +207,7 @@ def setup_worker_logging(**kwargs):
 # Beat Schedule (Periodic Tasks)
 # =============================================================================
 
-from workers.schedules import apply_beat_schedule
+
 
 apply_beat_schedule(celery_app)
 

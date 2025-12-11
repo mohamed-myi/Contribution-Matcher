@@ -158,7 +158,7 @@ def get_breakdown_and_features(
     # Compute match breakdown
     try:
         raw_breakdown = get_match_breakdown(profile_dict, issue_dict, session=db)
-    except Exception as e:
+    except Exception:
         raise
 
     # Extract component scores
@@ -209,7 +209,7 @@ def get_breakdown_and_features(
     # Extract features for ML training
     try:
         features = extract_base_features(issue_dict, profile_dict, session=db)
-    except Exception as e:
+    except Exception:
         raise
 
     return breakdown, features

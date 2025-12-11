@@ -10,9 +10,11 @@ vi.mock('react-router-dom', async () => {
   return {
     ...actual,
     BrowserRouter: ({ children, ...props }) => {
-      // Get initial path from window.location or use '/'
-      const path = typeof window !== 'undefined' && window.location ? window.location.pathname : '/';
-      return <MemoryRouter initialEntries={[path]} {...props}>{children}</MemoryRouter>;
+      // Get initial path and search from window.location or use '/'
+      const pathname = typeof window !== 'undefined' && window.location ? window.location.pathname : '/';
+      const search = typeof window !== 'undefined' && window.location ? window.location.search : '';
+      const initialEntry = search ? `${pathname}${search}` : pathname;
+      return <MemoryRouter initialEntries={[initialEntry]} {...props}>{children}</MemoryRouter>;
     },
   };
 });
@@ -127,7 +129,7 @@ describe('App Routing', () => {
 
   it('renders auth callback page', () => {
     Object.defineProperty(window, 'location', {
-      value: { pathname: '/auth/callback' },
+      value: { pathname: '/auth/callback', search: '?code=test-code' },
       writable: true,
     });
     

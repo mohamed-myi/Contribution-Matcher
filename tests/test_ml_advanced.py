@@ -19,21 +19,21 @@ from sklearn.model_selection import train_test_split
 
 # Check for optional dependencies
 try:
-    import xgboost
+    import xgboost  # noqa: F401
 
     HAS_XGBOOST = True
 except ImportError:
     HAS_XGBOOST = False
 
 try:
-    import lightgbm
+    import lightgbm  # noqa: F401
 
     HAS_LIGHTGBM = True
 except ImportError:
     HAS_LIGHTGBM = False
 
 try:
-    import skopt
+    import skopt  # noqa: F401
 
     HAS_SKOPT = True
 except ImportError:

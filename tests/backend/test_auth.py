@@ -47,11 +47,11 @@ def test_auth_callback_creates_user_with_valid_state(monkeypatch, test_app_clien
     client, session_factory = test_app_client
 
     # Mock GitHub API calls
-    monkeypatch.setattr(auth_router, "exchange_code_for_token", lambda code: "access")
+    monkeypatch.setattr(auth_router, "exchange_code_for_token", lambda code: "access")  # noqa: ARG005
     monkeypatch.setattr(
         auth_router,
         "get_github_user",
-        lambda token: {
+        lambda token: {  # noqa: ARG005
             "github_id": "123",
             "github_username": "octocat",
             "email": "octo@example.com",
@@ -63,7 +63,7 @@ def test_auth_callback_creates_user_with_valid_state(monkeypatch, test_app_clien
     monkeypatch.setattr(
         auth_router,
         "_validate_and_consume_oauth_state",
-        lambda state: True,
+        lambda state: True,  # noqa: ARG005
     )
 
     resp = client.get(
@@ -91,11 +91,11 @@ def test_auth_callback_uses_code_exchange_when_redis_available(monkeypatch, test
     client, session_factory = test_app_client
 
     # Mock GitHub API calls
-    monkeypatch.setattr(auth_router, "exchange_code_for_token", lambda code: "access")
+    monkeypatch.setattr(auth_router, "exchange_code_for_token", lambda code: "access")  # noqa: ARG005
     monkeypatch.setattr(
         auth_router,
         "get_github_user",
-        lambda token: {
+        lambda token: {  # noqa: ARG005
             "github_id": "456",
             "github_username": "secureuser",
             "email": "secure@example.com",
@@ -107,14 +107,14 @@ def test_auth_callback_uses_code_exchange_when_redis_available(monkeypatch, test
     monkeypatch.setattr(
         auth_router,
         "_validate_and_consume_oauth_state",
-        lambda state: True,
+        lambda state: True,  # noqa: ARG005
     )
 
     # Mock auth code storage to return True (simulating Redis available)
     monkeypatch.setattr(
         auth_router,
         "_store_auth_code",
-        lambda code, token, user_id: True,
+        lambda code, token, user_id: True,  # noqa: ARG005
     )
 
     resp = client.get(
@@ -144,7 +144,7 @@ def test_auth_token_exchange_success(monkeypatch, test_app_client):
     monkeypatch.setattr(
         auth_router,
         "_exchange_auth_code",
-        lambda code: ("jwt_token_here", 123),
+        lambda code: ("jwt_token_here", 123),  # noqa: ARG005
     )
 
     resp = client.post("/api/v1/auth/token", params={"code": "valid_auth_code"})
@@ -162,7 +162,7 @@ def test_auth_token_exchange_invalid_code(monkeypatch, test_app_client):
     monkeypatch.setattr(
         auth_router,
         "_exchange_auth_code",
-        lambda code: (None, None),
+        lambda code: (None, None),  # noqa: ARG005
     )
 
     resp = client.post("/api/v1/auth/token", params={"code": "invalid_code"})

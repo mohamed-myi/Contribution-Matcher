@@ -13,7 +13,7 @@ except ImportError:
     HAS_OPENPYXL = False
 
 try:
-    import markdown
+    import markdown  # noqa: F401
 
     HAS_MARKDOWN = True
 except ImportError:
@@ -72,7 +72,7 @@ def format_table(issues: list[dict], verbose: bool = False) -> str:
 
     # Calculate column widths
     widths = {col: len(col) for col in columns}
-    for i, issue in enumerate(issues, 1):
+    for issue in issues:
         title = str(issue.get("title", ""))[:50]
         widths["Title"] = max(widths.get("Title", 0), len(title))
         if verbose:
@@ -206,7 +206,7 @@ def format_excel(issues: list[dict], output_file: str) -> None:
             try:
                 if len(str(row.value)) > max_length:
                     max_length = len(str(row.value))
-            except:
+            except Exception:
                 pass
         adjusted_width = min(max_length + 2, 50)
         ws.column_dimensions[column_letter].width = adjusted_width

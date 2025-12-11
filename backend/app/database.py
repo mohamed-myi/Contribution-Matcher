@@ -13,7 +13,7 @@ and allows proper health checking before database access.
 """
 
 # Re-export from core.db for backward compatibility
-from core.db import Base, db, get_db
+from core.db import db  # noqa: F401
 
 
 class _LazyEngine:

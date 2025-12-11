@@ -4,8 +4,6 @@ Issue service - bridges FastAPI endpoints with core business logic.
 Uses IssueRepository for database access.
 """
 
-import contextlib
-
 from sqlalchemy.orm import Session
 
 from core import parsing
@@ -218,7 +216,7 @@ def issue_to_dict(issue: Issue, is_bookmarked: bool = False) -> dict:
         try:
             last_part = issue.url.rstrip("/").split("/")[-1]
             issue_number = int(last_part)
-        except (ValueError, IndexError, TypeError) as e:
+        except (ValueError, IndexError, TypeError):
             pass
 
     # Truncate description

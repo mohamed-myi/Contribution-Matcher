@@ -77,7 +77,7 @@ def test_create_profile_from_github(authorized_client, monkeypatch):
         def get(self, *args, **kwargs):
             return MockResponse()
 
-    monkeypatch.setattr(httpx, "Client", lambda **kwargs: MockClient())
+    monkeypatch.setattr(httpx, "Client", lambda **kwargs: MockClient())  # noqa: ARG005
 
     resp = client.post(
         "/api/profile/from-github",

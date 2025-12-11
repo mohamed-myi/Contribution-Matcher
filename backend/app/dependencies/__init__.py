@@ -8,13 +8,10 @@ Provides centralized dependencies for:
 - Caching
 """
 
-from collections.abc import Generator
-
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from core.cache import cache
-from core.db import db as core_db, get_db as core_get_db
 from core.repositories import (
     IssueRepository,
     ProfileRepository,

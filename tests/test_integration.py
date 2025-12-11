@@ -24,22 +24,21 @@ class TestDiscoverWorkflow:
     """Tests for issue discovery workflow."""
 
     @patch("core.cli.contribution_matcher.search_issues")
-    @patch("core.cli.contribution_matcher.get_repo_metadata_from_api")
+    @patch("core.cli.contribution_matcher.batch_get_repo_metadata")
     def test_discover_issues_workflow(self, mock_repo_meta, mock_search, test_db, monkeypatch):
         """Test complete issue discovery workflow."""
         test_db_path, _, _ = test_db
-        
+
         # Set DATABASE_URL to use the test database so cmd_discover uses it
         test_db_url = f"sqlite:///{test_db_path}"
         monkeypatch.setenv("DATABASE_URL", test_db_url)
-        
+
         # Reset and re-initialize the global db object with the test database URL
         from core.db import db
         if db.is_initialized:
             db.engine.dispose()
         db._initialized = False
         db.initialize(test_db_url)
-        
         # Mock GitHub API responses
         mock_search.return_value = [
             {
@@ -54,13 +53,18 @@ class TestDiscoverWorkflow:
             }
         ]
 
+        # batch_get_repo_metadata returns a dict mapping (owner, name) tuples to metadata
         mock_repo_meta.return_value = {
-            "stars": 100,
-            "forks": 20,
-            "languages": {"Python": 50000},
-            "topics": ["python"],
-            "last_commit_date": "2024-01-01T00:00:00Z",
-            "contributor_count": 5,
+            ("test", "repo"): {
+                "repo_owner": "test",
+                "repo_name": "repo",
+                "stars": 100,
+                "forks": 20,
+                "languages": {"Python": 50000},
+                "topics": ["python"],
+                "last_commit_date": "2024-01-01T00:00:00Z",
+                "contributor_count": 5,
+            }
         }
 
         # Create args object
@@ -69,6 +73,8 @@ class TestDiscoverWorkflow:
         args.language = None
         args.stars = None
         args.limit = 10
+        args.verbose = False
+        args.no_quality_filters = False
 
         # Run discover command
         cmd_discover(args)
@@ -357,11 +363,10 @@ class TestListWorkflow:
     def test_list_issues_workflow(self, test_db, multiple_issues_in_db, capsys, monkeypatch):
         """Test listing issues."""
         test_db_path, _, _ = test_db
-        
+
         # Set DATABASE_URL to use the test database so cmd_list uses it
         test_db_url = f"sqlite:///{test_db_path}"
         monkeypatch.setenv("DATABASE_URL", test_db_url)
-        
         # Reset and re-initialize the global db object with the test database URL
         from core.db import db
         if db.is_initialized:

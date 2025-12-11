@@ -18,16 +18,16 @@ def test_issue_discovery_persists_results(monkeypatch, authorized_client):
     }
 
     # Patch at the source modules
-    monkeypatch.setattr(github_api, "search_issues", lambda **kwargs: [fake_issue])
+    monkeypatch.setattr(github_api, "search_issues", lambda **kwargs: [fake_issue])  # noqa: ARG005
     monkeypatch.setattr(
         github_api,
         "get_repo_metadata_from_api",
-        lambda owner, name, use_cache=True: {"stars": 10, "forks": 1},
+        lambda owner, name, use_cache=True: {"stars": 10, "forks": 1},  # noqa: ARG005
     )
     monkeypatch.setattr(
         parsing,
         "parse_issue",
-        lambda issue, repo: {
+        lambda issue, repo: {  # noqa: ARG005
             "title": issue["title"],
             "url": issue["html_url"],
             "body": issue["body"],
@@ -50,7 +50,7 @@ def test_issue_discovery_persists_results(monkeypatch, authorized_client):
     monkeypatch.setattr(
         skill_extractor,
         "analyze_job_text",
-        lambda body: ("backend", [("python", "language")], {}),
+        lambda body: ("backend", [("python", "language")], {}),  # noqa: ARG005
     )
 
     resp = client.post(

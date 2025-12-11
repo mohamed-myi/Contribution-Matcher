@@ -7,11 +7,11 @@ import requests
 from dotenv import load_dotenv
 
 from core.constants import GITHUB_API_BASE
+from core.parsing.skill_extractor import analyze_job_text
 
 with contextlib.suppress(PermissionError):
     load_dotenv()
 GITHUB_TOKEN = os.getenv("PAT_TOKEN")
-from core.parsing.skill_extractor import analyze_job_text
 
 DEV_PROFILE_JSON = "dev_profile.json"
 

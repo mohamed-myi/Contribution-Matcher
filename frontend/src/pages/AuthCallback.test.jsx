@@ -18,6 +18,9 @@ describe('AuthCallback Page', () => {
   });
 
   it('shows loading state initially', async () => {
+    // Mock exchangeAuthCode to return a promise that never resolves
+    api.exchangeAuthCode.mockImplementation(() => new Promise(() => {})); // Never resolves
+    
     // Mock login to delay execution so we can see loading state
     const mockLogin = vi.fn(() => new Promise(() => {})); // Never resolves
     

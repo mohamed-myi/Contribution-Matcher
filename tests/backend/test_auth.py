@@ -2,8 +2,11 @@ from backend.app.models import User
 from backend.app.routers import auth as auth_router
 
 
-def test_auth_login_redirects_to_github(test_app_client):
+def test_auth_login_redirects_to_github(monkeypatch, test_app_client):
     """Test that /auth/login redirects to GitHub OAuth."""
+    # Mock Redis/cache to be available for OAuth state storage
+    monkeypatch.setattr(auth_router, "_store_oauth_state", lambda state: True)  # noqa: ARG005
+    
     client, _ = test_app_client
     resp = client.get("/api/v1/auth/login", follow_redirects=False)
     # Should be a redirect to GitHub
@@ -64,6 +67,13 @@ def test_auth_callback_creates_user_with_valid_state(monkeypatch, test_app_clien
         auth_router,
         "_validate_and_consume_oauth_state",
         lambda state: True,  # noqa: ARG005
+    )
+    
+    # Mock Redis/cache functions to be available for auth code storage
+    monkeypatch.setattr(
+        auth_router,
+        "_store_auth_code",
+        lambda code, token, user_id: True,  # noqa: ARG005
     )
 
     resp = client.get(

@@ -203,16 +203,16 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install safety
-        run: pip install safety
+      - name: Install pip-audit
+        run: pip install pip-audit
 
-      - name: Run safety scan on requirements.txt
-        run: safety scan -r requirements.txt --output screen
+      - name: Run pip-audit scan on requirements.txt
+        run: pip-audit -r requirements.txt
 
-      - name: Run safety scan on requirements-ml.txt
+      - name: Run pip-audit scan on requirements-ml.txt
         run: |
           if [ -f requirements-ml.txt ]; then
-            safety scan -r requirements-ml.txt --output screen
+            pip-audit -r requirements-ml.txt
           else
             echo "requirements-ml.txt not found, skipping"
           fi

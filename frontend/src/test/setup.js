@@ -6,7 +6,13 @@ import { server } from './mocks/server';
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 
 // Reset handlers after each test
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  // Clear localStorage between tests
+  if (global.localStorage && typeof global.localStorage.clear === 'function') {
+    global.localStorage.clear();
+  }
+});
 
 // Clean up after all tests
 afterAll(() => server.close());
@@ -43,13 +49,29 @@ if (!window.requestIdleCallback) {
   });
 }
 
-// Mock localStorage
-const localStorageMock = {
-  getItem: vi.fn(),
-  setItem: vi.fn(),
-  removeItem: vi.fn(),
-  clear: vi.fn(),
-};
+// Mock localStorage with actual storage implementation
+const localStorageMock = (() => {
+  let store = {};
+  return {
+    getItem: (key) => store[key] || null,
+    setItem: (key, value) => {
+      store[key] = String(value);
+    },
+    removeItem: (key) => {
+      delete store[key];
+    },
+    clear: () => {
+      store = {};
+    },
+    get length() {
+      return Object.keys(store).length;
+    },
+    key: (index) => {
+      const keys = Object.keys(store);
+      return keys[index] || null;
+    },
+  };
+})();
 global.localStorage = localStorageMock;
 
 // Mock document.cookie

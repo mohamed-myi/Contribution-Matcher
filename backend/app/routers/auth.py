@@ -12,7 +12,7 @@ Refactored to use:
 import secrets
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
@@ -316,10 +316,19 @@ def oauth_callback(
 
         # Use repository to create/update user
         # Note: access_token is encrypted by the repository before storage
+        github_id = github_user.get("github_id")
+        github_username = github_user.get("github_username") or github_user.get("github_id")
+
+        if not github_id or not github_username:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="GitHub ID and username are required",
+            )
+
         user_repo = UserRepository(db)
         user = user_repo.create_or_update_from_github(
-            github_id=github_user["github_id"],
-            github_username=github_user.get("github_username") or github_user.get("github_id"),
+            github_id=github_id,
+            github_username=github_username,
             email=github_user.get("email"),
             avatar_url=github_user.get("avatar_url"),
             access_token=access_token,
@@ -357,10 +366,9 @@ def oauth_callback(
         return RedirectResponse(url=f"{frontend_url}/auth/callback?error=authentication_failed")
 
 
-@router.post("/token")
+@router.post("/token", response_model=None)
 def exchange_token(
     code: str = Query(...),
-    response: Response | None = None,
 ):
     """
     Exchange an auth code for a JWT token.
@@ -429,7 +437,7 @@ def exchange_token(
 @router.get("/me", response_model=UserResponse)
 def current_user(user: User = Depends(get_current_user)) -> UserResponse:
     """Get current authenticated user."""
-    return user
+    return UserResponse.model_validate(user)
 
 
 @router.post("/logout")
@@ -557,7 +565,7 @@ def refresh_token(
         else:
             old_jti = None
 
-        if old_jti:
+        if old_jti and token:
             # Get token expiry for blacklist entry
             expiry = get_token_expiry(token)
             if not expiry:

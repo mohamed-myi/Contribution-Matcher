@@ -78,7 +78,7 @@ def get_logger(name: str = __name__) -> structlog.stdlib.BoundLogger:
     """Get a structured logger instance."""
     if not structlog.is_configured():
         configure_logging()
-    return structlog.get_logger(name)  # type: ignore[return-value]
+    return structlog.get_logger(name)  # type: ignore[no-any-return]
 
 
 # =============================================================================

@@ -15,6 +15,8 @@ logger = get_logger("security.encryption")
 # Try to import cryptography, provide fallback message if not available
 if TYPE_CHECKING:
     from cryptography.fernet import Fernet, InvalidToken
+
+    CRYPTOGRAPHY_AVAILABLE = True
 else:
     try:
         from cryptography.fernet import Fernet, InvalidToken

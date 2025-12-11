@@ -16,6 +16,8 @@ from typing import TYPE_CHECKING, Any, Optional, TypeVar
 if TYPE_CHECKING:
     import redis
     from redis.exceptions import ConnectionError, TimeoutError
+
+    REDIS_AVAILABLE = True
 else:
     try:
         import redis
@@ -168,9 +170,13 @@ class RedisCache:
             if data is None:
                 return None
             if isinstance(data, bytes):
-                return json.loads(data.decode("utf-8"))
+                parsed = json.loads(data.decode("utf-8"))
+                return parsed if isinstance(parsed, dict) else None
             # Handle case where data might be a string or other type
-            return json.loads(data) if isinstance(data, (str, bytes)) else data
+            if isinstance(data, str):
+                parsed = json.loads(data)
+                return parsed if isinstance(parsed, dict) else None
+            return None
         except (json.JSONDecodeError, ConnectionError, TimeoutError) as e:
             logger.debug("cache_get_error", key=key, error=str(e))
             return None
@@ -336,9 +342,11 @@ class RedisCache:
 
         try:
             keys = client.keys(pattern)
-            if keys:
+            if keys and isinstance(keys, (list, tuple)):
                 deleted = client.delete(*keys)
-                return int(deleted) if deleted is not None else 0
+                if deleted is not None:
+                    return int(deleted)
+                return 0
             return 0
         except (ConnectionError, TimeoutError):
             return 0
@@ -369,7 +377,12 @@ class RedisCache:
 
         try:
             result = client.ttl(key)
-            return int(result) if result is not None else -1
+            if result is None:
+                return -1
+            if isinstance(result, (int, float)):
+                return int(result)
+            # Handle case where result might be an awaitable or other type
+            return -1
         except (ConnectionError, TimeoutError):
             return -1
 
@@ -403,7 +416,7 @@ class RedisCache:
         Returns:
             Dictionary with health information
         """
-        status = {
+        status: dict[str, Any] = {
             "available": self._available,
             "initialized": self._initialized,
         }

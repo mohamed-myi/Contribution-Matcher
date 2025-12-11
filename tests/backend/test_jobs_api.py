@@ -1,9 +1,24 @@
 from backend.app.routers import jobs as jobs_router
 
 
+def test_jobs_api_requires_authentication(test_app_client):
+    """Test that jobs API requires authentication."""
+    client, _ = test_app_client
+
+    # All jobs endpoints should return 401 without authentication
+    resp = client.get("/api/v1/jobs")
+    assert resp.status_code == 401
+
+    resp = client.post("/api/v1/jobs/run", json={"job_id": "test"})
+    assert resp.status_code == 401
+
+    resp = client.post("/api/v1/jobs/reschedule", json={"job_id": "test", "cron": "* * * * *"})
+    assert resp.status_code == 401
+
+
 def test_jobs_api_disabled_returns_503(authorized_client):
     client, _, _ = authorized_client
-    resp = client.get("/api/jobs", headers={"Authorization": "Bearer fake"})
+    resp = client.get("/api/v1/jobs", headers={"Authorization": "Bearer fake"})
     assert resp.status_code == 503
     assert resp.json()["detail"] == "Internal scheduler is disabled"
 
@@ -33,7 +48,7 @@ def test_jobs_api_list(monkeypatch, authorized_client):
     )
 
     client, _, _ = authorized_client
-    resp = client.get("/api/jobs", headers={"Authorization": "Bearer fake"})
+    resp = client.get("/api/v1/jobs", headers={"Authorization": "Bearer fake"})
     assert resp.status_code == 200
     data = resp.json()
     assert data[0]["id"] == "discover_all"
@@ -51,7 +66,7 @@ def test_jobs_api_run(monkeypatch, authorized_client):
 
     client, _, _ = authorized_client
     resp = client.post(
-        "/api/jobs/run",
+        "/api/v1/jobs/run",
         json={"job_id": "discover_all", "user_id": 1},
         headers={"Authorization": "Bearer fake"},
     )
@@ -71,10 +86,9 @@ def test_jobs_api_reschedule(monkeypatch, authorized_client):
 
     client, _, _ = authorized_client
     resp = client.post(
-        "/api/jobs/reschedule",
+        "/api/v1/jobs/reschedule",
         json={"job_id": "discover_all", "cron": "0 12 * * *"},
         headers={"Authorization": "Bearer fake"},
     )
     assert resp.status_code == 200
     assert captured == {"job_id": "discover_all", "cron": "0 12 * * *"}
-

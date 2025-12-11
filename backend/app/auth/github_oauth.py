@@ -2,8 +2,6 @@
 Utility functions for GitHub OAuth flow.
 """
 
-from typing import Dict, Optional
-
 import httpx
 
 from ..config import get_settings
@@ -14,6 +12,7 @@ GITHUB_API_URL = "https://api.github.com"
 
 
 def get_oauth_authorize_url(state: str) -> str:
+    """Build GitHub OAuth authorize URL with client settings and state."""
     settings = get_settings()
     # Convert AnyHttpUrl to string to avoid serialization issues
     redirect_uri = str(settings.github_redirect_uri) if settings.github_redirect_uri else ""
@@ -23,11 +22,19 @@ def get_oauth_authorize_url(state: str) -> str:
         "scope": settings.github_scope,
         "state": state,
     }
-    query = "&".join(f"{key}={httpx.QueryParams({key: value})[key]}" for key, value in params.items() if value)
+    query = "&".join(
+        f"{key}={httpx.QueryParams({key: value})[key]}" for key, value in params.items() if value
+    )
     return f"{GITHUB_AUTHORIZE_URL}?{query}"
 
 
 def exchange_code_for_token(code: str) -> str:
+    """
+    Exchange GitHub OAuth code for an access token.
+
+    Raises:
+        ValueError when token is missing in the response.
+    """
     settings = get_settings()
     # Convert AnyHttpUrl to string to avoid serialization issues
     redirect_uri = str(settings.github_redirect_uri) if settings.github_redirect_uri else None
@@ -46,7 +53,8 @@ def exchange_code_for_token(code: str) -> str:
     return access_token
 
 
-def get_github_user(access_token: str) -> Dict[str, Optional[str]]:
+def get_github_user(access_token: str) -> dict[str, str | None]:
+    """Fetch GitHub user profile and primary email using the OAuth token."""
     headers = {
         "Authorization": f"Bearer {access_token}",
         "Accept": "application/vnd.github+json",
@@ -70,4 +78,3 @@ def get_github_user(access_token: str) -> Dict[str, Optional[str]]:
         "email": email or user_data.get("email"),
         "avatar_url": user_data.get("avatar_url"),
     }
-

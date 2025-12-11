@@ -7,4 +7,3 @@ from core.cli.contribution_matcher import main
 
 if __name__ == "__main__":
     main()
-

@@ -1,51 +1,135 @@
 import axios from 'axios';
 
+// Base API URLs derived from environment (falls back to local dev).
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-const API_URL = `${BASE_URL}/api`;
+const API_URL = `${BASE_URL}/api/v1`;
 
+// API Configuration
+const API_CONFIG = {
+  timeout: 30000, // 30 seconds
+  retryAttempts: 2,
+  retryDelay: 1000, // 1 second
+  retryableStatuses: [408, 429, 500, 502, 503, 504],
+};
+
+/**
+ * Axios instance configured for the backend API with auth header injection,
+ * sane timeouts, gzip support, and cookie-based auth.
+ * 
+ * Authentication is handled via:
+ * - HttpOnly cookies (preferred for security)
+ * - Bearer token fallback (for backward compatibility)
+ */
 export const apiClient = axios.create({
   baseURL: API_URL,
+  timeout: API_CONFIG.timeout,
+  withCredentials: true, // Send cookies with requests
   headers: {
     'Content-Type': 'application/json',
+    'Accept-Encoding': 'gzip, deflate', // Accept compressed responses
   },
 });
 
-// Request interceptor to add auth token
+// Simple retry logic
+/**
+ * Retry helper for transient HTTP errors.
+ */
+const retryRequest = async (error, retryCount = 0) => {
+  const config = error.config;
+  
+  // Don't retry if max attempts reached or not retryable
+  if (
+    retryCount >= API_CONFIG.retryAttempts ||
+    !config ||
+    config._retry ||
+    !API_CONFIG.retryableStatuses.includes(error.response?.status)
+  ) {
+    return Promise.reject(error);
+  }
+  
+  // Mark as retry to prevent infinite loops
+  config._retry = true;
+  config._retryCount = retryCount + 1;
+  
+  // Wait before retrying
+  await new Promise(resolve => setTimeout(resolve, API_CONFIG.retryDelay * (retryCount + 1)));
+  
+  return apiClient(config);
+};
+
+// Request interceptor to add auth token (fallback for backward compatibility)
+// Primary auth is via HttpOnly cookies (sent automatically with withCredentials: true)
 apiClient.interceptors.request.use(
   (config) => {
+    // Fallback: use localStorage token if cookie auth fails
+    // This maintains backward compatibility during migration
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // Add CSRF token for state-changing requests
+    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(config.method?.toUpperCase())) {
+      const csrfToken = getCookie('csrf_token');
+      if (csrfToken) {
+        config.headers['X-CSRF-Token'] = csrfToken;
+      }
+    }
+    
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// Response interceptor for error handling
+/**
+ * Get a cookie value by name.
+ */
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) {
+    return parts.pop()?.split(';').shift();
+  }
+  return null;
+}
+
+// Response interceptor for error handling and retry
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     // Handle 401 Unauthorized
     if (error.response?.status === 401) {
-      // Token expired or invalid
       localStorage.removeItem('token');
-      // Redirect to login if not already there
       if (window.location.pathname !== '/login' && !window.location.pathname.startsWith('/auth')) {
         window.location.href = '/login';
       }
+      return Promise.reject(error);
     }
+    
+    // Retry on transient errors
+    const retryCount = error.config?._retryCount || 0;
+    if (API_CONFIG.retryableStatuses.includes(error.response?.status)) {
+      return retryRequest(error, retryCount);
+    }
+    
     return Promise.reject(error);
   }
 );
 
 // API helper functions
+/**
+ * Typed API surface used across the frontend. All methods return axios promises.
+ */
 export const api = {
   // Auth - returns full URL for redirect (uses API_URL which includes /api)
   getLoginUrl: () => `${API_URL}/auth/login`,
   getCurrentUser: () => apiClient.get('/auth/me'),
   logout: () => apiClient.post('/auth/logout'),
   deleteAccount: () => apiClient.delete('/auth/account'),
+  
+  // Exchange auth code for JWT token (secure token exchange pattern)
+  // This is called after OAuth callback to get the actual JWT
+  exchangeAuthCode: (code) => apiClient.post(`/auth/token?code=${encodeURIComponent(code)}`),
 
   // Issues
   discoverIssues: (params) => apiClient.post('/issues/discover', params),
@@ -78,7 +162,7 @@ export const api = {
     window.URL.revokeObjectURL(url);
   },
 
-  // Profile
+
   getProfile: () => apiClient.get('/profile'),
   createProfileFromGithub: (username) => apiClient.post('/profile/from-github', { github_username: username }),
   createProfileFromResume: (file) => {
@@ -97,8 +181,11 @@ export const api = {
 
   // ML
   labelIssue: (id, label) => apiClient.post(`/ml/label/${id}`, { label }),
+  removeLabel: (id) => apiClient.delete(`/ml/label/${id}`),
   getLabelStatus: () => apiClient.get('/ml/label-status'),
-  getUnlabeledIssues: (limit = 50) => apiClient.get('/ml/unlabeled-issues', { params: { limit } }),
+  getUnlabeledIssues: (limit = 50, includeOthers = false) => apiClient.get('/ml/unlabeled-issues', { params: { limit, include_others: includeOthers } }),
+  getLabeledIssues: (limit = 50, offset = 0, labelFilter = null) => 
+    apiClient.get('/ml/labeled-issues', { params: { limit, offset, label_filter: labelFilter } }),
   trainModel: (options = {}) => apiClient.post('/ml/train', options),
   getModelInfo: () => apiClient.get('/ml/model-info'),
   evaluateModel: () => apiClient.post('/ml/evaluate'),
@@ -107,6 +194,12 @@ export const api = {
   getJobs: () => apiClient.get('/jobs'),
   triggerJob: (jobId) => apiClient.post('/jobs/trigger', { job_id: jobId }),
   rescheduleJob: (jobId, cronExpression) => apiClient.post('/jobs/reschedule', { job_id: jobId, cron_expression: cronExpression }),
+
+  // Staleness & Verification
+  verifyIssueStatus: (issueId) => apiClient.post(`/issues/${issueId}/verify-status`),
+  bulkVerifyIssues: (limit = 50, minAgeDays = 7) => 
+    apiClient.post('/issues/verify-bulk', null, { params: { limit, min_age_days: minAgeDays } }),
+  getStalenessStats: () => apiClient.get('/issues/staleness-stats'),
 };
 
 export default apiClient;

@@ -1,11 +1,23 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo, startTransition } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Layout } from '../components/Layout';
-import { Card, CardBody, Button, Badge, DifficultyBadge, ScoreBadge, TechBadge, PageLoader } from '../components/common';
+import { Card, CardBody, Button, Badge, DifficultyBadge, ScoreBadge, TechBadge, PageLoader, SkeletonCard, SkeletonList } from '../components/common';
 import { api } from '../api/client';
-import { useDebounce, useDebouncedCallback, useCancelableRequest } from '../hooks';
-import { PROGRAMMING_LANGUAGES, PAGE_SIZE, DEBOUNCE, VIRTUALIZATION } from '../constants';
+import { useCancelableRequest } from '../hooks';
+import { PROGRAMMING_LANGUAGES, PAGE_SIZE } from '../constants';
 import './Issues.css';
+
+// Helper to create initial filter state from URL params
+const getInitialFilters = (searchParams) => ({
+  difficulty: searchParams.get('difficulty') || '',
+  technology: searchParams.get('technology') || '',
+  language: searchParams.get('language') || '',
+  bookmarked: searchParams.get('bookmarked') === 'true',
+  dateRange: searchParams.get('dateRange') || '',
+  minStars: searchParams.get('minStars') || '',
+  issueType: searchParams.get('issueType') || '',
+  scoreRange: searchParams.get('scoreRange') || '',
+});
 
 export function Issues() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -17,34 +29,22 @@ export function Issues() {
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
-  const [filters, setFilters] = useState({
-    difficulty: searchParams.get('difficulty') || '',
-    technology: searchParams.get('technology') || '',
-    language: searchParams.get('language') || '',
-    bookmarked: searchParams.get('bookmarked') === 'true',
-  });
   const [exporting, setExporting] = useState(false);
+
+  // Discovery state
+  const [discoverLanguage, setDiscoverLanguage] = useState('');
+  const [discovering, setDiscovering] = useState(false);
+  const [discoverMessage, setDiscoverMessage] = useState(null);
+
+  // Filter state - initialized once from URL, consolidated
+  const initialFilters = useMemo(() => getInitialFilters(searchParams), [searchParams]);
+  const [pendingFilters, setPendingFilters] = useState(initialFilters);
+  const [appliedFilters, setAppliedFilters] = useState(initialFilters);
 
   // Cancelable request handling
   const { getSignal, isAbortError } = useCancelableRequest();
 
-  // Debounce the technology filter input
-  const debouncedTechnology = useDebounce(filters.technology, DEBOUNCE.FILTER);
-
-  // Memoized filters for API call (uses debounced technology)
-  const apiFilters = useMemo(() => ({
-    ...filters,
-    technology: debouncedTechnology,
-  }), [filters.difficulty, filters.language, filters.bookmarked, debouncedTechnology]);
-
-  // Fetch issues when debounced filters change
-  useEffect(() => {
-    setOffset(0);
-    setIssues([]);
-    setHasMore(true);
-    fetchIssues(0, true);
-  }, [apiFilters]);
-
+  // Define fetchIssues BEFORE useEffect that uses it
   const fetchIssues = useCallback(async (currentOffset = 0, reset = false) => {
     try {
       if (reset) {
@@ -53,36 +53,17 @@ export function Issues() {
         setLoadingMore(true);
       }
       
-      // Get abort signal for this request
       const signal = getSignal();
       
       let response;
-      if (apiFilters.bookmarked) {
+      if (appliedFilters.bookmarked) {
         response = await api.getBookmarks({ signal });
         let bookmarkedIssues = response.data.issues || [];
         bookmarkedIssues = bookmarkedIssues.map(issue => ({ ...issue, is_bookmarked: true }));
         
         // Client-side filter for bookmarks
-        if (apiFilters.difficulty) {
-          bookmarkedIssues = bookmarkedIssues.filter(
-            issue => issue.difficulty === apiFilters.difficulty
-          );
-        }
-        if (apiFilters.technology) {
-          bookmarkedIssues = bookmarkedIssues.filter(
-            issue => issue.technologies?.some(t => 
-              t.toLowerCase().includes(apiFilters.technology.toLowerCase())
-            )
-          );
-        }
-        if (apiFilters.language) {
-          bookmarkedIssues = bookmarkedIssues.filter(
-            issue => issue.repo_languages && 
-              Object.keys(issue.repo_languages).some(lang => 
-                lang.toLowerCase() === apiFilters.language.toLowerCase()
-              )
-          );
-        }
+        bookmarkedIssues = applyClientFilters(bookmarkedIssues, appliedFilters);
+        
         setIssues(bookmarkedIssues);
         setTotalCount(bookmarkedIssues.length);
         setHasMore(false);
@@ -91,13 +72,19 @@ export function Issues() {
           offset: currentOffset,
           limit: PAGE_SIZE,
         };
-        if (apiFilters.difficulty) params.difficulty = apiFilters.difficulty;
-        if (apiFilters.technology) params.technology = apiFilters.technology;
-        if (apiFilters.language) params.language = apiFilters.language;
+        if (appliedFilters.difficulty) params.difficulty = appliedFilters.difficulty;
+        if (appliedFilters.technology) params.technology = appliedFilters.technology;
+        if (appliedFilters.language) params.language = appliedFilters.language;
+        if (appliedFilters.dateRange) params.days_back = getDaysFromRange(appliedFilters.dateRange);
+        if (appliedFilters.issueType) params.issue_type = appliedFilters.issueType;
+        if (appliedFilters.minStars) params.min_stars = parseInt(appliedFilters.minStars, 10);
+        if (appliedFilters.scoreRange) params.score_range = appliedFilters.scoreRange;
         
         response = await api.getIssues({ ...params, signal });
-        const newIssues = response.data.issues || [];
+        let newIssues = response.data.issues || [];
         const total = response.data.total || 0;
+        
+        // All filters are now server-side, no client filtering needed
         
         if (reset) {
           setIssues(newIssues);
@@ -111,17 +98,22 @@ export function Issues() {
       }
       setError(null);
     } catch (err) {
-      // Ignore abort errors
-      if (isAbortError(err)) {
-        return;
-      }
+      if (isAbortError(err)) return;
       console.error('Failed to fetch issues:', err);
       setError('Failed to load issues');
     } finally {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [apiFilters, getSignal, isAbortError]);
+  }, [appliedFilters, getSignal, isAbortError]);
+
+  // Fetch issues when applied filters change
+  useEffect(() => {
+    setOffset(0);
+    setIssues([]);
+    setHasMore(true);
+    fetchIssues(0, true);
+  }, [fetchIssues]);
 
   const loadMore = useCallback(() => {
     if (!loadingMore && hasMore) {
@@ -129,35 +121,63 @@ export function Issues() {
     }
   }, [loadingMore, hasMore, offset, fetchIssues]);
 
-  // Debounced URL update
-  const updateUrlParams = useDebouncedCallback((newFilters) => {
-    const params = new URLSearchParams();
-    if (newFilters.difficulty) params.set('difficulty', newFilters.difficulty);
-    if (newFilters.technology) params.set('technology', newFilters.technology);
-    if (newFilters.language) params.set('language', newFilters.language);
-    if (newFilters.bookmarked) params.set('bookmarked', 'true');
-    setSearchParams(params);
-  }, DEBOUNCE.FILTER);
-
   const handleFilterChange = useCallback((key, value) => {
-    const newFilters = { ...filters, [key]: value };
-    setFilters(newFilters);
-    updateUrlParams(newFilters);
-  }, [filters, updateUrlParams]);
+    setPendingFilters(prev => ({ ...prev, [key]: value }));
+  }, []);
 
+  // Use startTransition for non-urgent filter updates (keeps UI responsive)
+  const applyFilters = useCallback(() => {
+    startTransition(() => {
+      setAppliedFilters(pendingFilters);
+    });
+    
+    // Update URL params (synchronous - doesn't need transition)
+    const params = new URLSearchParams();
+    if (pendingFilters.difficulty) params.set('difficulty', pendingFilters.difficulty);
+    if (pendingFilters.technology) params.set('technology', pendingFilters.technology);
+    if (pendingFilters.language) params.set('language', pendingFilters.language);
+    if (pendingFilters.bookmarked) params.set('bookmarked', 'true');
+    if (pendingFilters.dateRange) params.set('dateRange', pendingFilters.dateRange);
+    if (pendingFilters.minStars) params.set('minStars', pendingFilters.minStars);
+    if (pendingFilters.issueType) params.set('issueType', pendingFilters.issueType);
+    if (pendingFilters.scoreRange) params.set('scoreRange', pendingFilters.scoreRange);
+    setSearchParams(params);
+  }, [pendingFilters, setSearchParams]);
+
+  const handleDiscover = useCallback(async () => {
+    try {
+      setDiscovering(true);
+      setDiscoverMessage(null);
+      
+      const params = {};
+      if (discoverLanguage) params.language = discoverLanguage;
+      
+      const response = await api.discoverIssues(params);
+      const count = response.data?.discovered || response.data?.issues?.length || 0;
+      
+      setDiscoverMessage({ type: 'success', text: `Discovered ${count} new issues!` });
+      
+      // Refresh the issues list
+      fetchIssues(0, true);
+    } catch (err) {
+      console.error('Failed to discover issues:', err);
+      setDiscoverMessage({ type: 'error', text: 'Failed to discover issues. Try again.' });
+    } finally {
+      setDiscovering(false);
+    }
+  }, [discoverLanguage, fetchIssues]);
+
+  // Optimistic bookmark update - no external state dependencies for stable callback
   const handleBookmark = useCallback(async (issueId, isBookmarked) => {
     const newBookmarkState = !isBookmarked;
     
-    // Optimistic update
-    setIssues(prev => prev.map(issue => 
-      issue.id === issueId 
-        ? { ...issue, is_bookmarked: newBookmarkState }
-        : issue
-    ));
+    // Helper to update bookmark state in an issue
+    const updateIssueBookmark = (issue, bookmarked) => 
+      issue.id === issueId ? { ...issue, is_bookmarked: bookmarked } : issue;
     
-    if (selectedIssue?.id === issueId) {
-      setSelectedIssue(prev => ({ ...prev, is_bookmarked: newBookmarkState }));
-    }
+    // Optimistic update - batch both state changes
+    setIssues(prev => prev.map(issue => updateIssueBookmark(issue, newBookmarkState)));
+    setSelectedIssue(prev => prev?.id === issueId ? { ...prev, is_bookmarked: newBookmarkState } : prev);
     
     try {
       if (isBookmarked) {
@@ -167,44 +187,60 @@ export function Issues() {
       }
     } catch (err) {
       console.error('Failed to update bookmark:', err);
-      // Revert on error
-      setIssues(prev => prev.map(issue => 
-        issue.id === issueId 
-          ? { ...issue, is_bookmarked: isBookmarked }
-          : issue
-      ));
-      if (selectedIssue?.id === issueId) {
-        setSelectedIssue(prev => ({ ...prev, is_bookmarked: isBookmarked }));
-      }
+      // Rollback on error
+      setIssues(prev => prev.map(issue => updateIssueBookmark(issue, isBookmarked)));
+      setSelectedIssue(prev => prev?.id === issueId ? { ...prev, is_bookmarked: isBookmarked } : prev);
     }
-  }, [selectedIssue]);
+  }, []); // No dependencies - uses functional updates only
 
   const clearFilters = useCallback(() => {
-    setFilters({ difficulty: '', technology: '', language: '', bookmarked: false });
+    const emptyFilters = {
+      difficulty: '',
+      technology: '',
+      language: '',
+      bookmarked: false,
+      dateRange: '',
+      minStars: '',
+      issueType: '',
+      scoreRange: '',
+    };
+    setPendingFilters(emptyFilters);
+    startTransition(() => {
+      setAppliedFilters(emptyFilters);
+    });
     setSearchParams({});
   }, [setSearchParams]);
 
   const handleExport = useCallback(async (format) => {
     try {
       setExporting(true);
-      await api.exportIssues(format, filters.bookmarked);
+      await api.exportIssues(format, appliedFilters.bookmarked);
     } catch (err) {
       console.error('Failed to export issues:', err);
       setError('Failed to export issues');
     } finally {
       setExporting(false);
     }
-  }, [filters.bookmarked]);
+  }, [appliedFilters.bookmarked]);
 
-  const hasActiveFilters = filters.difficulty || filters.technology || filters.language || filters.bookmarked;
+  const hasActiveFilters = useMemo(() => {
+    return !!(appliedFilters.difficulty || appliedFilters.technology || appliedFilters.language || 
+      appliedFilters.bookmarked || appliedFilters.dateRange || appliedFilters.minStars || 
+      appliedFilters.issueType || appliedFilters.scoreRange);
+  }, [appliedFilters]);
 
-  if (loading && issues.length === 0) {
-    return (
-      <Layout>
-        <PageLoader message="Loading issues..." />
-      </Layout>
-    );
-  }
+  const hasUnappliedChanges = useMemo(() => {
+    return Object.keys(pendingFilters).some(key => pendingFilters[key] !== appliedFilters[key]);
+  }, [pendingFilters, appliedFilters]);
+
+  // Don't show full page loader - we'll use skeletons instead
+  // if (loading && issues.length === 0) {
+  //   return (
+  //     <Layout>
+  //       <PageLoader message="Loading issues..." />
+  //     </Layout>
+  //   );
+  // }
 
   return (
     <Layout>
@@ -221,7 +257,7 @@ export function Issues() {
               onClick={() => handleExport('csv')}
               disabled={exporting || issues.length === 0}
             >
-              Export CSV
+              {exporting ? 'Exporting...' : 'Export CSV'}
             </Button>
             <Button 
               variant="outline" 
@@ -229,71 +265,19 @@ export function Issues() {
               onClick={() => handleExport('json')}
               disabled={exporting || issues.length === 0}
             >
-              Export JSON
+              {exporting ? 'Exporting...' : 'Export JSON'}
             </Button>
           </div>
         </header>
 
-        {/* Filters */}
-        <Card className="issues-filters">
-          <CardBody>
-            <div className="filters-row">
-              <div className="filter-group">
-                <label>Difficulty</label>
-                <select 
-                  value={filters.difficulty}
-                  onChange={(e) => handleFilterChange('difficulty', e.target.value)}
-                >
-                  <option value="">All Difficulties</option>
-                  <option value="beginner">Beginner</option>
-                  <option value="intermediate">Intermediate</option>
-                  <option value="advanced">Advanced</option>
-                </select>
-              </div>
-
-              <div className="filter-group">
-                <label>Technology</label>
-                <input 
-                  type="text"
-                  placeholder="e.g., React, Docker"
-                  value={filters.technology}
-                  onChange={(e) => handleFilterChange('technology', e.target.value)}
-                />
-              </div>
-
-              <div className="filter-group">
-                <label>Language</label>
-                <select 
-                  value={filters.language}
-                  onChange={(e) => handleFilterChange('language', e.target.value)}
-                >
-                  <option value="">All Languages</option>
-                  {PROGRAMMING_LANGUAGES.map(lang => (
-                    <option key={lang} value={lang}>{lang}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="filter-group">
-                <label>Filter</label>
-                <Button 
-                  variant={filters.bookmarked ? 'secondary' : 'outline'}
-                  size="sm"
-                  onClick={() => handleFilterChange('bookmarked', !filters.bookmarked)}
-                  className="filter-bookmark-btn"
-                >
-                  {filters.bookmarked ? 'Showing Bookmarked Only' : 'Bookmarked Only'}
-                </Button>
-              </div>
-
-              {hasActiveFilters && (
-                <Button variant="ghost" size="sm" onClick={clearFilters}>
-                  Clear Filters
-                </Button>
-              )}
-            </div>
-          </CardBody>
-        </Card>
+        {/* Discover Tile */}
+        <DiscoverTile
+          language={discoverLanguage}
+          onLanguageChange={setDiscoverLanguage}
+          onDiscover={handleDiscover}
+          discovering={discovering}
+          message={discoverMessage}
+        />
 
         {error && (
           <div className="issues-error">
@@ -304,34 +288,53 @@ export function Issues() {
           </div>
         )}
 
-        {/* Issues Count */}
-        {!loading && issues.length > 0 && (
-          <div className="issues-count">
-            Showing {issues.length} of {totalCount} issues
-          </div>
-        )}
+        {/* Main Layout: Sidebar + Content */}
+        <div className="issues-layout">
+          {/* Filter Sidebar */}
+          <FilterSidebar
+            filters={pendingFilters}
+            onFilterChange={handleFilterChange}
+            onApplyFilters={applyFilters}
+            onClearFilters={clearFilters}
+            hasActiveFilters={hasActiveFilters}
+            hasUnappliedChanges={hasUnappliedChanges}
+          />
 
-        {/* Issues Grid - Uses CSS Grid for responsive layout */}
-        <IssuesGrid 
-          issues={issues}
-          loading={loading}
-          onSelect={setSelectedIssue}
-          onBookmark={handleBookmark}
-        />
+          {/* Issues Content */}
+          <div className="issues-content">
+            {!loading && issues.length > 0 && (
+              <div className="issues-count">
+                Showing {issues.length} of {totalCount} issues
+              </div>
+            )}
 
-        {/* Load More Button */}
-        {hasMore && !loading && issues.length > 0 && (
-          <div className="issues-load-more">
-            <Button 
-              variant="outline" 
-              onClick={loadMore}
-              loading={loadingMore}
-              disabled={loadingMore}
-            >
-              {loadingMore ? 'Loading...' : 'Load More Issues'}
-            </Button>
+            {loading && issues.length === 0 ? (
+              <div className="issues-grid">
+                <SkeletonList count={6} type="card" />
+              </div>
+            ) : (
+              <IssuesGrid 
+                issues={issues}
+                loading={loading}
+                onSelect={setSelectedIssue}
+                onBookmark={handleBookmark}
+              />
+            )}
+
+            {hasMore && !loading && issues.length > 0 && (
+              <div className="issues-load-more">
+                <Button 
+                  variant="outline" 
+                  onClick={loadMore}
+                  loading={loadingMore}
+                  disabled={loadingMore}
+                >
+                  {loadingMore ? 'Loading...' : 'Load More Issues'}
+                </Button>
+              </div>
+            )}
           </div>
-        )}
+        </div>
 
         {/* Issue Detail Modal */}
         {selectedIssue && (
@@ -347,9 +350,281 @@ export function Issues() {
 }
 
 /**
- * IssuesGrid - Renders the issues with optimized rendering
+ * DiscoverTile - Top section for discovering new issues (memoized)
  */
-function IssuesGrid({ issues, loading, onSelect, onBookmark }) {
+const DiscoverTile = memo(function DiscoverTile({ language, onLanguageChange, onDiscover, discovering, message }) {
+  const handleLanguageChange = useCallback((e) => {
+    onLanguageChange(e.target.value);
+  }, [onLanguageChange]);
+
+  return (
+    <Card className="discover-tile">
+      <CardBody>
+        <div className="discover-content">
+          <div className="discover-info">
+            <h3>Discover Issues</h3>
+            <p>
+              Search GitHub for new open source issues matching your criteria. 
+              Issues with labels like "good first issue" and "help wanted" will be 
+              fetched and added to your collection for scoring and filtering.
+            </p>
+            {message && (
+              <div className={`discover-message discover-message-${message.type}`}>
+                {message.text}
+              </div>
+            )}
+          </div>
+          <div className="discover-controls">
+            <div className="discover-field">
+              <label>Language</label>
+              <select
+                value={language}
+                onChange={handleLanguageChange}
+                disabled={discovering}
+              >
+                <option value="">All Languages</option>
+                {PROGRAMMING_LANGUAGES.map(lang => (
+                  <option key={lang} value={lang}>{lang}</option>
+                ))}
+              </select>
+            </div>
+            <Button
+              variant="primary"
+              onClick={onDiscover}
+              loading={discovering}
+              disabled={discovering}
+            >
+              {discovering ? 'Discovering...' : 'Discover Issues'}
+            </Button>
+          </div>
+        </div>
+      </CardBody>
+    </Card>
+  );
+});
+
+/**
+ * FilterSidebar - Sticky sidebar with all filter options (memoized)
+ */
+const FilterSidebar = memo(function FilterSidebar({ filters, onFilterChange, onApplyFilters, onClearFilters, hasActiveFilters, hasUnappliedChanges }) {
+  // Memoized change handlers to prevent re-creating functions
+  const handleChange = useCallback((key) => (e) => {
+    onFilterChange(key, e.target.value);
+  }, [onFilterChange]);
+
+  const handleBookmarkToggle = useCallback(() => {
+    onFilterChange('bookmarked', !filters.bookmarked);
+  }, [onFilterChange, filters.bookmarked]);
+
+  return (
+    <aside className="issues-sidebar">
+      <div className="sidebar-header">
+        <h3>Filters</h3>
+        {hasActiveFilters && (
+          <button className="sidebar-clear" onClick={onClearFilters}>
+            Clear All
+          </button>
+        )}
+      </div>
+
+      <div className="sidebar-filters">
+        {/* Difficulty */}
+        <div className="sidebar-filter-group">
+          <label>Difficulty</label>
+          <select
+            value={filters.difficulty}
+            onChange={handleChange('difficulty')}
+          >
+            <option value="">All Difficulties</option>
+            <option value="beginner">Beginner</option>
+            <option value="intermediate">Intermediate</option>
+            <option value="advanced">Advanced</option>
+          </select>
+        </div>
+
+        {/* Technology */}
+        <div className="sidebar-filter-group">
+          <label>Technology</label>
+          <input
+            type="text"
+            placeholder="e.g., React, Docker"
+            value={filters.technology}
+            onChange={handleChange('technology')}
+          />
+        </div>
+
+        {/* Language */}
+        <div className="sidebar-filter-group">
+          <label>Language</label>
+          <select
+            value={filters.language}
+            onChange={handleChange('language')}
+          >
+            <option value="">All Languages</option>
+            {PROGRAMMING_LANGUAGES.map(lang => (
+              <option key={lang} value={lang}>{lang}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Date Range */}
+        <div className="sidebar-filter-group">
+          <label>Date Range</label>
+          <select
+            value={filters.dateRange}
+            onChange={handleChange('dateRange')}
+          >
+            <option value="">All Time</option>
+            <option value="week">Last Week</option>
+            <option value="month">Last Month</option>
+            <option value="3months">Last 3 Months</option>
+          </select>
+        </div>
+
+        {/* Min Stars */}
+        <div className="sidebar-filter-group">
+          <label>Min Stars</label>
+          <input
+            type="number"
+            placeholder="e.g., 100"
+            min="0"
+            value={filters.minStars}
+            onChange={handleChange('minStars')}
+          />
+        </div>
+
+        {/* Issue Type */}
+        <div className="sidebar-filter-group">
+          <label>Issue Type</label>
+          <select
+            value={filters.issueType}
+            onChange={handleChange('issueType')}
+          >
+            <option value="">All Types</option>
+            <option value="bug">Bug</option>
+            <option value="feature">Feature</option>
+            <option value="documentation">Documentation</option>
+            <option value="enhancement">Enhancement</option>
+          </select>
+        </div>
+
+        {/* Score Range */}
+        <div className="sidebar-filter-group">
+          <label>Score Range</label>
+          <select
+            value={filters.scoreRange}
+            onChange={handleChange('scoreRange')}
+          >
+            <option value="">All Scores</option>
+            <option value="high">High (80+)</option>
+            <option value="medium">Medium (50-79)</option>
+            <option value="low">Low (&lt;50)</option>
+          </select>
+        </div>
+
+        {/* Bookmarked Toggle */}
+        <div className="sidebar-filter-group">
+          <label>Show Only</label>
+          <Button
+            variant={filters.bookmarked ? 'secondary' : 'outline'}
+            size="sm"
+            onClick={handleBookmarkToggle}
+            className="sidebar-bookmark-btn"
+          >
+            {filters.bookmarked ? 'Bookmarked' : 'Bookmarked'}
+          </Button>
+        </div>
+      </div>
+
+      {/* Apply Filters Button */}
+      <div className="sidebar-apply">
+        <Button
+          variant="primary"
+          onClick={onApplyFilters}
+          className="sidebar-apply-btn"
+          disabled={!hasUnappliedChanges}
+        >
+          Apply Filters
+        </Button>
+      </div>
+    </aside>
+  );
+});
+
+/**
+ * Helper: Apply client-side filters for bookmarks only
+ * All other filters are now server-side for proper pagination
+ */
+function applyClientFilters(issues, filters) {
+  let filtered = [...issues];
+
+  // Only apply filters that aren't supported by the bookmarks endpoint
+  if (filters.difficulty) {
+    filtered = filtered.filter(issue => issue.difficulty === filters.difficulty);
+  }
+  
+  if (filters.technology) {
+    filtered = filtered.filter(issue => 
+      issue.technologies?.some(t => 
+        t.toLowerCase().includes(filters.technology.toLowerCase())
+      )
+    );
+  }
+  
+  if (filters.language) {
+    filtered = filtered.filter(issue => 
+      issue.repo_languages && 
+      Object.keys(issue.repo_languages).some(lang => 
+        lang.toLowerCase() === filters.language.toLowerCase()
+      )
+    );
+  }
+
+  if (filters.minStars) {
+    const minStars = parseInt(filters.minStars, 10);
+    if (!isNaN(minStars)) {
+      filtered = filtered.filter(issue => (issue.repo_stars || 0) >= minStars);
+    }
+  }
+
+  if (filters.issueType) {
+    filtered = filtered.filter(issue => issue.issue_type === filters.issueType);
+  }
+
+  if (filters.scoreRange) {
+    filtered = filtered.filter(issue => {
+      const score = issue.score || 0;
+      switch (filters.scoreRange) {
+        case 'high': return score >= 80;
+        case 'medium': return score >= 50 && score < 80;
+        case 'low': return score < 50;
+        default: return true;
+      }
+    });
+  }
+
+  return filtered;
+}
+
+/**
+ * Helper: Convert date range to days
+ */
+function getDaysFromRange(range) {
+  switch (range) {
+    case 'week': return 7;
+    case 'month': return 30;
+    case '3months': return 90;
+    default: return null;
+  }
+}
+
+/**
+ * IssuesGrid - Renders issues with optimized rendering
+ */
+const IssuesGrid = memo(function IssuesGrid({ issues, loading, onSelect, onBookmark }) {
+  // Skip animations for large lists (performance optimization)
+  const skipAnimations = issues.length > 30;
+
   if (issues.length === 0 && !loading) {
     return (
       <div className="issues-empty">
@@ -361,25 +636,37 @@ function IssuesGrid({ issues, loading, onSelect, onBookmark }) {
 
   return (
     <div className="issues-grid">
-      {issues.map((issue, index) => (
+      {issues.map((issue) => (
         <IssueCard 
           key={issue.id} 
           issue={issue}
-          onSelect={() => onSelect(issue)}
-          onBookmark={() => onBookmark(issue.id, issue.is_bookmarked)}
-          delay={index % 5}
+          onSelect={onSelect}
+          onBookmark={onBookmark}
+          skipAnimation={skipAnimations}
         />
       ))}
     </div>
   );
-}
+});
 
-function IssueCard({ issue, onSelect, onBookmark, delay }) {
+/**
+ * IssueCard - Memoized card component to prevent unnecessary re-renders
+ */
+const IssueCard = memo(function IssueCard({ issue, onSelect, onBookmark, skipAnimation }) {
+  const handleClick = useCallback(() => {
+    onSelect(issue);
+  }, [onSelect, issue]);
+
+  const handleBookmarkClick = useCallback((e) => {
+    e.stopPropagation();
+    onBookmark(issue.id, issue.is_bookmarked);
+  }, [onBookmark, issue.id, issue.is_bookmarked]);
+
   return (
     <Card 
       hover 
-      className={`issue-card animate-slide-up stagger-${delay + 1}`}
-      onClick={onSelect}
+      className={`issue-card${skipAnimation ? '' : ' animate-slide-up'}`}
+      onClick={handleClick}
     >
       <div className="issue-card-header">
         <div className="issue-card-badges">
@@ -389,10 +676,7 @@ function IssueCard({ issue, onSelect, onBookmark, delay }) {
         <Button 
           variant={issue.is_bookmarked ? 'secondary' : 'outline'}
           size="sm"
-          onClick={(e) => {
-            e.stopPropagation();
-            onBookmark();
-          }}
+          onClick={handleBookmarkClick}
           aria-label={issue.is_bookmarked ? 'Remove bookmark' : 'Add bookmark'}
           className="issue-bookmark-btn"
         >
@@ -428,11 +712,10 @@ function IssueCard({ issue, onSelect, onBookmark, delay }) {
       )}
     </Card>
   );
-}
+});
 
 function IssueDetailModal({ issue, onClose, onBookmark }) {
   const [scoreBreakdown, setScoreBreakdown] = useState(null);
-  const [loadingScore, setLoadingScore] = useState(true);
   const [notes, setNotes] = useState([]);
   const [loadingNotes, setLoadingNotes] = useState(true);
   const [newNote, setNewNote] = useState('');
@@ -440,6 +723,14 @@ function IssueDetailModal({ issue, onClose, onBookmark }) {
   const [selectedLabel, setSelectedLabel] = useState(issue.label || null);
   
   const { getSignal, isAbortError } = useCancelableRequest();
+
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, []);
 
   useEffect(() => {
     const signal = getSignal();
@@ -458,7 +749,6 @@ function IssueDetailModal({ issue, onClose, onBookmark }) {
           console.error('Failed to fetch issue details:', err);
         }
       } finally {
-        setLoadingScore(false);
         setLoadingNotes(false);
       }
     };
@@ -469,44 +759,69 @@ function IssueDetailModal({ issue, onClose, onBookmark }) {
   const handleAddNote = async () => {
     if (!newNote.trim()) return;
     
+    // Create optimistic note with temporary ID
+    const optimisticNote = {
+      id: `temp-${Date.now()}`,
+      content: newNote.trim(),
+      created_at: new Date().toISOString(),
+      isPending: true,
+    };
+    
+    // Optimistically add note to UI
+    const noteContent = newNote.trim();
+    setNotes(prev => [...prev, optimisticNote]);
+    setNewNote('');
+    
     try {
       setAddingNote(true);
-      await api.addIssueNote(issue.id, newNote);
-      setNewNote('');
+      await api.addIssueNote(issue.id, noteContent);
       
-      // Refetch notes
+      // Refresh notes to get the actual note with real ID
       const response = await api.getIssueNotes(issue.id);
       setNotes(response.data.notes || []);
     } catch (err) {
       console.error('Failed to add note:', err);
+      // Rollback on error - remove the optimistic note
+      setNotes(prev => prev.filter(n => n.id !== optimisticNote.id));
+      setNewNote(noteContent); // Restore the note text so user can try again
     } finally {
       setAddingNote(false);
     }
   };
 
   const handleDeleteNote = async (noteId) => {
+    // Optimistically remove note from UI
+    const deletedNote = notes.find(n => n.id === noteId);
+    setNotes(notes.filter(n => n.id !== noteId));
+    
     try {
       await api.deleteIssueNote(issue.id, noteId);
-      setNotes(notes.filter(n => n.id !== noteId));
     } catch (err) {
       console.error('Failed to delete note:', err);
+      // Rollback on error - restore the note
+      if (deletedNote) {
+        setNotes(prev => [...prev, deletedNote].sort((a, b) => 
+          new Date(a.created_at) - new Date(b.created_at)
+        ));
+      }
     }
   };
 
   const handleLabelIssue = async (label) => {
-    // Toggle: if same label clicked again, unselect it
+    const previousLabel = selectedLabel;
     const newLabel = selectedLabel === label ? null : label;
+    
+    // Optimistically update label
     setSelectedLabel(newLabel);
     
     try {
       if (newLabel) {
         await api.labelIssue(issue.id, newLabel);
       }
-      // If unselecting, we could call an unlabel API if it exists
     } catch (err) {
       console.error('Failed to label issue:', err);
-      // Revert on error
-      setSelectedLabel(selectedLabel);
+      // Rollback on error
+      setSelectedLabel(previousLabel);
     }
   };
 
@@ -573,7 +888,6 @@ function IssueDetailModal({ issue, onClose, onBookmark }) {
               </section>
             )}
 
-            {/* Notes Section */}
             <section className="notes-section">
               <h4>Notes</h4>
               <div className="notes-add">
@@ -600,18 +914,23 @@ function IssueDetailModal({ issue, onClose, onBookmark }) {
               ) : (
                 <div className="notes-list">
                   {notes.map((note) => (
-                    <div key={note.id} className="note-item">
-                      <p className="note-content">{note.content}</p>
+                    <div key={note.id} className={`note-item ${note.isPending ? 'note-pending' : ''}`}>
+                      <p className="note-content">
+                        {note.content}
+                        {note.isPending && <span className="note-pending-indicator"> (Saving...)</span>}
+                      </p>
                       <div className="note-footer">
                         <span className="note-date">
                           {new Date(note.created_at).toLocaleDateString()}
                         </span>
-                        <button 
-                          className="note-delete"
-                          onClick={() => handleDeleteNote(note.id)}
-                        >
-                          Delete
-                        </button>
+                        {!note.isPending && (
+                          <button 
+                            className="note-delete"
+                            onClick={() => handleDeleteNote(note.id)}
+                          >
+                            Delete
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}

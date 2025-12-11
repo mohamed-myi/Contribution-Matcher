@@ -4,4 +4,5 @@ export { Dashboard } from './Dashboard';
 export { Issues } from './Issues';
 export { Profile } from './Profile';
 export { MLTraining } from './MLTraining';
+export { LabeledIssues } from './LabeledIssues';
 

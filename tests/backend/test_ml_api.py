@@ -48,13 +48,13 @@ def test_label_and_status(authorized_client):
     session.close()
 
     resp = client.post(
-        f"/api/ml/label/{issues[0]}",
+        f"/api/v1/ml/label/{issues[0]}",
         json={"label": "good"},
         headers={"Authorization": "Bearer fake"},
     )
     assert resp.status_code == 200
 
-    status_resp = client.get("/api/ml/label-status", headers={"Authorization": "Bearer fake"})
+    status_resp = client.get("/api/v1/ml/label-status", headers={"Authorization": "Bearer fake"})
     assert status_resp.status_code == 200
     data = status_resp.json()
     assert data["good_count"] == 1
@@ -71,7 +71,7 @@ def test_train_model(authorized_client, monkeypatch, tmp_path):
     for idx, issue_id in enumerate(issues):
         label = "good" if idx % 2 == 0 else "bad"
         client.post(
-            f"/api/ml/label/{issue_id}",
+            f"/api/v1/ml/label/{issue_id}",
             json={"label": label},
             headers={"Authorization": "Bearer fake"},
         )
@@ -79,7 +79,7 @@ def test_train_model(authorized_client, monkeypatch, tmp_path):
     monkeypatch.setenv("CONTRIBUTION_MATCHER_MODEL_DIR", str(tmp_path))
 
     resp = client.post(
-        "/api/ml/train",
+        "/api/v1/ml/train",
         json={"test_size": 0.25},
         headers={"Authorization": "Bearer fake"},
     )
@@ -89,7 +89,7 @@ def test_train_model(authorized_client, monkeypatch, tmp_path):
     assert body["model_type"] == "logistic_regression"
     assert body["metrics"]["samples"] >= 4
 
-    info_resp = client.get("/api/ml/model-info", headers={"Authorization": "Bearer fake"})
+    info_resp = client.get("/api/v1/ml/model-info", headers={"Authorization": "Bearer fake"})
     assert info_resp.status_code == 200
 
 
@@ -103,13 +103,13 @@ def test_evaluate_model(authorized_client):
     for idx, issue_id in enumerate(issues):
         label = "good" if idx % 2 == 0 else "bad"
         client.post(
-            f"/api/ml/label/{issue_id}",
+            f"/api/v1/ml/label/{issue_id}",
             json={"label": label},
             headers={"Authorization": "Bearer fake"},
         )
 
     resp = client.post(
-        "/api/ml/evaluate",
+        "/api/v1/ml/evaluate",
         json={"model_type": "logistic_regression"},
         headers={"Authorization": "Bearer fake"},
     )

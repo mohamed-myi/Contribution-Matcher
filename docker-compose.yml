@@ -1,7 +1,7 @@
 # =============================================================================
 # Contribution Matcher - Docker Compose Configuration
 # =============================================================================
-# 
+#
 # Services:
 #   - api: FastAPI application
 #   - worker-discovery: Celery worker for GitHub API (rate limited)
@@ -256,4 +256,3 @@ networks:
   cm-network:
     name: cm-network
     driver: bridge
-

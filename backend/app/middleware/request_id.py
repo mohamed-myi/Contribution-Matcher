@@ -21,7 +21,7 @@ class RequestIDMiddleware:
         request = Request(scope, receive=receive)
         request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
         scope.setdefault("state", {})["request_id"] = request_id
-        
+
         # Bind request ID to logging context
         bind_context(request_id=request_id)
 

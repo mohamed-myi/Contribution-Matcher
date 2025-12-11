@@ -1,7 +1,9 @@
 from datetime import datetime
 
 from backend.app.models import Issue
-from backend.app.services import issue_service
+from core import parsing
+from core.api import github_api
+from core.parsing import skill_extractor
 
 
 def test_issue_discovery_persists_results(monkeypatch, authorized_client):
@@ -15,18 +17,17 @@ def test_issue_discovery_persists_results(monkeypatch, authorized_client):
         "labels": [{"name": "good first issue"}],
     }
 
+    # Patch at the source modules
+    monkeypatch.setattr(github_api, "search_issues", lambda **kwargs: [fake_issue])  # noqa: ARG005
     monkeypatch.setattr(
-        issue_service, "search_issues", lambda **kwargs: [fake_issue]
-    )
-    monkeypatch.setattr(
-        issue_service,
+        github_api,
         "get_repo_metadata_from_api",
-        lambda owner, name, use_cache=True: {"stars": 10, "forks": 1},
+        lambda owner, name, use_cache=True: {"stars": 10, "forks": 1},  # noqa: ARG005
     )
     monkeypatch.setattr(
-        issue_service,
+        parsing,
         "parse_issue",
-        lambda issue, repo: {
+        lambda issue, repo: {  # noqa: ARG005
             "title": issue["title"],
             "url": issue["html_url"],
             "body": issue["body"],
@@ -47,13 +48,13 @@ def test_issue_discovery_persists_results(monkeypatch, authorized_client):
         },
     )
     monkeypatch.setattr(
-        issue_service,
+        skill_extractor,
         "analyze_job_text",
-        lambda body: ("backend", [("python", "language")], {}),
+        lambda body: ("backend", [("python", "language")], {}),  # noqa: ARG005
     )
 
     resp = client.post(
-        "/api/issues/discover",
+        "/api/v1/issues/discover",
         json={"labels": ["good first issue"], "limit": 1},
         headers={"Authorization": "Bearer fake"},
     )
@@ -98,7 +99,7 @@ def test_list_issues_filters_by_difficulty(monkeypatch, authorized_client):
     session.close()
 
     resp = client.get(
-        "/api/issues",
+        "/api/v1/issues",
         params={"difficulty": "beginner"},
         headers={"Authorization": "Bearer fake"},
     )

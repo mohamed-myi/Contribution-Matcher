@@ -1,71 +1,38 @@
 """
-Unified Database Package.
+Database Package.
 
-Provides DatabaseManager (recommended) and legacy functions for backward compatibility.
-
-New API:
+New API (recommended):
     from core.database import db, get_db, Base
     db.initialize()
     with db.session() as session:
         issues = session.query(Issue).all()
 
-Legacy API (deprecated):
-    from core.database import upsert_issue, query_issues
+For data operations, use the repository pattern:
+    from core.repositories import IssueRepository
+    repo = IssueRepository(session)
+    issues = repo.list_with_bookmarks(user_id, filters)
 """
 
-# New API - DatabaseManager from the internal module
-from core._database_manager import Base, DatabaseManager, db, get_db
-
-# Legacy API - Re-export all functions from the legacy module
-# These are deprecated but maintained for backward compatibility
-from core.database.database import (
-    DB_PATH,
-    db_conn,
-    export_to_csv,
-    export_to_json,
-    get_all_issue_urls,
-    get_issue_embedding,
-    get_issue_technologies,
+# New API - from the consolidated db module
+from core.cli.db_helpers import (
     get_labeling_statistics,
-    get_repo_metadata,
-    get_statistics,
-    get_variety_statistics,
-    init_db,
-    mark_issues_inactive,
     query_issues,
-    query_unlabeled_issues,
-    replace_issue_technologies,
     update_issue_label,
     upsert_issue,
-    upsert_issue_embedding,
-    upsert_repo_metadata,
 )
+from core.db import Base, DatabaseManager, db, get_db
+
+# Re-export deprecated functions for test compatibility
+# TODO: Update tests to use repository pattern instead
 
 __all__ = [
-    # New API
     "Base",
     "DatabaseManager",
     "db",
     "get_db",
-    # Legacy database functions
-    "DB_PATH",
-    "db_conn",
-    "export_to_csv",
-    "export_to_json",
-    "get_all_issue_urls",
-    "get_issue_embedding",
-    "get_issue_technologies",
-    "get_labeling_statistics",
-    "get_repo_metadata",
-    "get_statistics",
-    "get_variety_statistics",
-    "init_db",
-    "mark_issues_inactive",
+    # Deprecated functions for test compatibility
     "query_issues",
-    "query_unlabeled_issues",
-    "replace_issue_technologies",
-    "update_issue_label",
     "upsert_issue",
-    "upsert_issue_embedding",
-    "upsert_repo_metadata",
+    "update_issue_label",
+    "get_labeling_statistics",
 ]

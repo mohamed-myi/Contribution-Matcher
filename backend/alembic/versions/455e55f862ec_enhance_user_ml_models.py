@@ -20,4 +20,3 @@ def downgrade() -> None:
     op.drop_column("user_ml_models", "description")
     op.drop_column("user_ml_models", "evaluation_metrics")
     op.drop_column("user_ml_models", "model_type")
-

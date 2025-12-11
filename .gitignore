@@ -8,23 +8,27 @@ env/
 venv/
 ENV/
 .venv
+*.egg
+*.whl
+*.egg-info/
+*.pyc
 
 # Database
 *.db
-!contribution_matcher.db
 *.sqlite
 *.sqlite3
 
 # Model files
 *.pkl
-
+models/
+node_modules/
 # Profile data
 dev_profile.json
 
 # Resume files
 my_resume/
 *.pdf
-
+frontend/dist/
 
 .env
 .env.local
@@ -43,6 +47,6 @@ Thumbs.db
 
 *.log
 
-# Documentation (except README)
+# Documentation (except root README)
 *.md
-!README.md 
+!/README.md

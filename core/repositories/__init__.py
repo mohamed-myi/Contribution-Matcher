@@ -7,7 +7,7 @@ with batch operations and efficient queries.
 Usage:
     from core.repositories import IssueRepository
     from core.db import db
-    
+
     with db.session() as session:
         repo = IssueRepository(session)
         issues, total, bookmarks = repo.list_with_bookmarks(user_id, filters)
@@ -31,4 +31,3 @@ __all__ = [
     "DevProfileRepository",  # Alias
     "RepoMetadataRepository",
 ]
-

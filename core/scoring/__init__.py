@@ -35,4 +35,3 @@ __all__ = [
     "extract_features",
     "load_labeled_issues",
 ]
-

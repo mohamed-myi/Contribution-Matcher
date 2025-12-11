@@ -13,7 +13,7 @@ def test_update_profile_creates_entry(authorized_client):
     }
 
     resp = client.put(
-        "/api/profile",
+        "/api/v1/profile",
         json=payload,
         headers={"Authorization": "Bearer fake"},
     )
@@ -43,7 +43,7 @@ def test_get_profile_returns_data(authorized_client):
     session.close()
 
     resp = client.get(
-        "/api/profile",
+        "/api/v1/profile",
         headers={"Authorization": "Bearer fake"},
     )
     assert resp.status_code == 200
@@ -57,27 +57,30 @@ def test_create_profile_from_github(authorized_client, monkeypatch):
 
     # Mock the httpx call
     import httpx
-    
+
     class MockResponse:
         status_code = 200
+
         def json(self):
             return [
                 {"language": "Python", "topics": ["web", "api"]},
                 {"language": "JavaScript", "topics": ["frontend"]},
             ]
-    
+
     class MockClient:
         def __enter__(self):
             return self
+
         def __exit__(self, *args):
             pass
+
         def get(self, *args, **kwargs):
             return MockResponse()
-    
-    monkeypatch.setattr(httpx, "Client", lambda **kwargs: MockClient())
+
+    monkeypatch.setattr(httpx, "Client", lambda **kwargs: MockClient())  # noqa: ARG005
 
     resp = client.post(
-        "/api/profile/from-github",
+        "/api/v1/profile/from-github",
         json={},
         headers={"Authorization": "Bearer fake"},
     )

@@ -4,6 +4,7 @@ Simple in-memory rate limiter dependency.
 
 import threading
 import time
+
 from fastapi import Depends, HTTPException, Request, status
 
 from ..auth.dependencies import get_current_user
@@ -40,4 +41,3 @@ def enforce_rate_limit(
 ):
     key = f"user:{user.id}"
     global_rate_limiter.check(key)
-

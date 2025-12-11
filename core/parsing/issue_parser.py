@@ -1,66 +1,132 @@
-import json
+"""Issue parsing module for extracting structured information from GitHub issues."""
+
 import re
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
 
+from core.constants import SKILL_CATEGORIES
 from core.parsing.skill_extractor import analyze_job_text
-from core.config import SKILL_CATEGORIES
+
+# Pre-compiled regex patterns for performance
+_WHITESPACE_PATTERN = re.compile(r"\s+")
+
+# Difficulty patterns
+_BEGINNER_PATTERNS = [
+    re.compile(
+        r"\b(beginner|beginner-friendly|good first issue|first timer|starter|easy)\b", re.IGNORECASE
+    ),
+    re.compile(r"\bshould take\s+(?:about\s+)?(\d+)\s*(?:hour|hr)", re.IGNORECASE),
+    re.compile(r"\btakes?\s+(?:about\s+)?(\d+)\s*(?:hour|hr)", re.IGNORECASE),
+]
+_ADVANCED_PATTERNS = [
+    re.compile(r"\b(advanced|expert|complex|difficult|hard|challenging)\b", re.IGNORECASE),
+    re.compile(
+        r"\b(requires|needs)\s+(?:deep|extensive|significant)\s+(?:knowledge|experience|understanding)",
+        re.IGNORECASE,
+    ),
+]
+
+# Time estimate patterns
+_TIME_PATTERNS = [
+    (
+        re.compile(
+            r"should take\s+(?:about\s+)?(\d+)\s*(?:-\s*(\d+))?\s*(?:hour|hr|hours|hrs)",
+            re.IGNORECASE,
+        ),
+        "hours",
+    ),
+    (
+        re.compile(
+            r"takes?\s+(?:about\s+)?(\d+)\s*(?:-\s*(\d+))?\s*(?:hour|hr|hours|hrs)", re.IGNORECASE
+        ),
+        "hours",
+    ),
+    (re.compile(r"(\d+)\s*(?:-\s*(\d+))?\s*(?:hour|hr|hours|hrs)", re.IGNORECASE), "hours"),
+    (re.compile(r"(\d+)\s*(?:-\s*(\d+))?\s*(?:day|days)", re.IGNORECASE), "days"),
+    (re.compile(r"weekend\s+project", re.IGNORECASE), "weekend"),
+    (re.compile(r"small\s+task", re.IGNORECASE), "small"),
+    (re.compile(r"quick\s+(?:fix|task|change)", re.IGNORECASE), "quick"),
+]
+
+# Issue type patterns
+_BUG_PATTERNS = [
+    re.compile(
+        r"\b(bug|error|issue|problem|broken|fails?|doesn\'?t work|not working)\b", re.IGNORECASE
+    ),
+    re.compile(r"\b(fix|fixes?|fixed)\b", re.IGNORECASE),
+]
+_FEATURE_PATTERNS = [
+    re.compile(r"\b(feature|add|implement|new functionality|enhancement|improve)\b", re.IGNORECASE),
+    re.compile(r"\b(should|could|would like to|proposal)\b", re.IGNORECASE),
+]
+_DOC_PATTERNS = [
+    re.compile(r"\b(documentation|docs?|readme|guide|tutorial|example)\b", re.IGNORECASE)
+]
+_TEST_PATTERNS = [
+    re.compile(r"\b(test|testing|tests?|coverage|spec|specification)\b", re.IGNORECASE)
+]
+_REFACTOR_PATTERNS = [
+    re.compile(r"\b(refactor|refactoring|cleanup|clean up|restructure|optimize)\b", re.IGNORECASE)
+]
+
+# Label keywords for issue types
+_TYPE_LABELS = {
+    "bug": frozenset(["bug", "bugfix", "bug-fix", "defect", "error"]),
+    "feature": frozenset(["feature", "enhancement", "improvement", "new"]),
+    "documentation": frozenset(["documentation", "docs", "doc", "readme"]),
+    "testing": frozenset(["test", "testing", "tests", "coverage"]),
+    "refactoring": frozenset(["refactor", "refactoring", "cleanup", "clean-up"]),
+}
+
+# Difficulty label keywords
+_BEGINNER_LABELS = frozenset(
+    [
+        "good first issue",
+        "good-first-issue",
+        "beginner",
+        "beginner-friendly",
+        "first-timers-only",
+        "first timer",
+        "easy",
+        "starter",
+    ]
+)
+_INTERMEDIATE_LABELS = frozenset(["intermediate", "medium", "moderate"])
+_ADVANCED_LABELS = frozenset(["advanced", "hard", "difficult", "expert", "complex"])
 
 
 def _clean_text(text: str) -> str:
-    # Remove excessive whitespace and normalize
-
+    """Remove excessive whitespace and normalize."""
     if not text:
         return ""
-    text = re.sub(r'\s+', ' ', text)
-    return text.strip()
+    return _WHITESPACE_PATTERN.sub(" ", text).strip()
 
 
-def find_difficulty(issue: str, labels: List[str]) -> Optional[str]:
-    '''
+def find_difficulty(issue: str, labels: list[str]) -> str | None:
+    """
     Find difficulty level from issue body and labels.
 
-    Returns - 'beginner', 'intermediate', 'advanced', or None
-    '''
-
+    Returns: 'beginner', 'intermediate', 'advanced', or None
+    """
     if not issue and not labels:
         return None
 
-    text_lower = (issue or "").lower()
     labels_lower = [label.lower() for label in labels]
 
-    # Define difficulty keywords
-    beginner_labels = ["good first issue", "good-first-issue", "beginner", "beginner-friendly", 
-                      "first-timers-only", "first timer", "easy", "starter"]
-
-    intermediate_labels = ["intermediate", "medium", "moderate"]
-
-    advanced_labels = ["advanced", "hard", "difficult", "expert", "complex"]
-    
+    # Check labels first (fastest)
     for label in labels_lower:
-        if any(b in label for b in beginner_labels):
+        if any(b in label for b in _BEGINNER_LABELS):
             return "beginner"
-        if any(i in label for i in intermediate_labels):
+        if any(i in label for i in _INTERMEDIATE_LABELS):
             return "intermediate"
-        if any(a in label for a in advanced_labels):
+        if any(a in label for a in _ADVANCED_LABELS):
             return "advanced"
-    
-    # Check issue body text
-    beginner_patterns = [
-        r'\b(beginner|beginner-friendly|good first issue|first timer|starter|easy)\b',
-        r'\bshould take\s+(?:about\s+)?(\d+)\s*(?:hour|hr)',
-        r'\btakes?\s+(?:about\s+)?(\d+)\s*(?:hour|hr)',
-    ]
-    
-    advanced_patterns = [
-        r'\b(advanced|expert|complex|difficult|hard|challenging)\b',
-        r'\b(requires|needs)\s+(?:deep|extensive|significant)\s+(?:knowledge|experience|understanding)',
-    ]
-    
-    for pattern in beginner_patterns:
-        match = re.search(pattern, text_lower)
+
+    # Check issue body patterns
+    text_lower = (issue or "").lower()
+
+    for pattern in _BEGINNER_PATTERNS:
+        match = pattern.search(text_lower)
         if match:
-            # If it mentions hours and it's <= 3 hours, likely beginner
             if match.groups():
                 try:
                     hours = int(match.group(1))
@@ -69,211 +135,160 @@ def find_difficulty(issue: str, labels: List[str]) -> Optional[str]:
                 except (ValueError, IndexError):
                     pass
             return "beginner"
-    
-    for pattern in advanced_patterns:
-        if re.search(pattern, text_lower):
+
+    for pattern in _ADVANCED_PATTERNS:
+        if pattern.search(text_lower):
             return "advanced"
-    
-    # Default to intermediate if unclear
+
     return "intermediate"
 
 
 def find_technologies(
-    issue: str,
-    repo_languages: Optional[Dict[str, int]] = None,
-    repo_topics: Optional[List[str]] = None
-) -> List[Tuple[str, Optional[str]]]:
-    '''
+    issue: str, repo_languages: dict[str, int] | None = None, repo_topics: list[str] | None = None
+) -> list[tuple[str, str | None]]:
+    """
     Find technologies from issue body, repo languages, and topics.
 
-    Returns - List of (technology, category) tuples
-    '''
+    Returns: List of (technology, category) tuples
+    """
+    technologies: list[tuple[str, str | None]] = []
+    seen: set = set()
 
-    technologies = []
-
-    # Extract from issue body using skill_extractor
+    # Extract from issue body
     if issue:
         _, skills, _ = analyze_job_text(issue)
-        technologies.extend(skills)
-    
+        for tech, category in skills:  # type: ignore[assignment]
+            key = (tech.lower(), category)
+            if key not in seen:
+                seen.add(key)
+                technologies.append((tech, category))
+
     # Extract from repo languages
     if repo_languages:
-        for lang in repo_languages.keys():
-            # Normalize language name
+        for lang in repo_languages:  # type: ignore[assignment]
             lang_lower = lang.lower()
-            # Check if it matches any skill category
-            for category, skills in SKILL_CATEGORIES.items():
-                if lang_lower in [s.lower() for s in skills]:
-                    if (lang, category) not in technologies:
-                        technologies.append((lang, category))
+            category = None
+            for cat, category_skills in SKILL_CATEGORIES.items():
+                if lang_lower in [s.lower() for s in category_skills]:
+                    category = cat
                     break
-            else:
-                # Add as uncategorized
-                if (lang, None) not in technologies:
-                    technologies.append((lang, None))
-    
+
+            key = (lang_lower, category)
+            if key not in seen:
+                seen.add(key)
+                technologies.append((lang, category))
+
     # Extract from repo topics
     if repo_topics:
-        for topic in repo_topics:
+        for topic in repo_topics:  # type: ignore[assignment]
             topic_lower = topic.lower()
-            # Check if topic matches any skill
-            for category, skills in SKILL_CATEGORIES.items():
-                if topic_lower in [s.lower() for s in skills]:
-                    if (topic, category) not in technologies:
-                        technologies.append((topic, category))
+            for cat, category_skills in SKILL_CATEGORIES.items():
+                if topic_lower in [s.lower() for s in category_skills]:
+                    key = (topic_lower, cat)
+                    if key not in seen:
+                        seen.add(key)
+                        technologies.append((topic, cat))
                     break
-    
+
     return technologies
 
 
-def categorize_technologies(technologies: List[Tuple[str, Optional[str]]]) -> Dict[str, List[str]]:
-    '''
-    Group technologies by category.
-    
-    Returns:
-        Dictionary mapping category to list of technologies
-    '''
+def categorize_technologies(technologies: list[tuple[str, str | None]]) -> dict[str, list[str]]:
+    """Group technologies by category."""
+    categorized: dict[str, list[str]] = {}
 
-    categorized = {}
     for tech, category in technologies:
-        if category:
-            if category not in categorized:
-                categorized[category] = []
-            if tech not in categorized[category]:
-                categorized[category].append(tech)
-        else:
-            # Uncategorized
-            if "uncategorized" not in categorized:
-                categorized["uncategorized"] = []
-            if tech not in categorized["uncategorized"]:
-                categorized["uncategorized"].append(tech)
+        cat_key = category or "uncategorized"
+        if cat_key not in categorized:
+            categorized[cat_key] = []
+        if tech not in categorized[cat_key]:
+            categorized[cat_key].append(tech)
+
     return categorized
 
 
-def find_time_estimate(issue: str) -> Optional[str]:
-    '''
+def find_time_estimate(issue: str) -> str | None:
+    """
     Find time estimate from issue body.
 
-    Returns - Time estimate string (e.g., "2-3 hours", "1 day", "weekend project") or None
-    '''
-
+    Returns: Time estimate string or None
+    """
     if not issue:
         return None
 
     text_lower = issue.lower()
-    
-    # Patterns for time estimates
-    patterns = [
-        (r'should take\s+(?:about\s+)?(\d+)\s*(?:-\s*(\d+))?\s*(?:hour|hr|hours|hrs)', 'hours'),
-        (r'takes?\s+(?:about\s+)?(\d+)\s*(?:-\s*(\d+))?\s*(?:hour|hr|hours|hrs)', 'hours'),
-        (r'(\d+)\s*(?:-\s*(\d+))?\s*(?:hour|hr|hours|hrs)', 'hours'),
-        (r'(\d+)\s*(?:-\s*(\d+))?\s*(?:day|days)', 'days'),
-        (r'weekend\s+project', 'weekend'),
-        (r'small\s+task', 'small'),
-        (r'quick\s+(?:fix|task|change)', 'quick'),
-    ]
-    
-    for pattern, unit in patterns:
-        match = re.search(pattern, text_lower)
+
+    for pattern, unit in _TIME_PATTERNS:
+        match = pattern.search(text_lower)
         if match:
-            if unit == 'hours':
-                if match.group(2):
-                    return f"{match.group(1)}-{match.group(2)} hours"
-                else:
-                    return f"{match.group(1)} hour{'s' if int(match.group(1)) != 1 else ''}"
-            elif unit == 'days':
-                if match.group(2):
-                    return f"{match.group(1)}-{match.group(2)} days"
-                else:
-                    return f"{match.group(1)} day{'s' if int(match.group(1)) != 1 else ''}"
-            elif unit == 'weekend':
+            if unit == "hours":
+                n1 = match.group(1)
+                n2 = match.group(2) if len(match.groups()) > 1 else None
+                if n2:
+                    return f"{n1}-{n2} hours"
+                return f"{n1} hour{'s' if int(n1) != 1 else ''}"
+            elif unit == "days":
+                n1 = match.group(1)
+                n2 = match.group(2) if len(match.groups()) > 1 else None
+                if n2:
+                    return f"{n1}-{n2} days"
+                return f"{n1} day{'s' if int(n1) != 1 else ''}"
+            elif unit == "weekend":
                 return "weekend project"
-            elif unit == 'small':
+            elif unit == "small":
                 return "small task"
-            elif unit == 'quick':
+            elif unit == "quick":
                 return "quick task"
-    
+
     return None
 
 
-def classify_issue_type(issue: str, labels: List[str]) -> Optional[str]:
-    '''
+def classify_issue_type(issue: str, labels: list[str]) -> str | None:
+    """
     Classify issue type.
 
-    Returns - 'bug', 'feature', 'documentation', 'testing', 'refactoring', or None
-    '''
-
+    Returns: 'bug', 'feature', 'documentation', 'testing', 'refactoring', or None
+    """
     if not issue and not labels:
         return None
 
-    text_lower = (issue or "").lower()
     labels_lower = [label.lower() for label in labels]
-    
-    # Check labels first
-    type_labels = {
-        'bug': ['bug', 'bugfix', 'bug-fix', 'defect', 'error'],
-        'feature': ['feature', 'enhancement', 'improvement', 'new'],
-        'documentation': ['documentation', 'docs', 'doc', 'readme'],
-        'testing': ['test', 'testing', 'tests', 'coverage'],
-        'refactoring': ['refactor', 'refactoring', 'cleanup', 'clean-up'],
-    }
-    
-    for issue_type, keywords in type_labels.items():
+
+    # Check labels first (fastest)
+    for issue_type, keywords in _TYPE_LABELS.items():
         for label in labels_lower:
             if any(kw in label for kw in keywords):
                 return issue_type
-    
-    # Check issue body text
-    bug_patterns = [
-        r'\b(bug|error|issue|problem|broken|fails?|doesn\'?t work|not working)\b',
-        r'\b(fix|fixes?|fixed)\b',
-    ]
-    
-    feature_patterns = [
-        r'\b(feature|add|implement|new functionality|enhancement|improve)\b',
-        r'\b(should|could|would like to|proposal)\b',
-    ]
-    
-    doc_patterns = [
-        r'\b(documentation|docs?|readme|guide|tutorial|example)\b',
-    ]
-    
-    test_patterns = [
-        r'\b(test|testing|tests?|coverage|spec|specification)\b',
-    ]
-    
-    refactor_patterns = [
-        r'\b(refactor|refactoring|cleanup|clean up|restructure|optimize)\b',
-    ]
-    
-    if any(re.search(p, text_lower) for p in bug_patterns):
+
+    # Check issue body patterns
+    text_lower = (issue or "").lower()
+
+    if any(p.search(text_lower) for p in _BUG_PATTERNS):
         return "bug"
-    if any(re.search(p, text_lower) for p in feature_patterns):
+    if any(p.search(text_lower) for p in _FEATURE_PATTERNS):
         return "feature"
-    if any(re.search(p, text_lower) for p in doc_patterns):
+    if any(p.search(text_lower) for p in _DOC_PATTERNS):
         return "documentation"
-    if any(re.search(p, text_lower) for p in test_patterns):
+    if any(p.search(text_lower) for p in _TEST_PATTERNS):
         return "testing"
-    if any(re.search(p, text_lower) for p in refactor_patterns):
+    if any(p.search(text_lower) for p in _REFACTOR_PATTERNS):
         return "refactoring"
-    
+
     return None
 
 
-def parse_issue(issue_data: Dict, repo_metadata: Optional[Dict] = None) -> Dict:
-    '''
+def parse_issue(issue_data: dict, repo_metadata: dict | None = None) -> dict:
+    """
     Parse a GitHub issue and extract structured information.
 
-    Returns - Dictionary with parsed issue data
-    '''
-
+    Returns: Dictionary with parsed issue data
+    """
     issue_body = issue_data.get("body", "") or ""
     labels = [label.get("name", "") for label in issue_data.get("labels", [])]
 
     # Extract repo info from issue URL
     repo_url = issue_data.get("repository_url", "")
-    repo_owner = None
-    repo_name = None
+    repo_owner, repo_name = None, None
     if repo_url:
         parts = repo_url.replace("https://api.github.com/repos/", "").split("/")
         if len(parts) >= 2:
@@ -281,8 +296,15 @@ def parse_issue(issue_data: Dict, repo_metadata: Optional[Dict] = None) -> Dict:
 
     # Get repo metadata if not provided
     if repo_metadata is None and repo_owner and repo_name:
-        from core.database import get_repo_metadata
-        repo_metadata = get_repo_metadata(repo_owner, repo_name)
+        from core.db import db
+        from core.repositories import RepoMetadataRepository
+
+        if db.is_initialized:
+            with db.session() as session:
+                repo_repo = RepoMetadataRepository(session)
+                cached = repo_repo.get(repo_owner, repo_name)
+                if cached:
+                    repo_metadata = cached.to_dict()
 
     repo_languages = repo_metadata.get("languages", {}) if repo_metadata else {}
     repo_topics = repo_metadata.get("topics", []) if repo_metadata else []
@@ -292,29 +314,29 @@ def parse_issue(issue_data: Dict, repo_metadata: Optional[Dict] = None) -> Dict:
     technologies = find_technologies(issue_body, repo_languages, repo_topics)
     time_estimate = find_time_estimate(issue_body)
     issue_type = classify_issue_type(issue_body, labels)
-    
+
     # Get repo stats
     repo_stars = repo_metadata.get("stars") if repo_metadata else None
     repo_forks = repo_metadata.get("forks") if repo_metadata else None
     last_commit_date = repo_metadata.get("last_commit_date") if repo_metadata else None
     contributor_count = repo_metadata.get("contributor_count") if repo_metadata else None
-    
+
     # Check if repo is active (recent commits within last 6 months)
     is_active = 1
     if last_commit_date:
         try:
-            commit_date = datetime.fromisoformat(last_commit_date.replace('Z', '+00:00'))
+            commit_date = datetime.fromisoformat(last_commit_date.replace("Z", "+00:00"))
             six_months_ago = datetime.now(commit_date.tzinfo) - timedelta(days=180)
             if commit_date < six_months_ago:
                 is_active = 0
         except (ValueError, AttributeError):
             pass
-    
+
     # Build full repo URL
-    full_repo_url = None
-    if repo_owner and repo_name:
-        full_repo_url = f"https://github.com/{repo_owner}/{repo_name}"
-    
+    full_repo_url = (
+        f"https://github.com/{repo_owner}/{repo_name}" if repo_owner and repo_name else None
+    )
+
     return {
         "title": issue_data.get("title", ""),
         "url": issue_data.get("html_url", ""),
@@ -336,4 +358,3 @@ def parse_issue(issue_data: Dict, repo_metadata: Optional[Dict] = None) -> Dict:
         "is_active": is_active,
         "updated_at": issue_data.get("updated_at"),
     }
-

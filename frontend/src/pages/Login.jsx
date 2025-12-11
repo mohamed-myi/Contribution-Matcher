@@ -30,11 +30,11 @@ export function Login() {
       <Card variant="glass" padding="lg" className="login-card animate-slide-up">
         <div className="login-header">
           <div className="login-logo">
-            <span className="login-logo-icon">◈</span>
+            <span className="login-logo-icon">MYI</span>
           </div>
-          <h1 className="login-title">Contribution Matcher</h1>
+          <h1 className="login-title">IssueIndex</h1>
           <p className="login-subtitle">
-            Find open source issues that match your skills
+            Find open source repositories to contribute your skills!
           </p>
         </div>
 

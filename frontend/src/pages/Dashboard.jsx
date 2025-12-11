@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, useCallback, memo } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
-import { Card, CardHeader, CardBody, Button, Badge, ScoreBadge, DifficultyBadge, PageLoader } from '../components/common';
+import { Card, CardHeader, CardBody, Button, Badge, ScoreBadge, DifficultyBadge, PageLoader, SkeletonStatsCard, SkeletonRow, SkeletonList } from '../components/common';
 import { api } from '../api/client';
 import './Dashboard.css';
 
@@ -11,18 +11,20 @@ const PROGRAMMING_LANGUAGES = [
 ];
 
 export function Dashboard() {
+  const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [topMatches, setTopMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [discovering, setDiscovering] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState('');
+  
+  // Bookmarks modal state
+  const [showBookmarksModal, setShowBookmarksModal] = useState(false);
+  const [bookmarkedIssues, setBookmarkedIssues] = useState([]);
+  const [loadingBookmarks, setLoadingBookmarks] = useState(false);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
       const [statsRes, matchesRes] = await Promise.all([
@@ -38,9 +40,13 @@ export function Dashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const handleDiscoverIssues = async () => {
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
+
+  const handleDiscoverIssues = useCallback(async () => {
     try {
       setDiscovering(true);
       // Don't pass labels - let backend choose based on user's experience level
@@ -57,15 +63,42 @@ export function Dashboard() {
     } finally {
       setDiscovering(false);
     }
-  };
+  }, [selectedLanguage, fetchDashboardData]);
 
-  if (loading) {
-    return (
-      <Layout>
-        <PageLoader message="Loading dashboard..." />
-      </Layout>
-    );
-  }
+  const handleOpenBookmarks = useCallback(async () => {
+    // Only open modal if there are bookmarks
+    if (!stats?.bookmarked || stats.bookmarked === 0) {
+      return;
+    }
+    
+    setShowBookmarksModal(true);
+    setLoadingBookmarks(true);
+    
+    try {
+      const response = await api.getBookmarks();
+      setBookmarkedIssues(response.data.issues || []);
+    } catch (err) {
+      console.error('Failed to fetch bookmarks:', err);
+    } finally {
+      setLoadingBookmarks(false);
+    }
+  }, [stats?.bookmarked]);
+
+  const handleCloseBookmarksModal = useCallback(() => {
+    setShowBookmarksModal(false);
+  }, []);
+
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (showBookmarksModal) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [showBookmarksModal]);
 
   return (
     <Layout>
@@ -80,6 +113,7 @@ export function Dashboard() {
               className="language-select"
               value={selectedLanguage}
               onChange={(e) => setSelectedLanguage(e.target.value)}
+              disabled={loading}
             >
               <option value="">All Languages</option>
               {PROGRAMMING_LANGUAGES.map(lang => (
@@ -90,6 +124,7 @@ export function Dashboard() {
               variant="primary" 
               onClick={handleDiscoverIssues}
               loading={discovering}
+              disabled={loading}
             >
               Discover Issues
             </Button>
@@ -107,26 +142,45 @@ export function Dashboard() {
 
         {/* Stats Grid */}
         <div className="dashboard-stats">
-          <StatsCard
-            title="Total Issues"
-            value={stats?.total || 0}
-            delay={1}
-          />
-          <StatsCard
-            title="Bookmarked"
-            value={stats?.bookmarked || 0}
-            delay={2}
-          />
-          <StatsCard
-            title="Labeled"
-            value={stats?.labeled || 0}
-            delay={3}
-          />
-          <StatsCard
-            title="Top Score"
-            value={stats?.top_score ? `${Math.round(stats.top_score)}%` : 'N/A'}
-            delay={4}
-          />
+          {loading ? (
+            <>
+              <SkeletonStatsCard />
+              <SkeletonStatsCard />
+              <SkeletonStatsCard />
+              <SkeletonStatsCard />
+            </>
+          ) : (
+            <>
+              <StatsCard
+                title="Total Issues"
+                value={stats?.total || 0}
+                delay={1}
+                onClick={() => navigate('/issues')}
+                variant="clickable"
+              />
+              <StatsCard
+                title="Bookmarked"
+                value={stats?.bookmarked || 0}
+                delay={2}
+                onClick={handleOpenBookmarks}
+                variant={stats?.bookmarked > 0 ? "clickable" : "empty"}
+                emptyMessage="No bookmarks"
+              />
+              <StatsCard
+                title="Labeled"
+                value={stats?.labeled || 0}
+                delay={3}
+                onClick={() => navigate('/algorithm-improvement/labeled')}
+                variant="clickable"
+              />
+              <StatsCard
+                title="Top Score"
+                value={stats?.top_score ? `${Math.round(stats.top_score)}%` : 'N/A'}
+                delay={4}
+                variant="static"
+              />
+            </>
+          )}
         </div>
 
         {/* Main Content Grid */}
@@ -138,7 +192,9 @@ export function Dashboard() {
               <Link to="/issues" className="dashboard-card-link">View All</Link>
             </CardHeader>
             <CardBody>
-              {topMatches.length === 0 ? (
+              {loading ? (
+                <SkeletonList count={5} type="row" />
+              ) : topMatches.length === 0 ? (
                 <div className="dashboard-empty">
                   <p>No matched issues yet</p>
                   <Button variant="outline" size="sm" onClick={handleDiscoverIssues}>
@@ -168,8 +224,8 @@ export function Dashboard() {
                 <Link to="/profile" className="quick-action-card">
                   <span className="quick-action-label">Edit Profile</span>
                 </Link>
-                <Link to="/ml-training" className="quick-action-card">
-                  <span className="quick-action-label">Train Model</span>
+                <Link to="/algorithm-improvement" className="quick-action-card">
+                  <span className="quick-action-label">Improve Algorithm</span>
                 </Link>
                 <Link to="/issues?bookmarked=true" className="quick-action-card">
                   <span className="quick-action-label">Bookmarks</span>
@@ -207,26 +263,132 @@ export function Dashboard() {
             </CardBody>
           </Card>
         </div>
+
+        {/* Bookmarks Modal */}
+        {showBookmarksModal && (
+          <BookmarksModal
+            isOpen={showBookmarksModal}
+            onClose={handleCloseBookmarksModal}
+            issues={bookmarkedIssues}
+            loading={loadingBookmarks}
+          />
+        )}
       </div>
     </Layout>
   );
 }
 
-function StatsCard({ title, value, delay }) {
+// Bookmarks Modal Component
+const BookmarksModal = memo(function BookmarksModal({ isOpen, onClose, issues, loading }) {
+  if (!isOpen) return null;
+
   return (
-    <Card hover className={`stats-card animate-slide-up stagger-${delay}`}>
+    <div className="bookmarks-modal-overlay" onClick={onClose}>
+      <div className="bookmarks-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="bookmarks-modal-header">
+          <h2>Bookmarked Issues</h2>
+          <button className="bookmarks-modal-close" onClick={onClose}>
+            ×
+          </button>
+        </div>
+        
+        <div className="bookmarks-modal-content">
+          {loading ? (
+            <div className="bookmarks-modal-loading">
+              <span>Loading bookmarks...</span>
+            </div>
+          ) : issues.length === 0 ? (
+            <div className="bookmarks-modal-empty">
+              <p>You have no bookmarked issues.</p>
+            </div>
+          ) : (
+            <div className="bookmarks-modal-list">
+              {issues.map((issue) => (
+                <div key={issue.id} className="bookmarks-modal-item">
+                  <div className="bookmarks-item-info">
+                    <div className="bookmarks-item-header">
+                      <DifficultyBadge difficulty={issue.difficulty} size="sm" />
+                      <span className="bookmarks-item-stars">
+                        {issue.repo_stars?.toLocaleString() || 0} stars
+                      </span>
+                    </div>
+                    <h4 className="bookmarks-item-title">{issue.title}</h4>
+                    <p className="bookmarks-item-description">
+                      {issue.description 
+                        ? (issue.description.length > 150 
+                            ? issue.description.substring(0, 150) + '...' 
+                            : issue.description)
+                        : 'No description available'}
+                    </p>
+                  </div>
+                  <div className="bookmarks-item-actions">
+                    <a
+                      href={issue.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="bookmarks-item-btn bookmarks-item-github-btn"
+                    >
+                      Open in GitHub
+                    </a>
+                    <Link 
+                      to={`/issues/${issue.id}`} 
+                      className="bookmarks-item-btn bookmarks-item-view-btn"
+                      onClick={onClose}
+                    >
+                      View Issue
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+});
+
+const StatsCard = memo(function StatsCard({ title, value, delay, onClick, variant = "static", emptyMessage }) {
+  const isClickable = variant === "clickable" || (variant === "empty" && value > 0);
+  const isStatic = variant === "static";
+  const isEmpty = variant === "empty" && value === 0;
+  
+  const cardClasses = [
+    'stats-card',
+    `animate-slide-up`,
+    `stagger-${delay}`,
+    isClickable ? 'stats-card-clickable' : '',
+    isStatic ? 'stats-card-static' : '',
+    isEmpty ? 'stats-card-empty' : '',
+  ].filter(Boolean).join(' ');
+
+  const handleClick = () => {
+    if (isClickable && onClick) {
+      onClick();
+    }
+  };
+
+  return (
+    <Card 
+      hover={isClickable} 
+      className={cardClasses}
+      onClick={handleClick}
+    >
       <div className="stats-card-content">
         <span className="stats-card-bullet">•</span>
         <div className="stats-card-info">
           <span className="stats-card-value">{value}</span>
           <span className="stats-card-title">{title}</span>
+          {isEmpty && emptyMessage && (
+            <span className="stats-card-empty-message">{emptyMessage}</span>
+          )}
         </div>
       </div>
     </Card>
   );
-}
+});
 
-function IssueRow({ issue }) {
+const IssueRow = memo(function IssueRow({ issue }) {
   return (
     <Link to={`/issues/${issue.id}`} className="issue-row">
       <div className="issue-row-main">
@@ -239,9 +401,9 @@ function IssueRow({ issue }) {
       </div>
     </Link>
   );
-}
+});
 
-function DifficultyBar({ label, count, total, variant }) {
+const DifficultyBar = memo(function DifficultyBar({ label, count, total, variant }) {
   const percentage = total > 0 ? (count / total) * 100 : 0;
   
   return (
@@ -258,7 +420,7 @@ function DifficultyBar({ label, count, total, variant }) {
       </div>
     </div>
   );
-}
+});
 
 export default Dashboard;
 

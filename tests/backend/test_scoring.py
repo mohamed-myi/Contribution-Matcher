@@ -43,7 +43,7 @@ def test_top_matches_returns_scores(authorized_client):
     session.commit()
     session.close()
 
-    resp = client.get("/api/scoring/top-matches", headers={"Authorization": "Bearer fake"})
+    resp = client.get("/api/v1/scoring/top-matches", headers={"Authorization": "Bearer fake"})
     assert resp.status_code == 200, resp.text
     data = resp.json()
     assert "issues" in data
@@ -76,7 +76,7 @@ def test_score_single_issue(authorized_client):
     session.commit()
     session.close()
 
-    resp = client.get(f"/api/scoring/{issue_id}", headers={"Authorization": "Bearer fake"})
+    resp = client.get(f"/api/v1/scoring/{issue_id}", headers={"Authorization": "Bearer fake"})
     assert resp.status_code == 200
     body = resp.json()
     assert body["issue_id"] == issue_id

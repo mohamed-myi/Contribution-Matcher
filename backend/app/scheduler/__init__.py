@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any
 
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -33,6 +33,10 @@ JOB_DEFINITIONS = {
     "train_ml": {
         "func": jobs.run_ml_training_job,
         "description": "Train ML model for all users",
+    },
+    "cleanup_blacklist": {
+        "func": jobs.run_token_blacklist_cleanup,
+        "description": "Clean up expired tokens from blacklist (security maintenance)",
     },
 }
 
@@ -76,6 +80,14 @@ def schedule_default_jobs() -> None:
         replace_existing=True,
         misfire_grace_time=300,
     )
+    # Security maintenance: clean up expired blacklisted tokens hourly
+    scheduler.add_job(
+        jobs.run_token_blacklist_cleanup,
+        _cron("0 * * * *"),  # Every hour at minute 0
+        id="cleanup_blacklist",
+        replace_existing=True,
+        misfire_grace_time=600,  # 10 minute grace period
+    )
 
 
 def start_scheduler() -> None:
@@ -92,7 +104,7 @@ def shutdown_scheduler() -> None:
         logger.info("Scheduler shut down")
 
 
-def list_jobs() -> List[Dict[str, Any]]:
+def list_jobs() -> list[dict[str, Any]]:
     items = []
     for job in scheduler.get_jobs():
         items.append(
@@ -122,4 +134,3 @@ def trigger_job(job_id: str, **kwargs) -> None:
 def reschedule_job(job_id: str, cron: str) -> None:
     trigger = _cron(cron)
     scheduler.reschedule_job(job_id, trigger=trigger)
-

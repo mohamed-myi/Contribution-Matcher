@@ -1,143 +1,230 @@
 """
-Feature caching for issue/profile combinations.
+Feature cache service for computing and caching issue scoring breakdowns.
+
+Provides:
+- Score breakdown computation for issues
+- Feature extraction for ML training
+- Caching layer for expensive computations
 """
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Dict, List, Tuple
+from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from ..models import DevProfile, Issue, IssueFeatureCache, User
-from . import matching_service
+from core.scoring.issue_scorer import get_match_breakdown
+from core.scoring.ml_trainer import extract_base_features
+
+from ..models import DevProfile, Issue, User
+from . import profile_service
+
+# Default model directory for user ML models
+DEFAULT_MODEL_DIR = Path("models/users")
 
 
 @dataclass
-class BreakdownResult:
-    """Internal breakdown result with individual score components."""
-    issue_id: int
-    total_score: float
-    skill_match: float
-    experience_match: float
-    repo_quality: float
-    freshness: float
-    time_match: float
-    interest_match: float
-    ml_adjustment: float = 0.0
+class ScoreBreakdown:
+    """Score breakdown result with component scores."""
 
-    def to_dict(self) -> Dict[str, float]:
+    skill_match_pct: float
+    experience_score: float
+    repo_quality_score: float
+    freshness_score: float
+    time_match_score: float
+    interest_match_score: float
+    total_score: float
+    raw_breakdown: dict
+
+    def to_dict(self) -> dict:
+        """Convert breakdown to dictionary representation."""
         return {
-            "skill_match": self.skill_match,
-            "experience_match": self.experience_match,
-            "repo_quality": self.repo_quality,
-            "freshness": self.freshness,
-            "time_match": self.time_match,
-            "interest_match": self.interest_match,
-            "ml_adjustment": self.ml_adjustment,
+            "skill_match_pct": self.skill_match_pct,
+            "experience_score": self.experience_score,
+            "repo_quality_score": self.repo_quality_score,
+            "freshness_score": self.freshness_score,
+            "time_match_score": self.time_match_score,
+            "interest_match_score": self.interest_match_score,
+            "total_score": self.total_score,
+            **self.raw_breakdown,
         }
 
 
-def _breakdown_from_cache(issue: Issue, cache: IssueFeatureCache) -> BreakdownResult:
-    return BreakdownResult(
-        issue_id=issue.id,
-        total_score=cache.total_score or 0,
-        skill_match=cache.skill_match_pct or 0,
-        experience_match=cache.experience_score or 0,
-        repo_quality=cache.repo_quality_score or 0,
-        freshness=cache.freshness_score or 0,
-        time_match=cache.time_match_score or 0,
-        interest_match=cache.interest_match_score or 0,
-        ml_adjustment=0.0,
-    )
+def get_model_dir() -> Path:
+    """
+    Get the directory path for storing user ML models.
+
+    Creates the directory if it doesn't exist.
+
+    Returns:
+        Path to the model directory.
+    """
+    model_dir = DEFAULT_MODEL_DIR
+    model_dir.mkdir(parents=True, exist_ok=True)
+    return model_dir
 
 
-def _feature_vector_from_cache(cache: IssueFeatureCache) -> List[float]:
-    if not cache.feature_vector:
-        return []
-    if isinstance(cache.feature_vector, list):
-        return [float(x) for x in cache.feature_vector]
-    return [float(x) for x in json.loads(cache.feature_vector)]
+def _profile_to_dict(profile: DevProfile | None) -> dict:
+    """
+    Convert a DevProfile to a dictionary format suitable for scoring.
 
+    Args:
+        profile: DevProfile ORM object or None.
 
-def _store_cache(
-    db: Session,
-    issue: Issue,
-    profile: DevProfile,
-    breakdown: BreakdownResult,
-    feature_vector: List[float],
-) -> None:
-    cache = (
-        db.query(IssueFeatureCache)
-        .filter(IssueFeatureCache.issue_id == issue.id)
-        .one_or_none()
-    )
-    data = {
-        "issue_id": issue.id,
-        "profile_updated_at": profile.updated_at,
-        "issue_updated_at": issue.updated_at,
-        "computed_at": datetime.utcnow(),
-        "skill_match_pct": breakdown.skill_match,
-        "experience_score": breakdown.experience_match,
-        "repo_quality_score": breakdown.repo_quality,
-        "freshness_score": breakdown.freshness,
-        "time_match_score": breakdown.time_match,
-        "interest_match_score": breakdown.interest_match,
-        "total_score": breakdown.total_score,
-        "feature_vector": feature_vector,
+    Returns:
+        Dictionary with profile data for scoring functions.
+    """
+    if not profile:
+        return {
+            "skills": [],
+            "experience_level": "intermediate",
+            "interests": [],
+            "time_availability_hours_per_week": 10,
+        }
+
+    return {
+        "skills": profile.skills or [],
+        "experience_level": profile.experience_level or "intermediate",
+        "interests": profile.interests or [],
+        "time_availability_hours_per_week": profile.time_availability_hours_per_week or 10,
+        "preferred_languages": profile.preferred_languages or [],
     }
-    if cache:
-        for key, value in data.items():
-            setattr(cache, key, value)
-    else:
-        cache = IssueFeatureCache(**data)
-        db.add(cache)
-    db.commit()
+
+
+def _issue_to_dict(issue: Issue) -> dict:
+    """
+    Convert an Issue ORM object to a dictionary format suitable for scoring.
+
+    Args:
+        issue: Issue ORM object.
+
+    Returns:
+        Dictionary with issue data for scoring functions.
+    """
+    return {
+        "id": issue.id,
+        "title": issue.title,
+        "body": issue.body,
+        "url": issue.url,
+        "repo_owner": issue.repo_owner,
+        "repo_name": issue.repo_name,
+        "repo_url": issue.repo_url,
+        "difficulty": issue.difficulty,
+        "issue_type": issue.issue_type,
+        "time_estimate": issue.time_estimate,
+        "labels": issue.labels or [],
+        "repo_stars": issue.repo_stars,
+        "repo_forks": issue.repo_forks,
+        "repo_languages": issue.repo_languages,
+        "repo_topics": issue.repo_topics or [],
+        "last_commit_date": issue.last_commit_date,
+        "contributor_count": issue.contributor_count,
+        "is_active": issue.is_active,
+        "created_at": issue.created_at,
+        "updated_at": issue.updated_at,
+    }
 
 
 def get_breakdown_and_features(
     db: Session,
     user: User,
     issue: Issue,
-) -> Tuple[BreakdownResult, List[float]]:
-    profile = matching_service.ensure_profile(db, user)
-    cache = (
-        db.query(IssueFeatureCache)
-        .filter(IssueFeatureCache.issue_id == issue.id)
-        .one_or_none()
-    )
-    cache_valid = False
-    if cache:
-        profile_fresh = (
-            not profile.updated_at
-            or not cache.profile_updated_at
-            or cache.profile_updated_at >= profile.updated_at
-        )
-        issue_fresh = (
-            not issue.updated_at
-            or not cache.issue_updated_at
-            or cache.issue_updated_at >= issue.updated_at
-        )
-        cache_valid = profile_fresh and issue_fresh
+) -> tuple[ScoreBreakdown, list[float]]:
+    """
+    Compute score breakdown and ML features for an issue.
 
-    if cache and cache_valid:
-        breakdown = _breakdown_from_cache(issue, cache)
-        features = _feature_vector_from_cache(cache)
-        return breakdown, features
+    This function:
+    1. Loads the user's profile
+    2. Computes the match breakdown between profile and issue
+    3. Extracts numerical features for ML training
 
-    breakdown_dict, feature_vector = matching_service.compute_breakdown_and_features(issue, profile)
-    breakdown = BreakdownResult(
-        issue_id=issue.id,
-        total_score=breakdown_dict["total_score"],
-        skill_match=breakdown_dict["skill_match_pct"],
-        experience_match=breakdown_dict["experience_score"],
-        repo_quality=breakdown_dict["repo_quality_score"],
-        freshness=breakdown_dict["freshness_score"],
-        time_match=breakdown_dict["time_match_score"],
-        interest_match=breakdown_dict["interest_match_score"],
-        ml_adjustment=0.0,
+    Args:
+        db: Database session.
+        user: User for whom to compute the score.
+        issue: Issue to score.
+
+    Returns:
+        Tuple of (ScoreBreakdown, feature_list) where feature_list is suitable
+        for ML model training.
+    """
+    # Get user's profile
+    profile = profile_service.get_profile(db, user)
+    profile_dict = _profile_to_dict(profile)
+
+    # Convert issue to dict for scoring functions
+    issue_dict = _issue_to_dict(issue)
+
+    # Compute match breakdown
+    try:
+        raw_breakdown = get_match_breakdown(profile_dict, issue_dict, session=db)
+    except Exception:
+        raise
+
+    # Extract component scores
+    skills = raw_breakdown.get("skills", {})
+    skill_match_pct = skills.get("match_percentage", 0.0)
+
+    experience = raw_breakdown.get("experience", {})
+    experience_score = experience.get("score", 0.0)
+
+    repo_quality = raw_breakdown.get("repo_quality", {})
+    repo_quality_score = repo_quality.get("score", 0.0)
+
+    freshness = raw_breakdown.get("freshness", {})
+    freshness_score = freshness.get("score", 0.0)
+
+    time_match = raw_breakdown.get("time_match", {})
+    time_match_score = time_match.get("score", 0.0)
+
+    interest_match = raw_breakdown.get("interest_match", {})
+    interest_match_score = interest_match.get("score", 0.0)
+
+    # Compute total score using weights from constants
+    from core.constants import (
+        SKILL_MATCH_WEIGHT,
     )
-    _store_cache(db, issue, profile, breakdown, feature_vector)
-    return breakdown, feature_vector
+
+    skill_weighted = (skill_match_pct / 100.0) * SKILL_MATCH_WEIGHT
+    total_score = (
+        skill_weighted
+        + experience_score
+        + repo_quality_score
+        + freshness_score
+        + time_match_score
+        + interest_match_score
+    )
+
+    breakdown = ScoreBreakdown(
+        skill_match_pct=skill_match_pct,
+        experience_score=experience_score,
+        repo_quality_score=repo_quality_score,
+        freshness_score=freshness_score,
+        time_match_score=time_match_score,
+        interest_match_score=interest_match_score,
+        total_score=total_score,
+        raw_breakdown=raw_breakdown,
+    )
+
+    # Extract features for ML training
+    try:
+        features = extract_base_features(issue_dict, profile_dict, session=db)
+    except Exception:
+        raise
+
+    return breakdown, features
+
+
+def invalidate_cache(user_id: int, issue_id: int | None = None) -> None:
+    """
+    Invalidate cached scores for a user or specific issue.
+
+    This is a placeholder for future Redis-based caching.
+    Currently a no-op since we compute on demand.
+
+    Args:
+        user_id: User ID to invalidate cache for.
+        issue_id: Optional specific issue ID to invalidate.
+    """
+    # TODO: Implement Redis-based cache invalidation when caching is added
+    pass

@@ -5,11 +5,18 @@ Provides:
 - Token encryption (Fernet)
 - Configuration validation
 - Rate limiting
+- Account lockout protection
 """
 
 from .encryption import TokenEncryption, get_encryption_service
-from .validation import validate_security_config, SecurityConfigError
-from .rate_limiter import RateLimiter, get_rate_limiter
+from .rate_limiter import (
+    AccountLockout,
+    LockoutResult,
+    RateLimiter,
+    get_account_lockout,
+    get_rate_limiter,
+)
+from .validation import SecurityConfigError, validate_security_config
 
 __all__ = [
     "TokenEncryption",
@@ -18,4 +25,7 @@ __all__ = [
     "SecurityConfigError",
     "RateLimiter",
     "get_rate_limiter",
+    "AccountLockout",
+    "get_account_lockout",
+    "LockoutResult",
 ]

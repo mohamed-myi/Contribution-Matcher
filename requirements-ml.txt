@@ -1,0 +1,12 @@
+# Heavy ML dependencies (optional)
+# Install with: pip install -r requirements-ml.txt
+#
+# These packages are large (~3GB total) and only needed for:
+# - Advanced text embeddings (sentence-transformers)
+# - XGBoost/LightGBM model training
+# - Hyperparameter optimization
+
+xgboost>=2.0.0
+lightgbm>=4.0.0
+scikit-optimize>=0.9.0
+sentence-transformers>=2.2.0

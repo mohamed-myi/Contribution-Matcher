@@ -66,11 +66,18 @@ describe('AuthContext', () => {
 
   describe('initial state', () => {
     it('starts with loading true', async () => {
-      // Clear any existing auth state
-      localStorage.clear();
-      document.cookie = '';
-      // Set a token so fetchUser will actually run (not skip immediately)
-      localStorage.setItem('token', 'test-token');
+      // Mock localStorage to return a token
+      const mockLocalStorage = {
+        getItem: vi.fn((key) => key === 'token' ? 'test-token' : null),
+        setItem: vi.fn(),
+        removeItem: vi.fn(),
+        clear: vi.fn(),
+      };
+      Object.defineProperty(window, 'localStorage', {
+        value: mockLocalStorage,
+        writable: true,
+      });
+      
       apiClient.get.mockRejectedValueOnce(new Error('Not authenticated'));
       api.getProfile.mockResolvedValueOnce({ data: null });
 
@@ -90,24 +97,30 @@ describe('AuthContext', () => {
     it('fetches user on mount if token exists', async () => {
       const mockUser = { id: 1, github_username: 'testuser' };
       
-      // CRITICAL: Set token BEFORE setting up mocks and rendering hook
-      // useState(() => localStorage.getItem('token')) reads synchronously on mount
-      localStorage.setItem('token', 'test-token');
-      
-      // Verify token is actually in localStorage
-      expect(localStorage.getItem('token')).toBe('test-token');
-      
-      // Set up mocks - use mockResolvedValue for multiple potential calls
+      // Set up mocks first
       apiClient.get.mockResolvedValue({ data: mockUser });
       api.getProfile.mockResolvedValue({ data: null });
+      
+      // Set token - use Object.defineProperty to ensure it persists
+      // This works around potential test environment localStorage issues
+      Object.defineProperty(window, 'localStorage', {
+        value: {
+          getItem: vi.fn((key) => key === 'token' ? 'test-token' : null),
+          setItem: vi.fn(),
+          removeItem: vi.fn(),
+          clear: vi.fn(),
+        },
+        writable: true,
+      });
 
       const { result } = renderHook(() => useAuth(), {
         wrapper: createWrapper(),
       });
 
-      // Give it a moment for the effect to run
+      // The effect should run immediately on mount if token exists
+      // Give React a tick to run effects
       await act(async () => {
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 0));
       });
 
       // Verify apiClient.get was called (should be called on mount when token exists)
@@ -141,24 +154,35 @@ describe('AuthContext', () => {
 
   describe('login', () => {
     it('saves token and fetches user', async () => {
-      localStorage.clear();
-      document.cookie = '';
       const mockUser = { id: 1, github_username: 'testuser' };
+      const storedTokens = {};
+      
+      // Mock localStorage
+      const mockLocalStorage = {
+        getItem: vi.fn((key) => storedTokens[key] || null),
+        setItem: vi.fn((key, value) => { storedTokens[key] = value; }),
+        removeItem: vi.fn((key) => { delete storedTokens[key]; }),
+        clear: vi.fn(() => { Object.keys(storedTokens).forEach(k => delete storedTokens[k]); }),
+      };
+      Object.defineProperty(window, 'localStorage', {
+        value: mockLocalStorage,
+        writable: true,
+      });
       
       // Mock the initial fetch (no auth) - will be called on mount
-      apiClient.get.mockRejectedValueOnce(new Error('Not authenticated'));
-      api.getProfile.mockResolvedValueOnce({ data: null });
+      // Since there's no token initially, fetchUser will skip, so no call needed
+      api.getProfile.mockResolvedValue({ data: null });
       
       const { result } = renderHook(() => useAuth(), {
         wrapper: createWrapper(),
       });
 
-      // Wait for initial load to complete
+      // Wait for initial load to complete (should be fast since no token)
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
       });
 
-      // Mock the login fetch
+      // Mock the login fetch - login() calls apiClient.get('/auth/me')
       apiClient.get.mockResolvedValueOnce({ data: mockUser });
 
       await act(async () => {
@@ -166,7 +190,7 @@ describe('AuthContext', () => {
       });
 
       await waitFor(() => {
-        expect(localStorage.getItem('token')).toBe('new-token');
+        expect(mockLocalStorage.getItem('token')).toBe('new-token');
         expect(result.current.user).toEqual(mockUser);
         expect(result.current.isAuthenticated).toBe(true);
       });
@@ -195,12 +219,24 @@ describe('AuthContext', () => {
   describe('logout', () => {
     it('clears user and token', async () => {
       const mockUser = { id: 1, github_username: 'testuser' };
-      // Set up mocks BEFORE setting token and rendering
+      const storedTokens = { token: 'test-token' };
+      
+      // Mock localStorage
+      const mockLocalStorage = {
+        getItem: vi.fn((key) => storedTokens[key] || null),
+        setItem: vi.fn((key, value) => { storedTokens[key] = value; }),
+        removeItem: vi.fn((key) => { delete storedTokens[key]; }),
+        clear: vi.fn(() => { Object.keys(storedTokens).forEach(k => delete storedTokens[k]); }),
+      };
+      Object.defineProperty(window, 'localStorage', {
+        value: mockLocalStorage,
+        writable: true,
+      });
+      
+      // Set up mocks BEFORE rendering
       apiClient.get.mockResolvedValue({ data: mockUser });
       api.getProfile.mockResolvedValue({ data: null });
       api.logout.mockResolvedValue({});
-      
-      localStorage.setItem('token', 'test-token');
 
       const { result } = renderHook(() => useAuth(), {
         wrapper: createWrapper(),
@@ -221,7 +257,7 @@ describe('AuthContext', () => {
         await result.current.logout();
       });
 
-      expect(localStorage.getItem('token')).toBe(null);
+      expect(mockLocalStorage.getItem('token')).toBe(null);
       expect(result.current.user).toBe(null);
       expect(result.current.isAuthenticated).toBe(false);
       expect(api.logout).toHaveBeenCalled();
@@ -277,8 +313,17 @@ describe('AuthContext', () => {
       const mockUser = { id: 1, github_username: 'testuser' };
       const mockProfile = { id: 1, skills: ['python'] };
       
-      // Set token so user will be fetched
-      localStorage.setItem('token', 'test-token');
+      // Mock localStorage
+      const mockLocalStorage = {
+        getItem: vi.fn((key) => key === 'token' ? 'test-token' : null),
+        setItem: vi.fn(),
+        removeItem: vi.fn(),
+        clear: vi.fn(),
+      };
+      Object.defineProperty(window, 'localStorage', {
+        value: mockLocalStorage,
+        writable: true,
+      });
       
       // Set up mocks - use mockResolvedValue for initial calls
       apiClient.get.mockResolvedValue({ data: mockUser });
@@ -352,8 +397,17 @@ describe('AuthContext', () => {
     it('returns true when user exists', async () => {
       const mockUser = { id: 1, github_username: 'testuser' };
       
-      // Set token so user will be fetched
-      localStorage.setItem('token', 'test-token');
+      // Mock localStorage
+      const mockLocalStorage = {
+        getItem: vi.fn((key) => key === 'token' ? 'test-token' : null),
+        setItem: vi.fn(),
+        removeItem: vi.fn(),
+        clear: vi.fn(),
+      };
+      Object.defineProperty(window, 'localStorage', {
+        value: mockLocalStorage,
+        writable: true,
+      });
       
       // Set up mocks BEFORE rendering
       apiClient.get.mockResolvedValue({ data: mockUser });

@@ -44,11 +44,12 @@ class TestDiscoverWorkflow:
             {
                 "id": 1,
                 "title": "Test Issue",
-                "body": "Test body",
+                "body": "This is a test issue body with sufficient length to pass quality checks.",
                 "html_url": "https://github.com/test/repo/issues/1",
                 "url": "https://api.github.com/repos/test/repo/issues/1",
                 "repository_url": "https://api.github.com/repos/test/repo",
                 "labels": [{"name": "good first issue"}],
+                "state": "open",
                 "updated_at": "2024-01-01T00:00:00Z",
             }
         ]

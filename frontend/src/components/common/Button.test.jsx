@@ -36,7 +36,7 @@ describe('Button', () => {
 
   it('disables button when disabled prop is true', () => {
     render(<Button disabled>Disabled</Button>);
-    expect(screen.getByText('Disabled')).toBeDisabled();
+    expect(screen.getByRole('button')).toBeDisabled();
   });
 
   it('disables button when loading', () => {
@@ -54,7 +54,7 @@ describe('Button', () => {
 
   it('renders with full width when fullWidth is true', () => {
     render(<Button fullWidth>Full Width</Button>);
-    expect(screen.getByText('Full Width')).toHaveClass('btn-full');
+    expect(screen.getByRole('button')).toHaveClass('btn-full');
   });
 
   it('renders with icon on left by default', () => {
@@ -84,9 +84,9 @@ describe('Button', () => {
 
   it('renders with correct type attribute', () => {
     const { rerender } = render(<Button type="submit">Submit</Button>);
-    expect(screen.getByText('Submit')).toHaveAttribute('type', 'submit');
+    expect(screen.getByRole('button')).toHaveAttribute('type', 'submit');
 
     rerender(<Button type="button">Button</Button>);
-    expect(screen.getByText('Button')).toHaveAttribute('type', 'button');
+    expect(screen.getByRole('button')).toHaveAttribute('type', 'button');
   });
 });

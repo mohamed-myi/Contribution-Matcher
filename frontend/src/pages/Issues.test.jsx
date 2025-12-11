@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { screen, waitFor } from '@testing-library/react';
 import { Issues } from './Issues';
 import { renderWithProviders } from '../test/test-utils';
 import { api } from '../api/client';
@@ -26,11 +25,13 @@ describe('Issues Page', () => {
       data: { issues: [], total: 0 },
     });
 
-    render(
-      <MemoryRouter>
-        <Issues />
-      </MemoryRouter>
-    );
+    renderWithProviders(<Issues />, {
+      authState: {
+        isAuthenticated: true,
+        user: { id: 1, github_username: 'testuser' },
+        loading: false,
+      },
+    });
 
     await waitFor(() => {
       expect(api.getIssues).toHaveBeenCalled();
@@ -40,13 +41,16 @@ describe('Issues Page', () => {
   it('shows loading state initially', () => {
     api.getIssues.mockImplementation(() => new Promise(() => {}));
 
-    render(
-      <MemoryRouter>
-        <Issues />
-      </MemoryRouter>
-    );
+    const { container } = renderWithProviders(<Issues />, {
+      authState: {
+        isAuthenticated: true,
+        user: { id: 1, github_username: 'testuser' },
+        loading: false,
+      },
+    });
 
     // Should show loading or skeleton
-    expect(screen.queryByText(/Loading/i)).toBeInTheDocument();
+    const skeletonElements = container.querySelectorAll('.skeleton');
+    expect(skeletonElements.length).toBeGreaterThan(0);
   });
 });

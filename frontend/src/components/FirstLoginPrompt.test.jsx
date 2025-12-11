@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FirstLoginPrompt } from './FirstLoginPrompt';
 import { renderWithProviders } from '../test/test-utils';
@@ -84,18 +84,29 @@ describe('FirstLoginPrompt', () => {
     });
   });
 
-  it('shows loading state when syncing', () => {
+  it('shows loading state when syncing', async () => {
+    // Create a sync function that doesn't resolve immediately
+    const slowSync = vi.fn(() => new Promise(() => {})); // Never resolves
+    const user = userEvent.setup();
+    
     renderWithProviders(<FirstLoginPrompt />, {
       authState: {
         isAuthenticated: true,
         user: mockUser,
         showFirstLoginPrompt: true,
-        syncFromGitHub: mockSyncFromGitHub,
+        syncFromGitHub: slowSync,
         dismissFirstLoginPrompt: mockDismissFirstLoginPrompt,
-        profileLoading: true,
       },
     });
-    expect(screen.getByText('Syncing...')).toBeInTheDocument();
+
+    // Click sync button to trigger syncing state
+    const syncButton = screen.getByText('Yes, Sync from GitHub');
+    await user.click(syncButton);
+
+    // Should show syncing text while syncing
+    await waitFor(() => {
+      expect(screen.getByText('Syncing...')).toBeInTheDocument();
+    });
   });
 
   it('renders manual setup option', () => {

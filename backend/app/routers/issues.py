@@ -263,31 +263,36 @@ def get_stats(
     cache_key = CacheKeys.user_stats(current_user.id)
 
     # Try to get from cache
-    cached_stats = cache.get_json(cache_key)
-    if cached_stats is not None:
-        return IssueStatsResponse(**cached_stats)
+    try:
+        cached_stats = cache.get_json(cache_key)
+        if cached_stats is not None:
+            return IssueStatsResponse(**cached_stats)
+    except Exception as e:
+        pass
 
     # Compute stats
-    repo = IssueRepository(db)
-    stats = repo.get_variety_stats(current_user.id)
+    try:
+        repo = IssueRepository(db)
+        stats = repo.get_variety_stats(current_user.id)
 
-    labeled_count = db.query(IssueLabel).filter(IssueLabel.user_id == current_user.id).count()
-    bookmark_count = (
-        db.query(IssueBookmark).filter(IssueBookmark.user_id == current_user.id).count()
-    )
+        labeled_count = db.query(IssueLabel).filter(IssueLabel.user_id == current_user.id).count()
+        bookmark_count = (
+            db.query(IssueBookmark).filter(IssueBookmark.user_id == current_user.id).count()
+        )
 
-    result = {
-        "total": stats.get("total", 0),
-        "bookmarked": bookmark_count,
-        "labeled": labeled_count,
-        "top_score": None,
-        "by_difficulty": stats.get("by_difficulty", {}),
-    }
+        result = {
+            "total": stats.get("total", 0),
+            "bookmarked": bookmark_count,
+            "labeled": labeled_count,
+            "top_score": None,
+            "by_difficulty": stats.get("by_difficulty", {}),
+        }
 
-    # Cache for 5 minutes
-    cache.set_json(cache_key, result, CacheKeys.TTL_SHORT)
-
-    return IssueStatsResponse(**result)
+        # Cache for 5 minutes
+        cache.set_json(cache_key, result, CacheKeys.TTL_SHORT)
+        return IssueStatsResponse(**result)
+    except Exception as e:
+        raise
 
 
 @router.get("/staleness-stats")

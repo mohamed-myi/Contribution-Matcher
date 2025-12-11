@@ -156,7 +156,10 @@ def get_breakdown_and_features(
     issue_dict = _issue_to_dict(issue)
 
     # Compute match breakdown
-    raw_breakdown = get_match_breakdown(profile_dict, issue_dict, session=db)
+    try:
+        raw_breakdown = get_match_breakdown(profile_dict, issue_dict, session=db)
+    except Exception as e:
+        raise
 
     # Extract component scores
     skills = raw_breakdown.get("skills", {})
@@ -204,7 +207,10 @@ def get_breakdown_and_features(
     )
 
     # Extract features for ML training
-    features = extract_base_features(issue_dict, profile_dict, session=db)
+    try:
+        features = extract_base_features(issue_dict, profile_dict, session=db)
+    except Exception as e:
+        raise
 
     return breakdown, features
 

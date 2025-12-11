@@ -160,7 +160,8 @@ export function useFetch(fetchFn, deps = []) {
       setState({ data, loading: false, error: null });
     } catch (err) {
       if (isAbortError(err)) {
-        // Request was cancelled, ignore
+        // Request was cancelled, ignore - don't set error state
+        setState((s) => ({ ...s, loading: false, error: null }));
         return;
       }
       setState((s) => ({ ...s, loading: false, error: err }));

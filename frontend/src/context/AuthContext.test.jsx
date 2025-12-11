@@ -65,6 +65,11 @@ describe('AuthContext', () => {
 
   describe('initial state', () => {
     it('starts with loading true', async () => {
+      // Clear any existing auth state
+      localStorage.clear();
+      document.cookie = '';
+      // Set a token so fetchUser will actually run (not skip immediately)
+      localStorage.setItem('token', 'test-token');
       apiClient.get.mockRejectedValueOnce(new Error('Not authenticated'));
       api.getProfile.mockResolvedValueOnce({ data: null });
 
@@ -72,19 +77,25 @@ describe('AuthContext', () => {
         wrapper: createWrapper(),
       });
 
-      // Initially loading
+      // Initially loading should be true
       expect(result.current.loading).toBe(true);
 
+      // Wait for fetchUser to complete
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
       });
     });
 
     it('fetches user on mount if token exists', async () => {
-      localStorage.setItem('token', 'test-token');
+      localStorage.clear();
+      document.cookie = '';
       const mockUser = { id: 1, github_username: 'testuser' };
-      apiClient.get.mockResolvedValueOnce({ data: mockUser });
-      api.getProfile.mockResolvedValueOnce({ data: null });
+      // Set up mocks BEFORE setting token
+      apiClient.get.mockResolvedValue({ data: mockUser });
+      api.getProfile.mockResolvedValue({ data: null });
+      
+      // Set token BEFORE rendering hook so useState initializer reads it
+      localStorage.setItem('token', 'test-token');
 
       const { result } = renderHook(() => useAuth(), {
         wrapper: createWrapper(),
@@ -92,10 +103,10 @@ describe('AuthContext', () => {
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
-      });
+        expect(result.current.user).toEqual(mockUser);
+      }, { timeout: 3000 });
 
       expect(apiClient.get).toHaveBeenCalledWith('/auth/me');
-      expect(result.current.user).toEqual(mockUser);
       expect(result.current.isAuthenticated).toBe(true);
     });
 
@@ -120,8 +131,14 @@ describe('AuthContext', () => {
 
   describe('login', () => {
     it('saves token and fetches user', async () => {
+      localStorage.clear();
+      document.cookie = '';
       const mockUser = { id: 1, github_username: 'testuser' };
-      apiClient.get.mockResolvedValue({ data: mockUser });
+      // Mock the initial fetch (no auth)
+      apiClient.get.mockRejectedValueOnce(new Error('Not authenticated'));
+      api.getProfile.mockResolvedValueOnce({ data: null });
+      // Mock the login fetch
+      apiClient.get.mockResolvedValueOnce({ data: mockUser });
 
       const { result } = renderHook(() => useAuth(), {
         wrapper: createWrapper(),
@@ -135,9 +152,11 @@ describe('AuthContext', () => {
         await result.current.login('new-token');
       });
 
-      expect(localStorage.getItem('token')).toBe('new-token');
-      expect(result.current.user).toEqual(mockUser);
-      expect(result.current.isAuthenticated).toBe(true);
+      await waitFor(() => {
+        expect(localStorage.getItem('token')).toBe('new-token');
+        expect(result.current.user).toEqual(mockUser);
+        expect(result.current.isAuthenticated).toBe(true);
+      });
     });
 
     it('handles login errors', async () => {
@@ -162,19 +181,25 @@ describe('AuthContext', () => {
 
   describe('logout', () => {
     it('clears user and token', async () => {
-      localStorage.setItem('token', 'test-token');
+      localStorage.clear();
+      document.cookie = '';
       const mockUser = { id: 1, github_username: 'testuser' };
-      apiClient.get.mockResolvedValueOnce({ data: mockUser });
-      api.getProfile.mockResolvedValueOnce({ data: null });
-      api.logout.mockResolvedValueOnce({});
+      // Set up mocks BEFORE setting token and rendering
+      apiClient.get.mockResolvedValue({ data: mockUser });
+      api.getProfile.mockResolvedValue({ data: null });
+      api.logout.mockResolvedValue({});
+      
+      localStorage.setItem('token', 'test-token');
 
       const { result } = renderHook(() => useAuth(), {
         wrapper: createWrapper(),
       });
 
+      // Wait for user to be loaded and profile check to complete
       await waitFor(() => {
+        expect(result.current.user).toEqual(mockUser);
         expect(result.current.isAuthenticated).toBe(true);
-      });
+      }, { timeout: 3000 });
 
       await act(async () => {
         await result.current.logout();
@@ -233,9 +258,14 @@ describe('AuthContext', () => {
 
   describe('syncFromGitHub', () => {
     it('syncs profile from GitHub', async () => {
+      localStorage.clear();
+      document.cookie = '';
       const mockUser = { id: 1, github_username: 'testuser' };
       const mockProfile = { id: 1, skills: ['python'] };
-      apiClient.get.mockResolvedValueOnce({ data: mockUser });
+      // Set up mocks - use mockResolvedValue for initial calls, mockResolvedValueOnce for specific sync calls
+      apiClient.get.mockResolvedValue({ data: mockUser });
+      api.getProfile.mockResolvedValue({ data: null });
+      // Mock sync operations (these should be Once since they're called explicitly)
       api.createProfileFromGithub.mockResolvedValueOnce({});
       api.getProfile.mockResolvedValueOnce({ data: mockProfile });
 
@@ -243,9 +273,11 @@ describe('AuthContext', () => {
         wrapper: createWrapper(),
       });
 
+      // Wait for user to be loaded and profile check to complete
       await waitFor(() => {
+        expect(result.current.user).toEqual(mockUser);
         expect(result.current.isAuthenticated).toBe(true);
-      });
+      }, { timeout: 3000 });
 
       let syncedProfile;
       await act(async () => {
@@ -294,17 +326,22 @@ describe('AuthContext', () => {
     });
 
     it('returns true when user exists', async () => {
+      localStorage.clear();
+      document.cookie = '';
       const mockUser = { id: 1, github_username: 'testuser' };
-      apiClient.get.mockResolvedValueOnce({ data: mockUser });
-      api.getProfile.mockResolvedValueOnce({ data: null });
+      // Set up mocks BEFORE rendering
+      apiClient.get.mockResolvedValue({ data: mockUser });
+      api.getProfile.mockResolvedValue({ data: null });
 
       const { result } = renderHook(() => useAuth(), {
         wrapper: createWrapper(),
       });
 
+      // Wait for user to be loaded and profile check to complete
       await waitFor(() => {
+        expect(result.current.user).toEqual(mockUser);
         expect(result.current.isAuthenticated).toBe(true);
-      });
+      }, { timeout: 3000 });
 
       expect(result.current.isAuthenticated).toBe(true);
     });

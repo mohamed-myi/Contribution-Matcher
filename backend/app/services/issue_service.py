@@ -215,8 +215,11 @@ def issue_to_dict(issue: Issue, is_bookmarked: bool = False) -> dict:
     # Extract issue_number from URL
     issue_number = None
     if issue.url:
-        with contextlib.suppress(ValueError, IndexError):
-            issue_number = int(issue.url.rstrip("/").split("/")[-1])
+        try:
+            last_part = issue.url.rstrip("/").split("/")[-1]
+            issue_number = int(last_part)
+        except (ValueError, IndexError, TypeError) as e:
+            pass
 
     # Truncate description
     description = None

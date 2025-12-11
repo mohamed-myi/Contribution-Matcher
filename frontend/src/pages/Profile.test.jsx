@@ -43,7 +43,7 @@ describe('Profile Page', () => {
   it('shows loading state initially', () => {
     api.getProfile.mockImplementation(() => new Promise(() => {}));
 
-    renderWithProviders(<Profile />, {
+    const { container } = renderWithProviders(<Profile />, {
       authState: {
         isAuthenticated: true,
         user: { id: 1 },
@@ -51,7 +51,9 @@ describe('Profile Page', () => {
       },
     });
 
-    expect(screen.queryByText(/Loading/i)).toBeInTheDocument();
+    // Should show skeleton profile when loading
+    const skeletonProfiles = container.querySelectorAll('.skeleton-profile');
+    expect(skeletonProfiles.length).toBeGreaterThan(0);
   });
 
   it('handles 404 when no profile exists', async () => {

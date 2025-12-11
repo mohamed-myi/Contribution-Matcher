@@ -42,7 +42,7 @@ describe('Dashboard Page', () => {
   it('shows loading state initially', () => {
     api.getIssueStats.mockImplementation(() => new Promise(() => {}));
 
-    renderWithProviders(<Dashboard />, {
+    const { container } = renderWithProviders(<Dashboard />, {
       authState: {
         isAuthenticated: true,
         user: { id: 1 },
@@ -50,8 +50,9 @@ describe('Dashboard Page', () => {
       },
     });
 
-    // Should show loading or skeleton
-    expect(screen.queryByText(/Loading/i)).toBeInTheDocument();
+    // Should show skeleton cards when loading
+    const skeletonCards = container.querySelectorAll('.skeleton-stats-card');
+    expect(skeletonCards.length).toBeGreaterThan(0);
   });
 
   it('displays stats when loaded', async () => {

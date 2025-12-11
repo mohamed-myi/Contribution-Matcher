@@ -25,8 +25,21 @@ class TestDiscoverWorkflow:
 
     @patch("core.cli.contribution_matcher.search_issues")
     @patch("core.cli.contribution_matcher.get_repo_metadata_from_api")
-    def test_discover_issues_workflow(self, mock_repo_meta, mock_search, test_db):
+    def test_discover_issues_workflow(self, mock_repo_meta, mock_search, test_db, monkeypatch):
         """Test complete issue discovery workflow."""
+        test_db_path, _, _ = test_db
+        
+        # Set DATABASE_URL to use the test database so cmd_discover uses it
+        test_db_url = f"sqlite:///{test_db_path}"
+        monkeypatch.setenv("DATABASE_URL", test_db_url)
+        
+        # Reset and re-initialize the global db object with the test database URL
+        from core.db import db
+        if db.is_initialized:
+            db.engine.dispose()
+        db._initialized = False
+        db.initialize(test_db_url)
+        
         # Mock GitHub API responses
         mock_search.return_value = [
             {
@@ -341,12 +354,27 @@ class TestExportWorkflow:
 class TestListWorkflow:
     """Tests for listing issues."""
 
-    def test_list_issues_workflow(self, test_db, multiple_issues_in_db, capsys):
+    def test_list_issues_workflow(self, test_db, multiple_issues_in_db, capsys, monkeypatch):
         """Test listing issues."""
+        test_db_path, _, _ = test_db
+        
+        # Set DATABASE_URL to use the test database so cmd_list uses it
+        test_db_url = f"sqlite:///{test_db_path}"
+        monkeypatch.setenv("DATABASE_URL", test_db_url)
+        
+        # Reset and re-initialize the global db object with the test database URL
+        from core.db import db
+        if db.is_initialized:
+            db.engine.dispose()
+        db._initialized = False
+        db.initialize(test_db_url)
+        
         args = Mock()
         args.difficulty = "beginner"
         args.issue_type = None
         args.limit = 100
+        args.format = "text"
+        args.verbose = False
 
         cmd_list(args)
 

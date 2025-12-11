@@ -2,6 +2,37 @@ import { render } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../context/AuthContext';
+import AuthContext from '../context/AuthContext';
+import { vi } from 'vitest';
+
+/**
+ * Mock AuthProvider that uses provided auth state
+ */
+function MockAuthProvider({ children, authState = {} }) {
+  const mockAuthValue = {
+    user: authState.user || null,
+    token: authState.token || null,
+    loading: authState.loading !== undefined ? authState.loading : false,
+    error: authState.error || null,
+    isAuthenticated: authState.isAuthenticated !== undefined 
+      ? authState.isAuthenticated 
+      : !!authState.user,
+    login: authState.login || vi.fn(),
+    logout: authState.logout || vi.fn(),
+    fetchProfile: authState.fetchProfile || vi.fn(),
+    syncFromGitHub: authState.syncFromGitHub || vi.fn(),
+    profile: authState.profile || null,
+    profileLoading: authState.profileLoading || false,
+    showFirstLoginPrompt: authState.showFirstLoginPrompt || false,
+    dismissFirstLoginPrompt: authState.dismissFirstLoginPrompt || vi.fn(),
+  };
+
+  return (
+    <AuthContext.Provider value={mockAuthValue}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
 
 /**
  * Custom render function that wraps components with all necessary providers
@@ -9,6 +40,7 @@ import { AuthProvider } from '../context/AuthContext';
  * @param {Object} options - Render options
  * @param {QueryClient} options.queryClient - Custom QueryClient instance
  * @param {Object} options.routerOptions - React Router options
+ * @param {Object} options.authState - Mock auth state (user, isAuthenticated, loading, etc.)
  * @returns {Object} Render result with all testing utilities
  */
 export function renderWithProviders(
@@ -21,16 +53,33 @@ export function renderWithProviders(
       },
     }),
     routerOptions = {},
+    authState,
     ...renderOptions
   } = {}
 ) {
-  const Wrapper = ({ children }) => (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter {...routerOptions}>
-        <AuthProvider>{children}</AuthProvider>
-      </BrowserRouter>
-    </QueryClientProvider>
-  );
+  const Wrapper = ({ children }) => {
+    if (authState) {
+      // Use mock auth provider
+      return (
+        <QueryClientProvider client={queryClient}>
+          <BrowserRouter {...routerOptions}>
+            <MockAuthProvider authState={authState}>
+              {children}
+            </MockAuthProvider>
+          </BrowserRouter>
+        </QueryClientProvider>
+      );
+    }
+    
+    // Use real auth provider
+    return (
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter {...routerOptions}>
+          <AuthProvider>{children}</AuthProvider>
+        </BrowserRouter>
+      </QueryClientProvider>
+    );
+  };
 
   return render(ui, {
     wrapper: Wrapper,

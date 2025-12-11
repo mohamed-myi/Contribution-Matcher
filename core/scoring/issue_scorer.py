@@ -1,7 +1,7 @@
 # Issue scoring module for matching developer profile against GitHub issues
 
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 
 from core.constants import (
     CODE_FOCUSED_TYPES,
@@ -17,8 +17,11 @@ def _get_issue_technologies_orm(issue_id: int, session) -> list[tuple[str, str |
     """Get technologies for an issue using ORM."""
     from core.models import IssueTechnology
 
-    results = session.query(IssueTechnology).filter(IssueTechnology.issue_id == issue_id).all()
-    return [(r.technology, r.technology_category) for r in results]
+    try:
+        results = session.query(IssueTechnology).filter(IssueTechnology.issue_id == issue_id).all()
+        return [(r.technology, r.technology_category) for r in results]
+    except Exception as e:
+        raise
 
 
 def _query_issues_orm(session, user_id: int = None, limit: int = 100) -> list[dict]:
@@ -266,12 +269,12 @@ def calculate_repo_quality(repo_metadata: dict | None) -> float:
     return min(15.0, score)
 
 
-def calculate_freshness(issue_updated_at: str | None) -> float:
+def calculate_freshness(issue_updated_at: str | datetime | None) -> float:
     """
     Calculate an issue freshness score from last updated timestamp.
 
     Args:
-        issue_updated_at: ISO timestamp string.
+        issue_updated_at: ISO timestamp string or datetime object.
 
     Returns:
         Score from 0-10 weighted toward recently updated issues.
@@ -281,8 +284,19 @@ def calculate_freshness(issue_updated_at: str | None) -> float:
         return 1.0  # Default low score
 
     try:
-        updated_date = datetime.fromisoformat(issue_updated_at.replace("Z", "+00:00"))
-        days_ago = (datetime.now(updated_date.tzinfo) - updated_date).days
+        # Handle datetime object directly
+        if isinstance(issue_updated_at, datetime):
+            updated_date = issue_updated_at
+        else:
+            # Handle string: parse ISO format
+            updated_date = datetime.fromisoformat(issue_updated_at.replace("Z", "+00:00"))
+        
+        # Ensure timezone-aware datetime for comparison
+        if updated_date.tzinfo is None:
+            updated_date = updated_date.replace(tzinfo=timezone.utc)
+        
+        now = datetime.now(updated_date.tzinfo)
+        days_ago = (now - updated_date).days
 
         if days_ago <= 7:
             return 10.0  # Recently updated
@@ -292,7 +306,7 @@ def calculate_freshness(issue_updated_at: str | None) -> float:
             return 4.0
         else:
             return 1.0
-    except (ValueError, AttributeError):
+    except (ValueError, AttributeError, TypeError):
         return 1.0
 
 
@@ -395,52 +409,57 @@ def get_match_breakdown(profile: dict, issue_data: dict, session=None) -> dict:
     Returns:
         Dictionary with component scores and supporting metadata.
     """
+    try:
+        # Get issue technologies
+        issue_id = issue_data.get("id")
+        if issue_id and session:
+            # Ensure issue_id is an integer (handle case where it might be a string)
+            try:
+                issue_id_int = int(issue_id) if not isinstance(issue_id, int) else issue_id
+                issue_techs_tuples = _get_issue_technologies_orm(issue_id_int, session)
+                issue_technologies = [tech for tech, _ in issue_techs_tuples]
+            except (ValueError, TypeError):
+                issue_technologies = []
+        else:
+            issue_technologies = []
 
-    # Get issue technologies
-    issue_id = issue_data.get("id")
-    if issue_id and session:
-        issue_techs_tuples = _get_issue_technologies_orm(issue_id, session)
-        issue_technologies = [tech for tech, _ in issue_techs_tuples]
-    else:
-        issue_technologies = []
+        profile_skills = profile.get("skills", [])
 
-    profile_skills = profile.get("skills", [])
-
-    # Calculate skill match
-    skill_match_pct, skill_matching, skill_missing = calculate_skill_match(
-        profile_skills, issue_technologies
-    )
-
-    # Calculate other matches
-    experience_score = calculate_experience_match(
-        profile.get("experience_level", "intermediate"), issue_data.get("difficulty")
-    )
-
-    # Get repo metadata
-    repo_metadata = {}
-    if issue_data.get("repo_owner") and issue_data.get("repo_name") and session:
-        repo_metadata = (
-            _get_repo_metadata_orm(issue_data["repo_owner"], issue_data["repo_name"], session) or {}
+        # Calculate skill match
+        skill_match_pct, skill_matching, skill_missing = calculate_skill_match(
+            profile_skills, issue_technologies
         )
 
-    repo_quality_score = calculate_repo_quality(repo_metadata)
+        # Calculate other matches
+        experience_score = calculate_experience_match(
+            profile.get("experience_level", "intermediate"), issue_data.get("difficulty")
+        )
 
-    freshness_score = calculate_freshness(issue_data.get("updated_at"))
+        # Get repo metadata
+        repo_metadata = {}
+        if issue_data.get("repo_owner") and issue_data.get("repo_name") and session:
+            try:
+                repo_metadata = (
+                    _get_repo_metadata_orm(issue_data["repo_owner"], issue_data["repo_name"], session) or {}
+                )
+            except Exception:
+                raise
 
-    time_match_score = calculate_time_match(
-        profile.get("time_availability_hours_per_week"), issue_data.get("time_estimate")
-    )
+        repo_quality_score = calculate_repo_quality(repo_metadata)
+        freshness_score = calculate_freshness(issue_data.get("updated_at"))
+        time_match_score = calculate_time_match(
+            profile.get("time_availability_hours_per_week"), issue_data.get("time_estimate")
+        )
+        interest_match_score = calculate_interest_match(
+            profile.get("interests", []),
+            (
+                issue_data.get("repo_topics", [])
+                if isinstance(issue_data.get("repo_topics"), list)
+                else []
+            ),
+        )
 
-    interest_match_score = calculate_interest_match(
-        profile.get("interests", []),
-        (
-            issue_data.get("repo_topics", [])
-            if isinstance(issue_data.get("repo_topics"), list)
-            else []
-        ),
-    )
-
-    return {
+        return {
         "skills": {
             "match_percentage": skill_match_pct,
             "matching": skill_matching,
@@ -472,7 +491,9 @@ def get_match_breakdown(profile: dict, issue_data: dict, session=None) -> dict:
             "profile_interests": profile.get("interests", []),
             "repo_topics": issue_data.get("repo_topics", []),
         },
-    }
+        }
+    except Exception as e:
+        raise
 
 
 def score_issue_against_profile(profile: dict, issue_data: dict, session=None) -> dict:

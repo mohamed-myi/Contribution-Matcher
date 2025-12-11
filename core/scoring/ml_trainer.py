@@ -45,8 +45,13 @@ def extract_base_features(
     features = []
     issue_id = issue.get("id")
     if issue_id and session:
-        issue_techs_tuples = _get_issue_technologies_orm(issue_id, session)
-        all_issue_technologies = [tech for tech, _ in issue_techs_tuples]
+        # Ensure issue_id is an integer (handle case where it might be a string)
+        try:
+            issue_id_int = int(issue_id) if not isinstance(issue_id, int) else issue_id
+            issue_techs_tuples = _get_issue_technologies_orm(issue_id_int, session)
+            all_issue_technologies = [tech for tech, _ in issue_techs_tuples]
+        except (ValueError, TypeError):
+            all_issue_technologies = []
     else:
         all_issue_technologies = []
 

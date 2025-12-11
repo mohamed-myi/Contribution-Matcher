@@ -19,7 +19,11 @@ from core.profile import save_dev_profile
 @pytest.fixture(scope="function")
 def test_db():
     """Create a fresh test database for each test using ORM."""
-    test_db_path = "test_contribution_matcher.db"
+    # Use unique database file name per worker to avoid race conditions in parallel tests
+    # pytest-xdist sets PYTEST_XDIST_WORKER to values like "gw0", "gw1", etc.
+    worker_id = os.environ.get("PYTEST_XDIST_WORKER")
+    worker_suffix = f"_{worker_id}" if worker_id and worker_id != "master" else ""
+    test_db_path = f"test_contribution_matcher{worker_suffix}.db"
 
     # Remove test database if it exists
     if os.path.exists(test_db_path):
@@ -30,7 +34,8 @@ def test_db():
         f"sqlite:///{test_db_path}",
         connect_args={"check_same_thread": False},
     )
-    Base.metadata.create_all(bind=engine)
+    # Use checkfirst=True to prevent errors if tables already exist (race condition protection)
+    Base.metadata.create_all(bind=engine, checkfirst=True)
 
     # Create session factory
     TestingSessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)

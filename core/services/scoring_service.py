@@ -222,6 +222,12 @@ class ScoringService:
 
         if model_version == "v2":
             try:
+                if (
+                    self.feature_selector_v2 is None
+                    or self.scaler_v2 is None
+                    or self.model_v2 is None
+                ):
+                    raise ValueError("V2 model components not initialized")
                 features = extract_features(issue, profile_data, use_advanced=True)
                 X = np.array([features])
                 X_selected = self.feature_selector_v2.transform(X)
@@ -235,6 +241,8 @@ class ScoringService:
 
         if model_version == "legacy" or self.model_legacy is not None:
             try:
+                if self.scaler_legacy is None or self.model_legacy is None:
+                    raise ValueError("Legacy model components not initialized")
                 from core.scoring.ml_trainer import extract_features
 
                 features = extract_features(issue, profile_data, use_advanced=False)
@@ -354,7 +362,11 @@ class ScoringService:
         cached_result = cache.get_json(cache_key)
         if cached_result is not None:
             logger.debug(f"Cache hit for top matches: {cache_key}")
-            return cached_result
+            # Ensure cached result is a list
+            if isinstance(cached_result, list):
+                return cached_result
+            # If it's a dict, wrap it in a list (shouldn't happen but handle gracefully)
+            return [cached_result] if isinstance(cached_result, dict) else []
 
         # Compute top matches
         if self.issue_repo is None:

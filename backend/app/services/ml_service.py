@@ -4,6 +4,8 @@ Machine learning service for labeling issues and training per-user models.
 
 from __future__ import annotations
 
+from typing import Any
+
 import joblib
 import numpy as np
 from fastapi import HTTPException, status
@@ -76,7 +78,7 @@ def unlabeled_issues(
     subquery = db.query(IssueLabel.issue_id).filter(IssueLabel.user_id == user.id).subquery()
 
     query = db.query(Issue).filter(
-        ~Issue.id.in_(subquery),
+        ~Issue.id.in_(subquery),  # type: ignore[arg-type]
         Issue.is_active,
     )
 
@@ -136,7 +138,10 @@ def labeled_issues(
     # Get paginated results
     results = base_query.order_by(IssueLabel.labeled_at.desc()).offset(offset).limit(limit).all()
 
-    return results, total_count, good_count, bad_count
+    # Convert Row objects to tuples
+    results_tuples = [(row[0], row[1]) for row in results] if results else []
+
+    return results_tuples, total_count, good_count, bad_count
 
 
 def remove_label(db: Session, user: User, issue_id: int) -> None:
@@ -203,7 +208,9 @@ def _split_dataset(X: np.ndarray, y: np.ndarray, test_size: float) -> tuple[np.n
     return train_test_split(X, y, test_size=test_size, random_state=42, stratify=y)
 
 
-def _train_pipeline(model_type: str, X_train, y_train, X_test, y_test):
+def _train_pipeline(
+    model_type: str, X_train, y_train, X_test, y_test
+) -> tuple[Any, dict[str, Any]]:  # type: ignore[no-untyped-def]
     """Train a model pipeline (logistic or XGBoost) and return metrics."""
     if model_type == "xgboost":
         try:

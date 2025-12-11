@@ -95,7 +95,7 @@ def cached(
             cached_result = cache.get_json(cache_key)
             if cached_result is not None:
                 logger.debug("cache_hit", key=cache_key)
-                return cached_result
+                return cached_result  # type: ignore[return-value]
 
             # Compute result
             logger.debug("cache_miss", key=cache_key)
@@ -103,13 +103,13 @@ def cached(
 
             # Cache the result (if not None)
             if result is not None:
-                cache.set_json(cache_key, result, ttl)
+                cache.set_json(cache_key, result, ttl)  # type: ignore[arg-type]
 
             return result
 
         # Add cache management methods to the wrapper
-        wrapper.cache_key_template = key_template
-        wrapper.cache_ttl = ttl
+        wrapper.cache_key_template = key_template  # type: ignore[attr-defined]
+        wrapper.cache_ttl = ttl  # type: ignore[attr-defined]
 
         def invalidate(*args, **kwargs) -> bool:
             """Invalidate cache for specific arguments."""
@@ -119,7 +119,7 @@ def cached(
                 cache_key = _generate_cache_key(key_template, args, kwargs)
             return cache.delete(cache_key)
 
-        wrapper.invalidate = invalidate
+        wrapper.invalidate = invalidate  # type: ignore[attr-defined]
 
         return wrapper
 
@@ -173,7 +173,7 @@ def cached_model(
             if cached_model is not None:
                 logger.debug("model_cache_hit", tier="redis", key=key)
                 _memory_cache["model"] = cached_model
-                return cached_model
+                return cached_model  # type: ignore[return-value]
 
             # Tier 3: Load from disk/compute
             logger.info("model_cache_miss", key=key)
@@ -197,9 +197,9 @@ def cached_model(
             invalidate()
             return wrapper(*args, **kwargs)
 
-        wrapper.invalidate = invalidate
-        wrapper.refresh = refresh
-        wrapper.cache_key = key
+        wrapper.invalidate = invalidate  # type: ignore[attr-defined]
+        wrapper.refresh = refresh  # type: ignore[attr-defined]
+        wrapper.cache_key = key  # type: ignore[attr-defined]
 
         return wrapper
 
@@ -235,7 +235,7 @@ class CachedProperty:
         self.attr_name = f"_cached_{name}"
 
     def __call__(self, func: Callable) -> "CachedProperty":
-        self.func = func
+        self.func = func  # type: ignore[assignment]
         return self
 
     def __get__(self, obj, objtype=None):

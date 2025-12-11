@@ -104,6 +104,7 @@ def score_user_issues_task(
         logger.error("scoring_failed", user_id=user_id, error=str(exc))
         try:
             self.retry(exc=exc)
+            return {"scored": 0, "user_id": user_id, "error": str(exc), "retrying": True}
         except MaxRetriesExceededError:
             return {"scored": 0, "user_id": user_id, "error": str(exc)}
 
@@ -180,6 +181,7 @@ def score_single_issue_task(
         logger.error("scoring_single_failed", issue_id=issue_id, error=str(exc))
         try:
             self.retry(exc=exc)
+            return {"score": None, "error": str(exc), "retrying": True}
         except MaxRetriesExceededError:
             return {"score": None, "error": str(exc)}
 
@@ -331,8 +333,8 @@ def warm_feature_cache_task(
                 )
                 .filter(
                     # No cache or cache is stale (profile updated after cache)
-                    (IssueFeatureCache.id is None)
-                    | (IssueFeatureCache.profile_updated_at < profile_updated_at)
+                    (IssueFeatureCache.id.is_(None))  # type: ignore[attr-defined]
+                    | (IssueFeatureCache.profile_updated_at < profile_updated_at)  # type: ignore[operator]
                 )
                 .limit(batch_size)
                 .all()
@@ -402,6 +404,7 @@ def warm_feature_cache_task(
         logger.error("feature_cache_warming_failed", user_id=user_id, error=str(exc))
         try:
             self.retry(exc=exc)
+            return {"warmed": 0, "error": str(exc), "retrying": True}
         except MaxRetriesExceededError:
             return {"warmed": 0, "error": str(exc)}
 

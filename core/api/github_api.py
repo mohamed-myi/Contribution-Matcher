@@ -379,7 +379,7 @@ def batch_get_repo_metadata(
         logger.info("rest_fallback", repo_count=len(remaining))
         for owner, name in remaining:
             metadata = get_repo_metadata_from_api(owner, name, use_cache=False)
-            results[(owner, name)] = metadata
+            results[(owner, name)] = metadata  # type: ignore[assignment]
             time.sleep(0.1)
 
     return results
@@ -489,7 +489,8 @@ def check_issue_status(issue_url: str) -> str | None:
 
             response = _make_request(api_url)
             if response:
-                return response.json().get("state")
+                state = response.json().get("state")
+                return str(state) if state is not None else None
     except Exception as e:
         logger.error("check_status_failed", url=issue_url, error=str(e))
 

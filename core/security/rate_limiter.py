@@ -633,7 +633,14 @@ class RateLimiter:
         try:
             client = cache.client
             if client is None:
-                return False
+                # Return a rate limit result indicating unavailable
+                return RateLimitResult(
+                    allowed=True,  # Fail open when Redis unavailable
+                    remaining=config["limit"],
+                    limit=config["limit"],
+                    reset_at=now + config["window"],
+                    retry_after=None,
+                )
 
             pipe = client.pipeline()
 
@@ -648,7 +655,14 @@ class RateLimiter:
 
             results = pipe.execute()
             if not isinstance(results, (list, tuple)) or len(results) < 3:
-                return False
+                # Return a rate limit result indicating unavailable
+                return RateLimitResult(
+                    allowed=True,  # Fail open when Redis unavailable
+                    remaining=config["limit"],
+                    limit=config["limit"],
+                    reset_at=now + config["window"],
+                    retry_after=None,
+                )
             current_count = results[1] if results[1] is not None else 0
             oldest_entry = results[2]
 
@@ -842,7 +856,14 @@ class RateLimiter:
         try:
             client = cache.client
             if client is None:
-                return {}
+                # Return a rate limit result indicating unavailable
+                return RateLimitResult(
+                    allowed=True,  # Fail open when Redis unavailable
+                    remaining=config["limit"],
+                    limit=config["limit"],
+                    reset_at=int(time.time()) + config["window"],
+                    retry_after=None,
+                )
 
             # Clean old entries and count
             client.zremrangebyscore(key, 0, window_start)

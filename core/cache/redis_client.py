@@ -345,7 +345,11 @@ class RedisCache:
             if keys and isinstance(keys, (list, tuple)):
                 deleted = client.delete(*keys)
                 if deleted is not None:
-                    return int(deleted)
+                    # Handle both int and awaitable results
+                    if isinstance(deleted, (int, float)):
+                        return int(deleted)
+                    # If it's an awaitable or other type, return 0
+                    return 0
                 return 0
             return 0
         except (ConnectionError, TimeoutError):

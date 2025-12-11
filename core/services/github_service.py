@@ -302,7 +302,10 @@ class GitHubService:
         """
         import requests
 
-        from core.api.github_api import GITHUB_GRAPHQL_ENDPOINT, _get_graphql_headers
+        from core.api.github_api import GITHUB_GRAPHQL_ENDPOINT, _get_headers
+
+        def _get_graphql_headers():
+            return _get_headers(graphql=True)
 
         results = {}
 
@@ -358,21 +361,24 @@ class GitHubService:
                         alias = f"issue_{i}"
                         repo_data = data.get(alias, {})
                         issue_data = repo_data.get("issue", {}) if repo_data else {}
-                        state = issue_data.get("state", "").lower()
+                        state = str(issue_data.get("state", "")).lower() if issue_data else ""
 
-                        results[issue_info["url"]] = state if state else "unknown"
+                        issue_url = str(issue_info.get("url", ""))
+                        results[issue_url] = state if state else "unknown"
                 else:
                     logger.warning(
                         "graphql_status_check_failed",
                         status=response.status_code,
                     )
                     for issue_info in chunk:
-                        results[issue_info["url"]] = "unknown"
+                        issue_url = str(issue_info.get("url", ""))
+                        results[issue_url] = "unknown"
 
             except Exception as e:
                 logger.error("status_check_error", error=str(e))
                 for issue_info in chunk:
-                    results[issue_info["url"]] = "unknown"
+                    issue_url = str(issue_info.get("url", ""))
+                    results[issue_url] = "unknown"
 
             # Small delay between chunks
             if chunk_start + chunk_size < len(issues_to_check):
@@ -400,7 +406,9 @@ class GitHubService:
         from core.api.github_api import _graphql_batch_fetch_repos
 
         # Use existing GraphQL batch function
-        return _graphql_batch_fetch_repos(repo_list)
+        results = _graphql_batch_fetch_repos(repo_list)
+        # Filter out None values to match return type
+        return {k: v for k, v in results.items() if v is not None}  # type: ignore[return-value]
 
     # =========================================================================
     # Session Management

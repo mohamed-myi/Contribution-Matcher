@@ -108,6 +108,7 @@ def discover_issues_task(
         )
         try:
             self.retry(exc=exc)
+            return {"discovered": 0, "user_id": user_id, "error": str(exc), "retrying": True}
         except MaxRetriesExceededError:
             logger.error("discovery_max_retries", user_id=user_id)
             return {"discovered": 0, "user_id": user_id, "error": str(exc)}
@@ -183,6 +184,7 @@ def cleanup_stale_issues_task(
         logger.error("cleanup_failed", error=str(exc))
         try:
             self.retry(exc=exc)
+            return {"marked_inactive": 0, "error": str(exc), "retrying": True}
         except MaxRetriesExceededError:
             return {"marked_inactive": 0, "error": str(exc)}
 

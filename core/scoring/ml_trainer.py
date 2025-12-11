@@ -42,7 +42,7 @@ def extract_base_features(
 
     from core.scoring.issue_scorer import get_match_breakdown
 
-    features = []
+    features: list[float] = []
     issue_id = issue.get("id")
     if issue_id and session:
         # Ensure issue_id is an integer (handle case where it might be a string)

@@ -175,6 +175,35 @@ module = [
 allow_untyped_calls = true
 warn_return_any = false
 
+[[tool.mypy.overrides]]
+module = [
+    "core.cache.decorators",
+    "core.cache.redis_client",
+    "core.repositories.base",
+    "core.repositories.issue_repository",
+    "core.security.rate_limiter",
+]
+# Complex generic typing and decorator patterns
+allow_untyped_calls = true
+warn_return_any = false
+ignore_errors = false
+
+[[tool.mypy.overrides]]
+module = [
+    "core.parsing.issue_parser",
+    "core.api.github_api",
+    "core.profile.dev_profile",
+    "core.services.github_service",
+    "core.services.scoring_service",
+    "backend.app.services.staleness_service",
+    "backend.app.services.ml_service",
+    "workers.tasks.*",
+]
+# Complex type patterns that are difficult to type precisely
+allow_untyped_calls = true
+warn_return_any = false
+ignore_errors = false
+
 [tool.coverage.run]
 source = ["core", "backend"]
 branch = true

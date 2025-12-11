@@ -68,7 +68,7 @@ class ScoreRangeFilter(str, Enum):
     low = "low"  # <50
 
 
-class OrderByFilter(str, Enum):
+class OrderByFilter(str, Enum):  # type: ignore[misc]
     """Valid order_by filter values."""
 
     created_at = "created_at"

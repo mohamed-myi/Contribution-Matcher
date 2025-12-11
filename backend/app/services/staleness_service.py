@@ -159,22 +159,24 @@ def bulk_verify_issues(
     }
 
     for issue in issues:
-        result = verify_issue_status(db, issue)
+        result: dict = verify_issue_status(db, issue)
 
         if result.get("verified"):
             results["verified"] += 1
 
-            if result["status"] == "open":
+            if result.get("status") == "open":
                 results["still_open"] += 1
-            elif result["status"] == "closed":
+            elif result.get("status") == "closed":
                 results["now_closed"] += 1
-                results["closed_issues"].append(
-                    {
-                        "id": issue.id,
-                        "title": issue.title,
-                        "close_reason": result.get("close_reason"),
-                    }
-                )
+                closed_issues_list = results.get("closed_issues", [])
+                if isinstance(closed_issues_list, list):
+                    closed_issues_list.append(
+                        {
+                            "id": issue.id,
+                            "title": issue.title,
+                            "close_reason": result.get("close_reason"),
+                        }
+                    )
         else:
             results["errors"] += 1
 

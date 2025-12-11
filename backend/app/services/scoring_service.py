@@ -55,7 +55,12 @@ def _ml_adjustment(model_tuple: tuple[UserMLModel, object] | None, features: lis
         return 0.0
     _, model = model_tuple
     try:
-        proba = model.predict_proba([features])[0][1]
+        if not hasattr(model, "predict_proba"):
+            return 0.0
+        proba_result = model.predict_proba([features])  # type: ignore[attr-defined]
+        if proba_result is None or len(proba_result) == 0:
+            return 0.0
+        proba = proba_result[0][1]
         adjustment = (proba - 0.5) * 15.0  # Range roughly -7.5 to +7.5
         return float(adjustment)
     except Exception:

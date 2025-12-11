@@ -58,8 +58,8 @@ class BaseRepository(Generic[T]):
             return 0
         result = (
             self.session.query(self.model)
-            .filter(self.model.id.in_(ids))
-            .update(kwargs, synchronize_session=False)
+            .filter(self.model.id.in_(ids))  # type: ignore[attr-defined]
+            .update(kwargs, synchronize_session=False)  # type: ignore[arg-type]
         )
         self.session.flush()
         return result
@@ -75,7 +75,7 @@ class BaseRepository(Generic[T]):
 
     def count(self, **filters) -> int:
         """Get count of records, optionally filtered."""
-        query = self.session.query(func.count(self.model.id))
+        query = self.session.query(func.count(self.model.id))  # type: ignore[attr-defined]
         for key, value in filters.items():
             if hasattr(self.model, key):
                 query = query.filter(getattr(self.model, key) == value)
@@ -83,9 +83,10 @@ class BaseRepository(Generic[T]):
 
     def exists(self, id: int) -> bool:
         """Check if a record exists."""
-        return self.session.query(
-            self.session.query(self.model).filter(self.model.id == id).exists()
+        result = self.session.query(
+            self.session.query(self.model).filter(self.model.id == id).exists()  # type: ignore[attr-defined]
         ).scalar()
+        return bool(result) if result is not None else False
 
     def exists_where(self, **filters) -> bool:
         """Check if any record exists matching filters."""

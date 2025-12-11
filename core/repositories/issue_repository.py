@@ -24,7 +24,7 @@ class IssueRepository(BaseRepository[Issue]):
 
     model = Issue
 
-    def get_by_id(self, issue_id: int, user_id: int) -> Issue | None:
+    def get_by_id(self, issue_id: int, user_id: int) -> Issue | None:  # type: ignore[override]
         """Get an issue by ID for a specific user."""
         return (
             self.session.query(Issue)

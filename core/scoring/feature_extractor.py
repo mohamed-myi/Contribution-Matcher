@@ -194,7 +194,8 @@ def extract_polynomial_features(base_features: list[float]) -> list[float]:
     poly_features = poly.fit_transform(key_features_array)[0]
 
     # Return as list (should be 6 + 6 + 15 = 27 features)
-    return poly_features.tolist()
+    result = poly_features.tolist()
+    return [float(x) for x in result]  # type: ignore[return-value]
 
 
 def _parse_date_to_days(date_value, default_days: float = 365.0) -> float:

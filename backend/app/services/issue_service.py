@@ -106,8 +106,6 @@ def discover_issues_for_user(db: Session, user: User, request: IssueDiscoverRequ
 
         # Parse issue
         parsed = parsing.parse_issue(issue, repo_metadata)
-        if not parsed:
-            continue
 
         # Extract technologies
         technologies = []

@@ -88,22 +88,16 @@ def score_all_issues(db: Session, user: User) -> list[IssueResponse]:
     issues = db.query(Issue).filter(Issue.user_id == user.id).all()
     results = []
     for issue in issues:
-        try:
-            issue_response, _, _ = score_issue(db, user, issue)
-            results.append(issue_response)
-        except Exception:
-            raise
+        issue_response, _, _ = score_issue(db, user, issue)
+        results.append(issue_response)
     return sorted(results, key=lambda r: r.score or 0, reverse=True)
 
 
 def get_top_matches(db: Session, user: User, limit: int = 10) -> list[IssueResponse]:
     """Get top N matched issues."""
-    try:
-        all_scored = score_all_issues(db, user)
-        result = all_scored[:limit]
-        return result
-    except Exception:
-        raise
+    all_scored = score_all_issues(db, user)
+    result = all_scored[:limit]
+    return result
 
 
 def get_score_for_issue(db: Session, user: User, issue_id: int) -> ScoreBreakdownResponse:

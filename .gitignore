@@ -4,8 +4,10 @@ __pycache__/
 *$py.class
 *.so
 .Python
-env/
+.venv/
+.venv310/
 venv/
+env/
 ENV/
 .venv
 *.egg

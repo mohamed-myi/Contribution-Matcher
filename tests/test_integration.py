@@ -170,14 +170,15 @@ class TestProfileWorkflow:
 
         # Verify profile was created
         from core.profile import load_dev_profile
+        from core.profile.dev_profile import DEV_PROFILE_JSON
 
         profile = load_dev_profile()
         assert "python" in profile["skills"]
         assert profile["experience_level"] == "intermediate"
 
-        # Cleanup
-        if os.path.exists("dev_profile.json"):
-            os.remove("dev_profile.json")
+        # Cleanup - only remove the file created by this test
+        if os.path.exists(DEV_PROFILE_JSON):
+            os.remove(DEV_PROFILE_JSON)
 
 
 class TestScoringWorkflow:
@@ -203,8 +204,11 @@ class TestScoringWorkflow:
             # Should complete without error
             # (We can't easily capture stdout in this test, but no exception = success)
         finally:
-            if os.path.exists("dev_profile.json"):
-                os.remove("dev_profile.json")
+            # Cleanup
+            from core.profile.dev_profile import DEV_PROFILE_JSON
+
+            if os.path.exists(DEV_PROFILE_JSON):
+                os.remove(DEV_PROFILE_JSON)
 
     def test_score_specific_issue(self, test_db, sample_profile, sample_issue_in_db, init_test_db):
         """Test scoring a specific issue."""
@@ -227,8 +231,11 @@ class TestScoringWorkflow:
 
             cmd_score(args)
         finally:
-            if os.path.exists("dev_profile.json"):
-                os.remove("dev_profile.json")
+            # Cleanup
+            from core.profile.dev_profile import DEV_PROFILE_JSON
+
+            if os.path.exists(DEV_PROFILE_JSON):
+                os.remove(DEV_PROFILE_JSON)
 
 
 class TestLabelingWorkflow:

@@ -13,7 +13,12 @@ with contextlib.suppress(PermissionError):
     load_dotenv()
 GITHUB_TOKEN = os.getenv("PAT_TOKEN")
 
-DEV_PROFILE_JSON = "dev_profile.json"
+# Use worker-specific filename for parallel test execution to avoid race conditions
+worker_id = os.environ.get("PYTEST_XDIST_WORKER")
+if worker_id and worker_id != "master":
+    DEV_PROFILE_JSON = f"dev_profile_{worker_id}.json"
+else:
+    DEV_PROFILE_JSON = "dev_profile.json"
 
 
 def create_profile_from_github(username: str) -> dict:
@@ -228,6 +233,9 @@ def save_dev_profile(
         output_path: Path to output JSON file
         encrypt: Whether to encrypt the profile file
     """
+    # Resolve to absolute path to avoid issues with parallel test execution
+    if not os.path.isabs(output_path):
+        output_path = os.path.abspath(output_path)
 
     # Save to JSON file
     with open(output_path, "w", encoding="utf-8") as f:
@@ -302,6 +310,9 @@ def load_dev_profile(json_path: str = DEV_PROFILE_JSON, encrypted: bool | None =
     Returns:
         Dictionary with profile data
     """
+    # Resolve to absolute path to avoid issues with parallel test execution
+    if not os.path.isabs(json_path):
+        json_path = os.path.abspath(json_path)
 
     # Check for encrypted file first (default behavior)
     encrypted_path = json_path + ".encrypted"

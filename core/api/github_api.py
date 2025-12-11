@@ -378,7 +378,7 @@ def batch_get_repo_metadata(
     if remaining:
         logger.info("rest_fallback", repo_count=len(remaining))
         for owner, name in remaining:
-            metadata = get_repo_metadata_from_api(owner, name, use_cache=False)
+            metadata = get_repo_metadata_from_api(owner, name, use_cache=False)  # type: ignore[assignment]
             results[(owner, name)] = metadata  # type: ignore[assignment]
             time.sleep(0.1)
 

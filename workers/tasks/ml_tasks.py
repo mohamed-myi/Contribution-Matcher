@@ -53,9 +53,9 @@ def train_model_task(
 
         # Choose training function based on model type
         if model_type == "xgboost":
-            metrics = train_model(  # type: ignore[assignment]
-                use_hyperopt=use_hyperopt,
-                use_advanced_features=True,
+            metrics = train_model(
+                use_tuning=use_hyperopt,
+                use_advanced=True,
             )
         else:
             metrics = train_model()
@@ -133,7 +133,7 @@ def evaluate_model_task(
         # evaluate_model_performance not yet implemented
         # from core.scoring.ml_trainer import evaluate_model_performance
         # metrics = evaluate_model_performance()
-        metrics = {}  # type: ignore[assignment]
+        metrics: dict[str, float] = {}
 
         if metrics is None:
             return {

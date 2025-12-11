@@ -74,7 +74,7 @@ class OrderByFilter(str, Enum):  # type: ignore[misc]
     created_at = "created_at"
     score = "score"
     repo_stars = "repo_stars"
-    title = "title"
+    title = "title"  # type: ignore[assignment]
 
 
 # =============================================================================

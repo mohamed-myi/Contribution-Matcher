@@ -5,6 +5,7 @@ Checks if issues are still open and marks them appropriately.
 """
 
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -104,7 +105,7 @@ def bulk_verify_issues(
     user_id: int,
     limit: int = 50,
     min_age_days: int = 7,
-) -> dict:
+) -> dict[str, Any]:
     """
     Bulk verify issues that haven't been checked recently.
 
@@ -150,7 +151,7 @@ def bulk_verify_issues(
 
     logger.info("bulk_verify_started", user_id=user_id, issue_count=len(issues))
 
-    results = {
+    results: dict[str, Any] = {
         "verified": 0,
         "still_open": 0,
         "now_closed": 0,

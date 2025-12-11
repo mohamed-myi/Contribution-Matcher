@@ -168,8 +168,8 @@ def find_technologies(
         for lang in repo_languages:
             lang_lower = lang.lower()
             category = None
-            for cat, skills in SKILL_CATEGORIES.items():
-                if lang_lower in [s.lower() for s in skills]:  # type: ignore[attr-defined]
+            for cat, category_skills in SKILL_CATEGORIES.items():
+                if lang_lower in [s.lower() for s in category_skills]:
                     category = cat
                     break
 
@@ -182,8 +182,8 @@ def find_technologies(
     if repo_topics:
         for topic in repo_topics:
             topic_lower = topic.lower()
-            for cat, skills in SKILL_CATEGORIES.items():
-                if topic_lower in [s.lower() for s in skills]:  # type: ignore[attr-defined]
+            for cat, category_skills in SKILL_CATEGORIES.items():
+                if topic_lower in [s.lower() for s in category_skills]:
                     key = (topic_lower, cat)
                     if key not in seen:
                         seen.add(key)

@@ -238,10 +238,12 @@ def save_dev_profile(
         try:
             # Encryption functionality not yet implemented
             # from core.security.encryption import encrypt_profile
-            # encrypt_profile(output_path)
-            pass  # type: ignore[unreachable]
-            os.remove(output_path)  # Remove unencrypted file
-            print(f"Profile encrypted and saved to {output_path}.encrypted")
+            # encrypted_path = encrypt_profile(output_path)
+            # if encrypted_path and os.path.exists(encrypted_path):
+            #     os.remove(output_path)  # Remove unencrypted file only if encryption succeeded
+            #     print(f"Profile encrypted and saved to {encrypted_path}")
+            # For now, encryption is not implemented, so keep the unencrypted file
+            print(f"Profile saved to {output_path} (encryption not yet implemented)")
         except ImportError:
             print("Warning: cryptography not installed, profile saved unencrypted")
         except Exception as e:

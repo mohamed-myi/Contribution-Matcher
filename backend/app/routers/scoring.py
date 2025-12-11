@@ -31,11 +31,8 @@ def top_matches(
     current_user: User = Depends(get_current_user),
 ):
     """Return top-matching issues for the current user."""
-    try:
-        issues = scoring_service.get_top_matches(db, current_user, limit=limit)
-        return TopMatchesResponse(issues=issues)
-    except Exception:
-        raise
+    issues = scoring_service.get_top_matches(db, current_user, limit=limit)
+    return TopMatchesResponse(issues=issues)
 
 
 @router.get("/{issue_id}", response_model=ScoreBreakdownResponse)

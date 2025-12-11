@@ -79,6 +79,8 @@ class BaseRepository(Generic[T]):
         for key, value in filters.items():
             if hasattr(self.model, key):
                 query = query.filter(getattr(self.model, key) == value)
+            else:
+                raise ValueError(f"Unknown filter key '{key}' for model {self.model.__name__}")
         return query.scalar() or 0
 
     def exists(self, id: int) -> bool:

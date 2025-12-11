@@ -17,11 +17,8 @@ def _get_issue_technologies_orm(issue_id: int, session) -> list[tuple[str, str |
     """Get technologies for an issue using ORM."""
     from core.models import IssueTechnology
 
-    try:
-        results = session.query(IssueTechnology).filter(IssueTechnology.issue_id == issue_id).all()
-        return [(r.technology, r.technology_category) for r in results]
-    except Exception:
-        raise
+    results = session.query(IssueTechnology).filter(IssueTechnology.issue_id == issue_id).all()
+    return [(r.technology, r.technology_category) for r in results]
 
 
 def _query_issues_orm(session, user_id: int | None = None, limit: int = 100) -> list[dict]:
@@ -409,94 +406,85 @@ def get_match_breakdown(profile: dict, issue_data: dict, session=None) -> dict:
     Returns:
         Dictionary with component scores and supporting metadata.
     """
-    try:
-        # Get issue technologies
-        issue_id = issue_data.get("id")
-        if issue_id and session:
-            # Ensure issue_id is an integer (handle case where it might be a string)
-            try:
-                issue_id_int = int(issue_id) if not isinstance(issue_id, int) else issue_id
-                issue_techs_tuples = _get_issue_technologies_orm(issue_id_int, session)
-                issue_technologies = [tech for tech, _ in issue_techs_tuples]
-            except (ValueError, TypeError):
-                issue_technologies = []
-        else:
+    # Get issue technologies
+    issue_id = issue_data.get("id")
+    if issue_id and session:
+        # Ensure issue_id is an integer (handle case where it might be a string)
+        try:
+            issue_id_int = int(issue_id) if not isinstance(issue_id, int) else issue_id
+            issue_techs_tuples = _get_issue_technologies_orm(issue_id_int, session)
+            issue_technologies = [tech for tech, _ in issue_techs_tuples]
+        except (ValueError, TypeError):
             issue_technologies = []
+    else:
+        issue_technologies = []
 
-        profile_skills = profile.get("skills", [])
+    profile_skills = profile.get("skills", [])
 
-        # Calculate skill match
-        skill_match_pct, skill_matching, skill_missing = calculate_skill_match(
-            profile_skills, issue_technologies
+    # Calculate skill match
+    skill_match_pct, skill_matching, skill_missing = calculate_skill_match(
+        profile_skills, issue_technologies
+    )
+
+    # Calculate other matches
+    experience_score = calculate_experience_match(
+        profile.get("experience_level", "intermediate"), issue_data.get("difficulty")
+    )
+
+    # Get repo metadata
+    repo_metadata = {}
+    if issue_data.get("repo_owner") and issue_data.get("repo_name") and session:
+        repo_metadata = (
+            _get_repo_metadata_orm(issue_data["repo_owner"], issue_data["repo_name"], session) or {}
         )
 
-        # Calculate other matches
-        experience_score = calculate_experience_match(
-            profile.get("experience_level", "intermediate"), issue_data.get("difficulty")
-        )
+    repo_quality_score = calculate_repo_quality(repo_metadata)
+    freshness_score = calculate_freshness(issue_data.get("updated_at"))
+    time_match_score = calculate_time_match(
+        profile.get("time_availability_hours_per_week"), issue_data.get("time_estimate")
+    )
+    interest_match_score = calculate_interest_match(
+        profile.get("interests", []),
+        (
+            issue_data.get("repo_topics", [])
+            if isinstance(issue_data.get("repo_topics"), list)
+            else []
+        ),
+    )
 
-        # Get repo metadata
-        repo_metadata = {}
-        if issue_data.get("repo_owner") and issue_data.get("repo_name") and session:
-            try:
-                repo_metadata = (
-                    _get_repo_metadata_orm(
-                        issue_data["repo_owner"], issue_data["repo_name"], session
-                    )
-                    or {}
-                )
-            except Exception:
-                raise
-
-        repo_quality_score = calculate_repo_quality(repo_metadata)
-        freshness_score = calculate_freshness(issue_data.get("updated_at"))
-        time_match_score = calculate_time_match(
-            profile.get("time_availability_hours_per_week"), issue_data.get("time_estimate")
-        )
-        interest_match_score = calculate_interest_match(
-            profile.get("interests", []),
-            (
-                issue_data.get("repo_topics", [])
-                if isinstance(issue_data.get("repo_topics"), list)
-                else []
-            ),
-        )
-
-        return {
-            "skills": {
-                "match_percentage": skill_match_pct,
-                "matching": skill_matching,
-                "missing": skill_missing,
-                "total_required": len(issue_technologies),
-            },
-            "experience": {
-                "score": experience_score,
-                "profile_level": profile.get("experience_level"),
-                "issue_difficulty": issue_data.get("difficulty"),
-            },
-            "repo_quality": {
-                "score": repo_quality_score,
-                "stars": repo_metadata.get("stars"),
-                "forks": repo_metadata.get("forks"),
-                "contributor_count": repo_metadata.get("contributor_count"),
-            },
-            "freshness": {
-                "score": freshness_score,
-                "updated_at": issue_data.get("updated_at"),
-            },
-            "time_match": {
-                "score": time_match_score,
-                "profile_availability": profile.get("time_availability_hours_per_week"),
-                "issue_estimate": issue_data.get("time_estimate"),
-            },
-            "interest_match": {
-                "score": interest_match_score,
-                "profile_interests": profile.get("interests", []),
-                "repo_topics": issue_data.get("repo_topics", []),
-            },
-        }
-    except Exception:
-        raise
+    return {
+        "skills": {
+            "match_percentage": skill_match_pct,
+            "matching": skill_matching,
+            "missing": skill_missing,
+            "total_required": len(issue_technologies),
+        },
+        "experience": {
+            "score": experience_score,
+            "profile_level": profile.get("experience_level"),
+            "issue_difficulty": issue_data.get("difficulty"),
+        },
+        "repo_quality": {
+            "score": repo_quality_score,
+            "stars": repo_metadata.get("stars"),
+            "forks": repo_metadata.get("forks"),
+            "contributor_count": repo_metadata.get("contributor_count"),
+        },
+        "freshness": {
+            "score": freshness_score,
+            "updated_at": issue_data.get("updated_at"),
+        },
+        "time_match": {
+            "score": time_match_score,
+            "profile_availability": profile.get("time_availability_hours_per_week"),
+            "issue_estimate": issue_data.get("time_estimate"),
+        },
+        "interest_match": {
+            "score": interest_match_score,
+            "profile_interests": profile.get("interests", []),
+            "repo_topics": issue_data.get("repo_topics", []),
+        },
+    }
 
 
 def score_issue_against_profile(profile: dict, issue_data: dict, session=None) -> dict:

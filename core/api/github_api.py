@@ -433,7 +433,6 @@ def get_repo_metadata_from_api(
 ) -> dict | None:
     """Fetch repository metadata from GitHub API or cache."""
     settings = get_settings()
-    timedelta(days=settings.cache_validity_days)
 
     # Check cache first
     if use_cache:

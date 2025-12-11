@@ -138,7 +138,7 @@ class ScoreBreakdownResponse(BaseModel):
 
 
 class LabelRequest(BaseModel):
-    label: str = Field(pattern="^(good|bad)$")
+    label: str
 
 
 class ScoredIssueResponse(BaseModel):

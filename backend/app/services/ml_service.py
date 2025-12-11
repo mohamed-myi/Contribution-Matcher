@@ -27,6 +27,11 @@ def label_issue(db: Session, user: User, issue_id: int, label: str) -> None:
     """Assign or update a label ('good'|'bad') for an issue."""
     issue = issue_service.get_issue(db, user, issue_id)
     label = label.lower()
+    if label not in ("good", "bad"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid label; must be 'good' or 'bad'.",
+        )
     existing = (
         db.query(IssueLabel)
         .filter(IssueLabel.user_id == user.id, IssueLabel.issue_id == issue.id)

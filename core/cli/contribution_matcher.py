@@ -460,8 +460,6 @@ def cmd_create_profile(args):
     """Create developer profile."""
     _init_database()
 
-    not getattr(args, "no_encrypt", False)
-
     if args.github:
         try:
             create_profile_from_github(args.github)

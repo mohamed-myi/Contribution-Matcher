@@ -61,6 +61,24 @@ def test_label_and_status(authorized_client):
     assert data["labeled_count"] == 1
 
 
+def test_label_rejects_invalid_label(authorized_client):
+    client, _, session_factory = authorized_client
+    session = session_factory()
+    _ensure_profile(session, user_id=1)
+    issues = _prepare_issues(session, user_id=1)
+    session.close()
+
+    resp = client.post(
+        f"/api/v1/ml/label/{issues[0]}",
+        json={"label": "junk"},
+        headers={"Authorization": "Bearer fake"},
+    )
+    assert resp.status_code == 400, resp.text
+    body = resp.json()
+    assert "detail" in body
+    assert "Invalid label" in body["detail"]
+
+
 def test_train_model(authorized_client, monkeypatch, tmp_path):
     client, _, session_factory = authorized_client
     session = session_factory()

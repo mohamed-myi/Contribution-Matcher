@@ -13,7 +13,7 @@ except ImportError:
     HAS_OPENPYXL = False
 
 try:
-    import markdown  # noqa: F401
+    import markdown  # type: ignore[import-untyped]  # noqa: F401
 
     HAS_MARKDOWN = True
 except ImportError:

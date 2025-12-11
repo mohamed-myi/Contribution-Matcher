@@ -163,12 +163,12 @@ def bulk_verify_issues(
         result: dict = verify_issue_status(db, issue)
 
         if result.get("verified"):
-            results["verified"] += 1
+            results["verified"] = int(results.get("verified", 0)) + 1  # type: ignore[assignment]
 
             if result.get("status") == "open":
-                results["still_open"] += 1
+                results["still_open"] = int(results.get("still_open", 0)) + 1  # type: ignore[assignment]
             elif result.get("status") == "closed":
-                results["now_closed"] += 1
+                results["now_closed"] = int(results.get("now_closed", 0)) + 1  # type: ignore[assignment]
                 closed_issues_list = results.get("closed_issues", [])
                 if isinstance(closed_issues_list, list):
                     closed_issues_list.append(
@@ -179,7 +179,7 @@ def bulk_verify_issues(
                         }
                     )
         else:
-            results["errors"] += 1
+            results["errors"] = int(results.get("errors", 0)) + 1  # type: ignore[assignment]
 
     logger.info(
         "bulk_verify_complete",

@@ -300,7 +300,7 @@ class GitHubService:
         Returns:
             Mapping of issue URL to status value ('open', 'closed', or 'unknown').
         """
-        import requests
+        import requests  # type: ignore[import-untyped]
 
         from core.api.github_api import GITHUB_GRAPHQL_ENDPOINT, _get_headers
 

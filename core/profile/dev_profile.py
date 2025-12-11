@@ -3,7 +3,7 @@ import json
 import os
 from datetime import datetime
 
-import requests
+import requests  # type: ignore[import-untyped]
 from dotenv import load_dotenv
 
 from core.constants import GITHUB_API_BASE

@@ -157,7 +157,7 @@ def find_technologies(
     # Extract from issue body
     if issue:
         _, skills, _ = analyze_job_text(issue)
-        for tech, category in skills:
+        for tech, category in skills:  # type: ignore[assignment]
             key = (tech.lower(), category)
             if key not in seen:
                 seen.add(key)
@@ -165,7 +165,7 @@ def find_technologies(
 
     # Extract from repo languages
     if repo_languages:
-        for lang in repo_languages:
+        for lang in repo_languages:  # type: ignore[assignment]
             lang_lower = lang.lower()
             category = None
             for cat, category_skills in SKILL_CATEGORIES.items():
@@ -180,7 +180,7 @@ def find_technologies(
 
     # Extract from repo topics
     if repo_topics:
-        for topic in repo_topics:
+        for topic in repo_topics:  # type: ignore[assignment]
             topic_lower = topic.lower()
             for cat, category_skills in SKILL_CATEGORIES.items():
                 if topic_lower in [s.lower() for s in category_skills]:

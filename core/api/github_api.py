@@ -3,7 +3,7 @@
 import time
 from datetime import datetime, timedelta
 
-import requests
+import requests  # type: ignore[import-untyped]
 
 from core.config import get_settings
 from core.constants import DISCOVERY_LABELS, GITHUB_API_BASE, GITHUB_GRAPHQL_ENDPOINT

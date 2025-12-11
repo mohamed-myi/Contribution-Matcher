@@ -71,9 +71,9 @@ class ScoreRangeFilter(str, Enum):
 class OrderByFilter(str, Enum):  # type: ignore[misc]
     """Valid order_by filter values."""
 
-    created_at = "created_at"
-    score = "score"
-    repo_stars = "repo_stars"
+    created_at = "created_at"  # type: ignore[assignment]
+    score = "score"  # type: ignore[assignment]
+    repo_stars = "repo_stars"  # type: ignore[assignment]
     title = "title"  # type: ignore[assignment]
 
 

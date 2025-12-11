@@ -73,7 +73,7 @@ def get_github_user(access_token: str) -> dict[str, str | None]:
                     break
 
     return {
-        "github_id": str(user_data.get("id")),
+        "github_id": str(user_data["id"]) if user_data.get("id") is not None else None,
         "github_username": user_data.get("login"),
         "email": email or user_data.get("email"),
         "avatar_url": user_data.get("avatar_url"),

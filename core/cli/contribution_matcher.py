@@ -172,7 +172,7 @@ def cmd_discover_async(args):
             )
 
         print(f"Task queued: {task.id}")
-        print("Use 'python main.py task-status --id {task.id}' to check status")
+        print(f"Use 'python main.py task-status --id {task.id}' to check status")
 
     except ImportError:
         print("Error: Celery workers not available.")
@@ -334,7 +334,7 @@ def cmd_score_async(args):
         task = score_user_issues_task.delay(user_id=1)  # CLI uses default user
 
         print(f"Task queued: {task.id}")
-        print("Use 'python main.py task-status --id {task.id}' to check status")
+        print(f"Use 'python main.py task-status --id {task.id}' to check status")
 
     except ImportError:
         print("Error: Celery workers not available.")
@@ -754,7 +754,7 @@ def cmd_train_async(args):
 
         print(f"Task queued: {task.id}")
         print("Training may take 10-30 minutes.")
-        print("Use 'python main.py task-status --id {task.id}' to check status")
+        print(f"Use 'python main.py task-status --id {task.id}' to check status")
 
     except ImportError:
         print("Error: Celery workers not available.")

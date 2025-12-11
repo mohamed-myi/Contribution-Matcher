@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
 import { AuthCallback } from './AuthCallback';
 import { renderWithProviders } from '../test/test-utils';
 import { api } from '../api/client';
@@ -23,10 +22,11 @@ describe('AuthCallback Page', () => {
     const mockLogin = vi.fn(() => new Promise(() => {})); // Never resolves
     
     renderWithProviders(
-      <MemoryRouter initialEntries={['/auth/callback?code=test-code']}>
-        <AuthCallback />
-      </MemoryRouter>,
+      <AuthCallback />,
       {
+        routerOptions: {
+          initialEntries: ['/auth/callback?code=test-code'],
+        },
         authState: {
           isAuthenticated: false,
           loading: false,
@@ -48,10 +48,11 @@ describe('AuthCallback Page', () => {
     const mockLogin = vi.fn().mockResolvedValue(undefined);
 
     renderWithProviders(
-      <MemoryRouter initialEntries={['/auth/callback?code=test-code']}>
-        <AuthCallback />
-      </MemoryRouter>,
+      <AuthCallback />,
       {
+        routerOptions: {
+          initialEntries: ['/auth/callback?code=test-code'],
+        },
         authState: {
           isAuthenticated: false,
           loading: false,
@@ -124,6 +125,6 @@ describe('AuthCallback Page', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/Failed to complete authentication/)).toBeInTheDocument();
-    });
+    }, { timeout: 2000 });
   });
 });

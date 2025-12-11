@@ -207,12 +207,12 @@ jobs:
         run: pip install safety
 
       - name: Run safety scan on requirements.txt
-        run: safety scan -r requirements.txt --output text
+        run: safety scan -r requirements.txt --output screen
 
       - name: Run safety scan on requirements-ml.txt
         run: |
           if [ -f requirements-ml.txt ]; then
-            safety scan -r requirements-ml.txt --output text
+            safety scan -r requirements-ml.txt --output screen
           else
             echo "requirements-ml.txt not found, skipping"
           fi

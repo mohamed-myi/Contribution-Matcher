@@ -1,5 +1,5 @@
 import { render } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../context/AuthContext';
 import AuthContext from '../context/AuthContext';
@@ -58,15 +58,18 @@ export function renderWithProviders(
   } = {}
 ) {
   const Wrapper = ({ children }) => {
+    // Use MemoryRouter if initialEntries is provided, otherwise BrowserRouter
+    const Router = routerOptions.initialEntries ? MemoryRouter : BrowserRouter;
+    
     if (authState) {
       // Use mock auth provider
       return (
         <QueryClientProvider client={queryClient}>
-          <BrowserRouter {...routerOptions}>
+          <Router {...routerOptions}>
             <MockAuthProvider authState={authState}>
               {children}
             </MockAuthProvider>
-          </BrowserRouter>
+          </Router>
         </QueryClientProvider>
       );
     }
@@ -74,9 +77,9 @@ export function renderWithProviders(
     // Use real auth provider
     return (
       <QueryClientProvider client={queryClient}>
-        <BrowserRouter {...routerOptions}>
+        <Router {...routerOptions}>
           <AuthProvider>{children}</AuthProvider>
-        </BrowserRouter>
+        </Router>
       </QueryClientProvider>
     );
   };

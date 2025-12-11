@@ -23,7 +23,17 @@ from app import models  # noqa: F401,E402  # noqa ensures models imported
 config = context.config
 
 settings = get_settings()
-config.set_main_option("sqlalchemy.url", settings.database_url)
+database_url = settings.database_url
+
+# If using SQLite with relative path, make it relative to project root
+if database_url.startswith("sqlite:///") and not database_url.startswith("sqlite:////"):
+    # Extract the db filename from the URL
+    db_path = database_url.replace("sqlite:///", "")
+    # Make it absolute relative to project root
+    abs_db_path = os.path.join(PROJECT_ROOT, db_path)
+    database_url = f"sqlite:///{abs_db_path}"
+
+config.set_main_option("sqlalchemy.url", database_url)
 
 target_metadata = Base.metadata
 

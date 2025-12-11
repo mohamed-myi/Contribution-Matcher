@@ -70,7 +70,10 @@ export const handlers = [
 
   // Issues endpoints
   http.get(`${API_URL}/issues`, () => {
-    return HttpResponse.json(mockIssues);
+    return HttpResponse.json({
+      issues: mockIssues,
+      total: mockIssues.length,
+    });
   }),
 
   http.get(`${API_URL}/issues/:id`, ({ params }) => {
@@ -93,7 +96,10 @@ export const handlers = [
   }),
 
   http.get(`${API_URL}/issues/bookmarks`, () => {
-    return HttpResponse.json(mockIssues);
+    return HttpResponse.json({
+      issues: mockIssues,
+      total: mockIssues.length,
+    });
   }),
 
   http.get(`${API_URL}/issues/stats`, () => {
@@ -110,7 +116,9 @@ export const handlers = [
   }),
 
   http.get(`${API_URL}/scoring/top-matches`, () => {
-    return HttpResponse.json(mockIssues.slice(0, 10));
+    return HttpResponse.json({
+      issues: mockIssues.slice(0, 10),
+    });
   }),
 
   http.get(`${API_URL}/scoring/:id`, () => {
@@ -135,11 +143,21 @@ export const handlers = [
   }),
 
   http.get(`${API_URL}/ml/unlabeled-issues`, () => {
-    return HttpResponse.json(mockIssues);
+    return HttpResponse.json({
+      issues: mockIssues,
+    });
   }),
 
   http.get(`${API_URL}/ml/labeled-issues`, () => {
-    return HttpResponse.json(mockIssues);
+    return HttpResponse.json({
+      issues: mockIssues.map(issue => ({
+        ...issue,
+        label: 'good',
+      })),
+      total: mockIssues.length,
+      good_count: mockIssues.length,
+      bad_count: 0,
+    });
   }),
 
   http.post(`${API_URL}/ml/train`, () => {

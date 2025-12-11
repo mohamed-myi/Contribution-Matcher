@@ -348,7 +348,9 @@ class TestScoreIssueAgainstProfile:
     """Tests for overall issue scoring."""
 
     @patch("core.scoring.ml_trainer.predict_issue_quality")
-    def test_score_without_ml(self, mock_predict, test_db, sample_profile, sample_issue_in_db, init_test_db):
+    def test_score_without_ml(
+        self, mock_predict, test_db, sample_profile, sample_issue_in_db, init_test_db
+    ):
         """Test scoring without ML model."""
         mock_predict.return_value = (0.5, 0.5)  # Neutral prediction
 
@@ -367,7 +369,9 @@ class TestScoreIssueAgainstProfile:
         assert "ml_prediction" in result["breakdown"]
 
     @patch("core.scoring.issue_scorer.predict_issue_quality")
-    def test_score_with_ml_boost(self, mock_predict, test_db, sample_profile, sample_issue_in_db, init_test_db):
+    def test_score_with_ml_boost(
+        self, mock_predict, test_db, sample_profile, sample_issue_in_db, init_test_db
+    ):
         """Test scoring with ML prediction boost."""
         mock_predict.return_value = (0.9, 0.1)  # High confidence good
 
@@ -385,7 +389,9 @@ class TestScoreIssueAgainstProfile:
         assert result["breakdown"]["ml_prediction"]["adjustment"] > 0
 
     @patch("core.scoring.issue_scorer.predict_issue_quality")
-    def test_score_with_ml_penalty(self, mock_predict, test_db, sample_profile, sample_issue_in_db, init_test_db):
+    def test_score_with_ml_penalty(
+        self, mock_predict, test_db, sample_profile, sample_issue_in_db, init_test_db
+    ):
         """Test scoring with ML prediction penalty."""
         mock_predict.return_value = (0.1, 0.9)  # High confidence bad
 

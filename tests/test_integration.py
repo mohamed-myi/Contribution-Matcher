@@ -206,7 +206,7 @@ class TestScoringWorkflow:
             if os.path.exists("dev_profile.json"):
                 os.remove("dev_profile.json")
 
-    def test_score_specific_issue(self, test_db, sample_profile, sample_issue_in_db):
+    def test_score_specific_issue(self, test_db, sample_profile, sample_issue_in_db, init_test_db):
         """Test scoring a specific issue."""
         from core.profile import save_dev_profile
 
@@ -234,7 +234,9 @@ class TestScoringWorkflow:
 class TestLabelingWorkflow:
     """Tests for labeling workflow."""
 
-    def test_label_export_import_workflow(self, test_db, multiple_issues_in_db, tmp_path, init_test_db):
+    def test_label_export_import_workflow(
+        self, test_db, multiple_issues_in_db, tmp_path, init_test_db
+    ):
         """Test complete labeling workflow."""
         # Export unlabeled issues
         export_file = tmp_path / "labels.csv"

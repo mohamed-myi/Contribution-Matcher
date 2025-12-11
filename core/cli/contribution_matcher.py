@@ -893,6 +893,7 @@ def cmd_export(args):
         print(f"Exported {len(issues)} issues to {args.output}")
     elif args.format.lower() == "json":
         import json
+
         with open(args.output, "w", encoding="utf-8") as f:
             json.dump(issues, f, indent=2, default=str)
         print(f"Exported {len(issues)} issues to {args.output}")

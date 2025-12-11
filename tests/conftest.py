@@ -330,12 +330,14 @@ def init_test_db(test_db, monkeypatch):
     monkeypatch.setenv("DATABASE_URL", test_db_url)
     # Reset and re-initialize the global db object
     from core.db import db
+
     if db.is_initialized:
         db.engine.dispose()
     db._initialized = False
     db.initialize(test_db_url)
     # Create a user with id=1 for CLI functions that default to user_id=1
     from core.models import User
+
     with db.session() as session:
         existing_user = session.query(User).filter(User.id == 1).first()
         if not existing_user:

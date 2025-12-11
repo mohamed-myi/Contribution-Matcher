@@ -321,14 +321,16 @@ class TestCalculateInterestMatch:
 class TestGetMatchBreakdown:
     """Tests for match breakdown calculation."""
 
-    def test_complete_breakdown(self, test_db, sample_profile, sample_issue_in_db):
+    def test_complete_breakdown(self, test_db, sample_profile, sample_issue_in_db, init_test_db):
         """Test getting complete match breakdown."""
         from core.database import query_issues
+        from core.db import db
 
         issues = query_issues()
         issue = issues[0]
 
-        breakdown = get_match_breakdown(sample_profile, issue)
+        with db.session() as session:
+            breakdown = get_match_breakdown(sample_profile, issue, session=session)
 
         assert "skills" in breakdown
         assert "experience" in breakdown
@@ -346,16 +348,18 @@ class TestScoreIssueAgainstProfile:
     """Tests for overall issue scoring."""
 
     @patch("core.scoring.ml_trainer.predict_issue_quality")
-    def test_score_without_ml(self, mock_predict, test_db, sample_profile, sample_issue_in_db):
+    def test_score_without_ml(self, mock_predict, test_db, sample_profile, sample_issue_in_db, init_test_db):
         """Test scoring without ML model."""
         mock_predict.return_value = (0.5, 0.5)  # Neutral prediction
 
         from core.database import query_issues
+        from core.db import db
 
         issues = query_issues()
         issue = issues[0]
 
-        result = score_issue_against_profile(sample_profile, issue)
+        with db.session() as session:
+            result = score_issue_against_profile(sample_profile, issue, session=session)
 
         assert "score" in result
         assert "breakdown" in result
@@ -363,39 +367,44 @@ class TestScoreIssueAgainstProfile:
         assert "ml_prediction" in result["breakdown"]
 
     @patch("core.scoring.issue_scorer.predict_issue_quality")
-    def test_score_with_ml_boost(self, mock_predict, test_db, sample_profile, sample_issue_in_db):
+    def test_score_with_ml_boost(self, mock_predict, test_db, sample_profile, sample_issue_in_db, init_test_db):
         """Test scoring with ML prediction boost."""
         mock_predict.return_value = (0.9, 0.1)  # High confidence good
 
         from core.database import query_issues
+        from core.db import db
 
         issues = query_issues()
         issue = issues[0]
 
-        result = score_issue_against_profile(sample_profile, issue)
+        with db.session() as session:
+            result = score_issue_against_profile(sample_profile, issue, session=session)
 
         # Score should be boosted by ML
         assert result["score"] > 0
         assert result["breakdown"]["ml_prediction"]["adjustment"] > 0
 
     @patch("core.scoring.issue_scorer.predict_issue_quality")
-    def test_score_with_ml_penalty(self, mock_predict, test_db, sample_profile, sample_issue_in_db):
+    def test_score_with_ml_penalty(self, mock_predict, test_db, sample_profile, sample_issue_in_db, init_test_db):
         """Test scoring with ML prediction penalty."""
         mock_predict.return_value = (0.1, 0.9)  # High confidence bad
 
         from core.database import query_issues
+        from core.db import db
 
         issues = query_issues()
         issue = issues[0]
 
-        result = score_issue_against_profile(sample_profile, issue)
+        with db.session() as session:
+            result = score_issue_against_profile(sample_profile, issue, session=session)
 
         # Score should be penalized by ML
         assert result["breakdown"]["ml_prediction"]["adjustment"] < 0
 
-    def test_score_clamped_to_100(self, test_db, sample_profile, sample_issue_in_db):
+    def test_score_clamped_to_100(self, test_db, sample_profile, sample_issue_in_db, init_test_db):
         """Test that scores are clamped to 100 maximum."""
         from core.database import query_issues
+        from core.db import db
 
         issues = query_issues()
         issue = issues[0]
@@ -409,6 +418,7 @@ class TestScoreIssueAgainstProfile:
             "time_availability_hours_per_week": 20,
         }
 
-        result = score_issue_against_profile(perfect_profile, issue)
+        with db.session() as session:
+            result = score_issue_against_profile(perfect_profile, issue, session=session)
 
         assert result["score"] <= 100

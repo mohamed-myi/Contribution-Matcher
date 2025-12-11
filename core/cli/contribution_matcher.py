@@ -893,7 +893,10 @@ def cmd_export(args):
         )
         print(f"Exported {len(issues)} issues to {args.output}")
     elif args.format.lower() == "json":
-        export_to_json(args.output, issues)
+        import json
+        with open(args.output, "w", encoding="utf-8") as f:
+            json.dump(issues, f, indent=2, default=str)
+        print(f"Exported {len(issues)} issues to {args.output}")
     elif args.format.lower() in ["markdown", "html"]:
         output = format_output(issues, args.format.lower(), verbose=getattr(args, "verbose", False))
         with open(args.output, "w", encoding="utf-8") as f:

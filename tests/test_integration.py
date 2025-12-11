@@ -234,7 +234,7 @@ class TestScoringWorkflow:
 class TestLabelingWorkflow:
     """Tests for labeling workflow."""
 
-    def test_label_export_import_workflow(self, test_db, multiple_issues_in_db, tmp_path):
+    def test_label_export_import_workflow(self, test_db, multiple_issues_in_db, tmp_path, init_test_db):
         """Test complete labeling workflow."""
         # Export unlabeled issues
         export_file = tmp_path / "labels.csv"
@@ -278,7 +278,7 @@ class TestLabelingWorkflow:
         stats = get_labeling_statistics()
         assert stats["total_labeled"] > 0
 
-    def test_label_status(self, test_db, multiple_issues_in_db):
+    def test_label_status(self, test_db, multiple_issues_in_db, init_test_db):
         """Test label status command."""
         # Label one issue
         from core.database import query_issues, update_issue_label
@@ -295,7 +295,7 @@ class TestLabelingWorkflow:
 class TestMLTrainingWorkflow:
     """Tests for ML training workflow."""
 
-    def test_train_model_workflow(self, test_db, labeled_issues_for_ml):
+    def test_train_model_workflow(self, test_db, labeled_issues_for_ml, init_test_db):
         """Test complete ML training workflow."""
         # Add more labels to meet minimum
         from core.database import update_issue_label, upsert_issue
@@ -332,7 +332,7 @@ class TestMLTrainingWorkflow:
 class TestExportWorkflow:
     """Tests for export workflow."""
 
-    def test_export_csv_workflow(self, test_db, multiple_issues_in_db, tmp_path):
+    def test_export_csv_workflow(self, test_db, multiple_issues_in_db, tmp_path, init_test_db):
         """Test exporting to CSV."""
         output_file = tmp_path / "export.csv"
 
@@ -355,7 +355,7 @@ class TestExportWorkflow:
             rows = list(reader)
             assert len(rows) == 3
 
-    def test_export_json_workflow(self, test_db, multiple_issues_in_db, tmp_path):
+    def test_export_json_workflow(self, test_db, multiple_issues_in_db, tmp_path, init_test_db):
         """Test exporting to JSON."""
         output_file = tmp_path / "export.json"
 

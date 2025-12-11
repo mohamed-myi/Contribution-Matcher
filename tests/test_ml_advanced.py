@@ -182,9 +182,11 @@ class TestAdvancedFeatureExtraction:
             assert all(isinstance(f, (int, float)) for f in advanced_features)
             assert all(not np.isnan(f) and not np.isinf(f) for f in advanced_features)
 
-    def test_embedding_caching(self, test_db, sample_issue_in_db):
+    def test_embedding_caching(self, test_db, sample_issue_in_db, init_test_db):
         """Test that embeddings are cached in database."""
-        from core.database import get_issue_embedding, query_issues
+        from core.database import query_issues
+        from core.db import db
+        from core.models import IssueEmbedding
 
         issues = query_issues()
         issue = issues[0]
@@ -195,16 +197,20 @@ class TestAdvancedFeatureExtraction:
             mock_transformer.encode.return_value = np.random.rand(384)
             mock_model.return_value = mock_transformer
 
-            # Generate embeddings (should cache)
-            desc_emb, title_emb = get_text_embeddings(issue)
+            # Generate embeddings (should cache) - pass session for caching
+            with db.session() as session:
+                desc_emb, title_emb = get_text_embeddings(issue, session=session)
 
             # Check that embeddings were cached
-            cached = get_issue_embedding(issue_id)
+            with db.session() as session:
+                cached = session.query(IssueEmbedding).filter(IssueEmbedding.issue_id == issue_id).first()
 
             assert cached is not None
-            cached_desc, cached_title = cached
-            assert cached_desc is not None
-            assert cached_title is not None
+            assert cached.description_embedding is not None
+            assert cached.title_embedding is not None
+            import pickle
+            cached_desc = pickle.loads(cached.description_embedding)
+            cached_title = pickle.loads(cached.title_embedding)
             assert len(cached_desc) == 384  # Original embedding size
             assert len(cached_title) == 384  # Original embedding size
 
@@ -213,7 +219,7 @@ class TestXGBoostModelTraining:
     """Tests for XGBoost model training."""
 
     @pytest.mark.skipif(not HAS_XGBOOST or not HAS_LIGHTGBM, reason="XGBoost and LightGBM required")
-    def test_train_xgboost_with_stacking(self, test_db, labeled_issues_for_ml, sample_profile):
+    def test_train_xgboost_with_stacking(self, test_db, labeled_issues_for_ml, sample_profile, init_test_db):
         """Test training XGBoost model with stacking ensemble."""
         from core.database import update_issue_label, upsert_issue
 
@@ -256,7 +262,7 @@ class TestXGBoostModelTraining:
                 os.remove(f)
 
     @pytest.mark.skipif(not HAS_XGBOOST, reason="XGBoost required")
-    def test_train_xgboost_without_stacking(self, test_db, labeled_issues_for_ml, sample_profile):
+    def test_train_xgboost_without_stacking(self, test_db, labeled_issues_for_ml, sample_profile, init_test_db):
         """Test training XGBoost model without stacking."""
         from core.database import update_issue_label, upsert_issue
 
@@ -288,7 +294,7 @@ class TestXGBoostModelTraining:
                 os.remove(f)
 
     @pytest.mark.skipif(not HAS_XGBOOST, reason="XGBoost required")
-    def test_train_xgboost_without_advanced(self, test_db, labeled_issues_for_ml, sample_profile):
+    def test_train_xgboost_without_advanced(self, test_db, labeled_issues_for_ml, sample_profile, init_test_db):
         """Test training XGBoost model without advanced features."""
         from core.database import update_issue_label, upsert_issue
 
@@ -322,7 +328,7 @@ class TestXGBoostModelTraining:
     @pytest.mark.skipif(
         not HAS_XGBOOST or not HAS_SKOPT, reason="XGBoost and scikit-optimize required"
     )
-    def test_train_with_hyperparameter_tuning(self, test_db, labeled_issues_for_ml, sample_profile):
+    def test_train_with_hyperparameter_tuning(self, test_db, labeled_issues_for_ml, sample_profile, init_test_db):
         """Test training with hyperparameter optimization."""
         from core.database import update_issue_label, upsert_issue
 
@@ -359,7 +365,7 @@ class TestXGBoostModelTraining:
 class TestModelVersioning:
     """Tests for model versioning (v2 vs legacy)."""
 
-    def test_legacy_model_training(self, test_db, labeled_issues_for_ml):
+    def test_legacy_model_training(self, test_db, labeled_issues_for_ml, init_test_db):
         """Test training legacy GradientBoosting model."""
         from core.database import update_issue_label, upsert_issue
 
@@ -393,7 +399,7 @@ class TestModelVersioning:
                 os.remove(f)
 
     @pytest.mark.skipif(not HAS_XGBOOST, reason="XGBoost required")
-    def test_model_version_detection(self, test_db, sample_profile, sample_issue_in_db):
+    def test_model_version_detection(self, test_db, sample_profile, sample_issue_in_db, init_test_db):
         """Test that model version is correctly detected."""
         from core.database import query_issues, update_issue_label, upsert_issue
 
@@ -437,7 +443,7 @@ class TestModelVersioning:
                 if os.path.exists(f):
                     os.remove(f)
 
-    def test_legacy_model_prediction(self, test_db, sample_profile, sample_issue_in_db):
+    def test_legacy_model_prediction(self, test_db, sample_profile, sample_issue_in_db, init_test_db):
         """Test prediction with legacy model."""
         from core.database import query_issues, update_issue_label, upsert_issue
 
@@ -499,7 +505,7 @@ class TestThresholdOptimization:
 
     @pytest.mark.skipif(not HAS_XGBOOST, reason="XGBoost required")
     def test_threshold_optimization_in_training(
-        self, test_db, labeled_issues_for_ml, sample_profile
+        self, test_db, labeled_issues_for_ml, sample_profile, init_test_db
     ):
         """Test that threshold optimization is used in training."""
         from core.database import update_issue_label, upsert_issue
@@ -564,7 +570,7 @@ class TestHyperparameterOptimization:
         not HAS_XGBOOST or not HAS_SKOPT, reason="XGBoost and scikit-optimize required"
     )
     def test_hyperparameter_optimization_in_training(
-        self, test_db, labeled_issues_for_ml, sample_profile
+        self, test_db, labeled_issues_for_ml, sample_profile, init_test_db
     ):
         """Test that hyperparameter optimization is used when enabled."""
         from core.database import update_issue_label, upsert_issue
@@ -605,7 +611,7 @@ class TestModelPrediction:
     """Tests for model prediction functionality."""
 
     @pytest.mark.skipif(not HAS_XGBOOST, reason="XGBoost required")
-    def test_predict_with_v2_model(self, test_db, sample_profile, sample_issue_in_db):
+    def test_predict_with_v2_model(self, test_db, sample_profile, sample_issue_in_db, init_test_db):
         """Test prediction with v2 XGBoost model."""
         from core.database import query_issues, update_issue_label, upsert_issue
 
@@ -643,7 +649,7 @@ class TestModelPrediction:
                 if os.path.exists(f):
                     os.remove(f)
 
-    def test_predict_without_model(self, test_db, sample_profile, sample_issue_in_db):
+    def test_predict_without_model(self, test_db, sample_profile, sample_issue_in_db, init_test_db):
         """Test prediction when no model exists."""
         from core.database import query_issues
 
@@ -668,7 +674,7 @@ class TestModelPrediction:
         assert bad_prob == 0.5
 
     @pytest.mark.skipif(not HAS_XGBOOST, reason="XGBoost required")
-    def test_predict_with_different_feature_sets(self, test_db, sample_profile, sample_issue_in_db):
+    def test_predict_with_different_feature_sets(self, test_db, sample_profile, sample_issue_in_db, init_test_db):
         """Test prediction consistency with different feature configurations."""
         from core.database import query_issues, update_issue_label, upsert_issue
 
@@ -712,7 +718,7 @@ class TestModelPrediction:
 class TestFeatureConsistency:
     """Tests for feature extraction consistency."""
 
-    def test_feature_count_consistency(self, test_db, sample_profile, sample_issue_in_db):
+    def test_feature_count_consistency(self, test_db, sample_profile, sample_issue_in_db, init_test_db):
         """Test that feature counts are consistent."""
         from core.database import query_issues
 
@@ -730,7 +736,7 @@ class TestFeatureConsistency:
         # Base features should match non-advanced features
         assert base_features == features_no_advanced
 
-    def test_feature_values_consistency(self, test_db, sample_profile, sample_issue_in_db):
+    def test_feature_values_consistency(self, test_db, sample_profile, sample_issue_in_db, init_test_db):
         """Test that feature values are consistent across calls."""
         from core.database import query_issues
 
@@ -743,7 +749,7 @@ class TestFeatureConsistency:
         # Features should be identical for same input
         assert features1 == features2
 
-    def test_feature_handles_missing_data(self, test_db, sample_profile):
+    def test_feature_handles_missing_data(self, test_db, sample_profile, init_test_db):
         """Test that features handle missing data gracefully."""
         from core.database import query_issues, upsert_issue
 

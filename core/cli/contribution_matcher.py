@@ -553,7 +553,9 @@ def cmd_update_profile(args):
     current_langs = ", ".join(profile.get("preferred_languages", []))
     langs_input = input(f"Preferred languages (current: {current_langs}): ").strip()
     if langs_input:
-        profile["preferred_languages"] = [lang.strip() for lang in langs_input.split(",") if lang.strip()]
+        profile["preferred_languages"] = [
+            lang.strip() for lang in langs_input.split(",") if lang.strip()
+        ]
 
     # Update time availability
     current_time = profile.get("time_availability_hours_per_week")
@@ -960,9 +962,7 @@ def main():
     score_parser.add_argument("--verbose", "-v", action="store_true")
 
     # Score async command
-    subparsers.add_parser(
-        "score-async", help="Score issues asynchronously (Celery)"
-    )
+    subparsers.add_parser("score-async", help="Score issues asynchronously (Celery)")
 
     # Profile commands
     create_profile_parser = subparsers.add_parser("create-profile", help="Create developer profile")

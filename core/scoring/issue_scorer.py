@@ -440,7 +440,10 @@ def get_match_breakdown(profile: dict, issue_data: dict, session=None) -> dict:
         if issue_data.get("repo_owner") and issue_data.get("repo_name") and session:
             try:
                 repo_metadata = (
-                    _get_repo_metadata_orm(issue_data["repo_owner"], issue_data["repo_name"], session) or {}
+                    _get_repo_metadata_orm(
+                        issue_data["repo_owner"], issue_data["repo_name"], session
+                    )
+                    or {}
                 )
             except Exception:
                 raise
@@ -460,37 +463,37 @@ def get_match_breakdown(profile: dict, issue_data: dict, session=None) -> dict:
         )
 
         return {
-        "skills": {
-            "match_percentage": skill_match_pct,
-            "matching": skill_matching,
-            "missing": skill_missing,
-            "total_required": len(issue_technologies),
-        },
-        "experience": {
-            "score": experience_score,
-            "profile_level": profile.get("experience_level"),
-            "issue_difficulty": issue_data.get("difficulty"),
-        },
-        "repo_quality": {
-            "score": repo_quality_score,
-            "stars": repo_metadata.get("stars"),
-            "forks": repo_metadata.get("forks"),
-            "contributor_count": repo_metadata.get("contributor_count"),
-        },
-        "freshness": {
-            "score": freshness_score,
-            "updated_at": issue_data.get("updated_at"),
-        },
-        "time_match": {
-            "score": time_match_score,
-            "profile_availability": profile.get("time_availability_hours_per_week"),
-            "issue_estimate": issue_data.get("time_estimate"),
-        },
-        "interest_match": {
-            "score": interest_match_score,
-            "profile_interests": profile.get("interests", []),
-            "repo_topics": issue_data.get("repo_topics", []),
-        },
+            "skills": {
+                "match_percentage": skill_match_pct,
+                "matching": skill_matching,
+                "missing": skill_missing,
+                "total_required": len(issue_technologies),
+            },
+            "experience": {
+                "score": experience_score,
+                "profile_level": profile.get("experience_level"),
+                "issue_difficulty": issue_data.get("difficulty"),
+            },
+            "repo_quality": {
+                "score": repo_quality_score,
+                "stars": repo_metadata.get("stars"),
+                "forks": repo_metadata.get("forks"),
+                "contributor_count": repo_metadata.get("contributor_count"),
+            },
+            "freshness": {
+                "score": freshness_score,
+                "updated_at": issue_data.get("updated_at"),
+            },
+            "time_match": {
+                "score": time_match_score,
+                "profile_availability": profile.get("time_availability_hours_per_week"),
+                "issue_estimate": issue_data.get("time_estimate"),
+            },
+            "interest_match": {
+                "score": interest_match_score,
+                "profile_interests": profile.get("interests", []),
+                "repo_topics": issue_data.get("repo_topics", []),
+            },
         }
     except Exception:
         raise

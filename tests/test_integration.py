@@ -35,10 +35,28 @@ class TestDiscoverWorkflow:
 
         # Reset and re-initialize the global db object with the test database URL
         from core.db import db
+
         if db.is_initialized:
             db.engine.dispose()
         db._initialized = False
         db.initialize(test_db_url)
+
+        # Create a user with id=1 for the CLI to use (upsert_issue defaults to user_id=1)
+        from core.models import User
+
+        with db.session() as session:
+            # Check if user already exists
+            existing_user = session.query(User).filter(User.id == 1).first()
+            if not existing_user:
+                user = User(
+                    id=1,
+                    github_id="test_user_1",
+                    github_username="testuser1",
+                    email="test1@example.com",
+                )
+                session.add(user)
+                session.commit()
+
         # Mock GitHub API responses
         mock_search.return_value = [
             {
@@ -370,6 +388,7 @@ class TestListWorkflow:
         monkeypatch.setenv("DATABASE_URL", test_db_url)
         # Reset and re-initialize the global db object with the test database URL
         from core.db import db
+
         if db.is_initialized:
             db.engine.dispose()
         db._initialized = False

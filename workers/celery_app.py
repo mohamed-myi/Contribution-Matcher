@@ -193,7 +193,6 @@ celery_app.conf.update(
 # Configure structured logging for Celery
 
 
-
 @worker_process_init.connect
 def setup_worker_logging(**kwargs):
     """Configure structured logging when worker starts."""
@@ -206,7 +205,6 @@ def setup_worker_logging(**kwargs):
 # =============================================================================
 # Beat Schedule (Periodic Tasks)
 # =============================================================================
-
 
 
 apply_beat_schedule(celery_app)

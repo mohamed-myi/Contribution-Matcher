@@ -349,7 +349,11 @@ def batch_get_repo_metadata(
                 cached = repo_repo.batch_get(repo_list)
 
                 for key, metadata in cached.items():
-                    if metadata and metadata.cached_at and datetime.utcnow() - metadata.cached_at < cache_validity:
+                    if (
+                        metadata
+                        and metadata.cached_at
+                        and datetime.utcnow() - metadata.cached_at < cache_validity
+                    ):
                         results[key] = metadata.to_dict()
 
     # Fetch remaining from API

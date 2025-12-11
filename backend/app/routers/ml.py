@@ -10,14 +10,14 @@ from ..database import get_db
 from ..models import User
 from ..schemas import (
     EvaluateModelRequest,
-    LabelRequest,
-    LabelStatusResponse,
+    IssueResponse,
     LabeledIssueResponse,
     LabeledIssuesResponse,
+    LabelRequest,
+    LabelStatusResponse,
     ModelInfoResponse,
     TrainModelRequest,
     UnlabeledIssuesResponse,
-    IssueResponse,
 )
 from ..services import issue_service, ml_service
 
@@ -59,7 +59,9 @@ def get_unlabeled_issues(
     current_user: User = Depends(get_current_user),
 ):
     """List unlabeled issues prioritized for the current user."""
-    issues = ml_service.unlabeled_issues(db, current_user, limit=limit, include_others=include_others)
+    issues = ml_service.unlabeled_issues(
+        db, current_user, limit=limit, include_others=include_others
+    )
     issue_responses = []
     for issue in issues:
         serialized = issue_service.issue_to_dict(issue)
@@ -71,7 +73,9 @@ def get_unlabeled_issues(
 def get_labeled_issues(
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
-    label_filter: str = Query(default=None, description="Filter by label: good, bad, or null for all"),
+    label_filter: str = Query(
+        default=None, description="Filter by label: good, bad, or null for all"
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -79,27 +83,31 @@ def get_labeled_issues(
     results, total, good_count, bad_count = ml_service.labeled_issues(
         db, current_user, limit=limit, offset=offset, label_filter=label_filter
     )
-    
+
     issue_responses = []
     for issue, label in results:
         # Get technologies for the issue
         techs = [t.technology for t in issue.technologies] if issue.technologies else []
-        
-        issue_responses.append(LabeledIssueResponse(
-            id=issue.id,
-            title=issue.title,
-            url=issue.url,
-            difficulty=issue.difficulty,
-            issue_type=issue.issue_type,
-            repo_owner=issue.repo_owner,
-            repo_name=issue.repo_name,
-            repo_stars=issue.repo_stars,
-            description=issue.body[:200] + "..." if issue.body and len(issue.body) > 200 else issue.body,
-            technologies=techs,
-            label=label.label,
-            labeled_at=label.labeled_at,
-        ))
-    
+
+        issue_responses.append(
+            LabeledIssueResponse(
+                id=issue.id,
+                title=issue.title,
+                url=issue.url,
+                difficulty=issue.difficulty,
+                issue_type=issue.issue_type,
+                repo_owner=issue.repo_owner,
+                repo_name=issue.repo_name,
+                repo_stars=issue.repo_stars,
+                description=(
+                    issue.body[:200] + "..." if issue.body and len(issue.body) > 200 else issue.body
+                ),
+                technologies=techs,
+                label=label.label,
+                labeled_at=label.labeled_at,
+            )
+        )
+
     return LabeledIssuesResponse(
         issues=issue_responses,
         total=total,

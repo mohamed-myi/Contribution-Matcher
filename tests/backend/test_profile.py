@@ -57,23 +57,26 @@ def test_create_profile_from_github(authorized_client, monkeypatch):
 
     # Mock the httpx call
     import httpx
-    
+
     class MockResponse:
         status_code = 200
+
         def json(self):
             return [
                 {"language": "Python", "topics": ["web", "api"]},
                 {"language": "JavaScript", "topics": ["frontend"]},
             ]
-    
+
     class MockClient:
         def __enter__(self):
             return self
+
         def __exit__(self, *args):
             pass
+
         def get(self, *args, **kwargs):
             return MockResponse()
-    
+
     monkeypatch.setattr(httpx, "Client", lambda **kwargs: MockClient())
 
     resp = client.post(

@@ -6,23 +6,19 @@ It re-exports from the unified core.db module.
 
 For new code, prefer importing directly from core.db:
     from core.db import db, get_db, Base
-    
+
 Note: Database initialization is now handled explicitly in main.py startup,
 NOT at import time. This prevents issues with configuration loading order
 and allows proper health checking before database access.
 """
 
-from typing import Optional
-from sqlalchemy import Engine
-from sqlalchemy.orm import sessionmaker
-
 # Re-export from core.db for backward compatibility
-from core.db import Base, db, get_db
+from core.db import db
 
 
 class _LazyEngine:
     """Lazy wrapper for database engine that checks initialization."""
-    
+
     def __getattr__(self, name):
         if not db.is_initialized:
             raise RuntimeError(
@@ -33,7 +29,7 @@ class _LazyEngine:
 
 class _LazySessionLocal:
     """Lazy wrapper for SessionLocal that checks initialization."""
-    
+
     def __call__(self, *args, **kwargs):
         if not db.is_initialized:
             raise RuntimeError(

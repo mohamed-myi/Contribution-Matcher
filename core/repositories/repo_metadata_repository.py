@@ -1,7 +1,6 @@
 """Repository metadata repository for caching."""
 
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy import and_, or_
 
@@ -12,10 +11,10 @@ from .base import BaseRepository
 
 class RepoMetadataRepository(BaseRepository[RepoMetadata]):
     """Repository for caching repository metadata."""
-    
+
     model = RepoMetadata
-    
-    def get(self, repo_owner: str, repo_name: str) -> Optional[RepoMetadata]:
+
+    def get(self, repo_owner: str, repo_name: str) -> RepoMetadata | None:
         """Get cached metadata for a repository."""
         return (
             self.session.query(RepoMetadata)
@@ -25,33 +24,33 @@ class RepoMetadataRepository(BaseRepository[RepoMetadata]):
             )
             .first()
         )
-    
+
     def get_fresh(
         self,
         repo_owner: str,
         repo_name: str,
         validity_days: int = 7,
-    ) -> Optional[RepoMetadata]:
+    ) -> RepoMetadata | None:
         """Get cached metadata if not stale. Returns None if cache is expired."""
         metadata = self.get(repo_owner, repo_name)
         if metadata and not metadata.is_stale(validity_days):
             return metadata
         return None
-    
+
     def upsert(
         self,
         repo_owner: str,
         repo_name: str,
-        stars: Optional[int] = None,
-        forks: Optional[int] = None,
-        languages: Optional[Dict[str, int]] = None,
-        topics: Optional[List[str]] = None,
-        last_commit_date: Optional[str] = None,
-        contributor_count: Optional[int] = None,
+        stars: int | None = None,
+        forks: int | None = None,
+        languages: dict[str, int] | None = None,
+        topics: list[str] | None = None,
+        last_commit_date: str | None = None,
+        contributor_count: int | None = None,
     ) -> RepoMetadata:
         """Insert or update repository metadata with auto-refresh of cached_at."""
         metadata = self.get(repo_owner, repo_name)
-        
+
         if metadata:
             if stars is not None:
                 metadata.stars = stars
@@ -78,39 +77,35 @@ class RepoMetadataRepository(BaseRepository[RepoMetadata]):
                 contributor_count=contributor_count,
             )
             self.session.add(metadata)
-        
+
         self.session.flush()
         return metadata
-    
-    def batch_get(self, repos: List[Tuple[str, str]]) -> Dict[Tuple[str, str], RepoMetadata]:
+
+    def batch_get(self, repos: list[tuple[str, str]]) -> dict[tuple[str, str], RepoMetadata]:
         """
         Batch get metadata for multiple repositories in single query.
-        
+
         Args:
             repos: List of (owner, name) tuples
-        
+
         Returns:
             Dictionary mapping (owner, name) to metadata
         """
         if not repos:
             return {}
-        
+
         conditions = [
             and_(RepoMetadata.repo_owner == owner, RepoMetadata.repo_name == name)
             for owner, name in repos
         ]
-        
+
         results = self.session.query(RepoMetadata).filter(or_(*conditions)).all()
-        
+
         return {(r.repo_owner, r.repo_name): r for r in results}
-    
+
     def cleanup_stale(self, older_than_days: int = 30) -> int:
         """Remove cached metadata older than specified days."""
         cutoff = datetime.utcnow() - timedelta(days=older_than_days)
-        result = (
-            self.session.query(RepoMetadata)
-            .filter(RepoMetadata.cached_at < cutoff)
-            .delete()
-        )
+        result = self.session.query(RepoMetadata).filter(RepoMetadata.cached_at < cutoff).delete()
         self.session.flush()
         return result

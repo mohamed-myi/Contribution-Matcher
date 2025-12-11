@@ -135,7 +135,6 @@ celery_app.conf.update(
     task_serializer="pickle",
     accept_content=["pickle", "json"],
     result_serializer="pickle",
-    
     # Timezone
     timezone="UTC",
     enable_utc=True,
@@ -148,7 +147,6 @@ celery_app.conf.update(
 celery_app.conf.update(
     # Default rate limit (can be overridden per-task)
     task_default_rate_limit=None,
-    
     # Worker prefetch multiplier (how many tasks to prefetch)
     # Lower = more fair distribution, higher = better throughput
     worker_prefetch_multiplier=1,
@@ -161,13 +159,11 @@ celery_app.conf.update(
 celery_app.conf.update(
     # Retry on connection errors
     broker_connection_retry_on_startup=True,
-    
     # Task result expiration (24 hours)
     result_expires=86400,
-    
     # Task time limits
     task_soft_time_limit=300,  # 5 minutes soft limit
-    task_time_limit=600,       # 10 minutes hard limit
+    task_time_limit=600,  # 10 minutes hard limit
 )
 
 # =============================================================================
@@ -177,7 +173,6 @@ celery_app.conf.update(
 celery_app.conf.update(
     # Acknowledge tasks after completion (not before)
     task_acks_late=True,
-    
     # Reject tasks on worker shutdown (requeue them)
     task_reject_on_worker_lost=True,
 )
@@ -189,7 +184,6 @@ celery_app.conf.update(
 celery_app.conf.update(
     # Worker hijacks root logger
     worker_hijack_root_logger=False,
-    
     # Task send sent event
     task_send_sent_event=True,
 )
@@ -197,10 +191,12 @@ celery_app.conf.update(
 # Configure structured logging for Celery
 from celery.signals import worker_process_init
 
+
 @worker_process_init.connect
 def setup_worker_logging(**kwargs):
     """Configure structured logging when worker starts."""
-    from core.logging import configure_logging, configure_celery_logging
+    from core.logging import configure_celery_logging, configure_logging
+
     configure_logging(level="INFO")
     configure_celery_logging()
 
@@ -210,6 +206,7 @@ def setup_worker_logging(**kwargs):
 # =============================================================================
 
 from workers.schedules import apply_beat_schedule
+
 apply_beat_schedule(celery_app)
 
 
@@ -219,4 +216,3 @@ apply_beat_schedule(celery_app)
 
 # Uncomment to auto-discover tasks in Django apps
 # celery_app.autodiscover_tasks()
-

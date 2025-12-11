@@ -14,8 +14,6 @@ Tests all filter types:
 
 from datetime import datetime, timedelta
 
-import pytest
-
 from backend.app.models import Issue
 from core.models import IssueTechnology
 
@@ -99,10 +97,10 @@ def create_test_issues(session, user_id=1):
             is_active=True,
         ),
     ]
-    
+
     session.add_all(issues)
     session.commit()
-    
+
     # Add technologies
     technologies = [
         IssueTechnology(issue_id=1, technology="Python", technology_category="language"),
@@ -117,19 +115,19 @@ def create_test_issues(session, user_id=1):
     ]
     session.add_all(technologies)
     session.commit()
-    
+
     return issues
 
 
 class TestDifficultyFilter:
     """Tests for difficulty filter."""
-    
+
     def test_filter_by_beginner(self, authorized_client):
         client, _, session_factory = authorized_client
         session = session_factory()
         create_test_issues(session)
         session.close()
-        
+
         resp = client.get(
             "/api/issues",
             params={"difficulty": "beginner"},
@@ -140,13 +138,13 @@ class TestDifficultyFilter:
         assert data["total"] == 2
         for issue in data["issues"]:
             assert issue["difficulty"] == "beginner"
-    
+
     def test_filter_by_intermediate(self, authorized_client):
         client, _, session_factory = authorized_client
         session = session_factory()
         create_test_issues(session)
         session.close()
-        
+
         resp = client.get(
             "/api/issues",
             params={"difficulty": "intermediate"},
@@ -157,13 +155,13 @@ class TestDifficultyFilter:
         assert data["total"] == 2
         for issue in data["issues"]:
             assert issue["difficulty"] == "intermediate"
-    
+
     def test_filter_by_advanced(self, authorized_client):
         client, _, session_factory = authorized_client
         session = session_factory()
         create_test_issues(session)
         session.close()
-        
+
         resp = client.get(
             "/api/issues",
             params={"difficulty": "advanced"},
@@ -177,13 +175,13 @@ class TestDifficultyFilter:
 
 class TestIssueTypeFilter:
     """Tests for issue_type filter."""
-    
+
     def test_filter_by_bug(self, authorized_client):
         client, _, session_factory = authorized_client
         session = session_factory()
         create_test_issues(session)
         session.close()
-        
+
         resp = client.get(
             "/api/issues",
             params={"issue_type": "bug"},
@@ -194,13 +192,13 @@ class TestIssueTypeFilter:
         assert data["total"] == 2
         for issue in data["issues"]:
             assert issue["issue_type"] == "bug"
-    
+
     def test_filter_by_feature(self, authorized_client):
         client, _, session_factory = authorized_client
         session = session_factory()
         create_test_issues(session)
         session.close()
-        
+
         resp = client.get(
             "/api/issues",
             params={"issue_type": "feature"},
@@ -210,13 +208,13 @@ class TestIssueTypeFilter:
         data = resp.json()
         assert data["total"] == 1
         assert data["issues"][0]["issue_type"] == "feature"
-    
+
     def test_filter_by_documentation(self, authorized_client):
         client, _, session_factory = authorized_client
         session = session_factory()
         create_test_issues(session)
         session.close()
-        
+
         resp = client.get(
             "/api/issues",
             params={"issue_type": "documentation"},
@@ -230,13 +228,13 @@ class TestIssueTypeFilter:
 
 class TestLanguageFilter:
     """Tests for language filter (JSON key extraction)."""
-    
+
     def test_filter_by_python(self, authorized_client):
         client, _, session_factory = authorized_client
         session = session_factory()
         create_test_issues(session)
         session.close()
-        
+
         resp = client.get(
             "/api/issues",
             params={"language": "Python"},
@@ -247,13 +245,13 @@ class TestLanguageFilter:
         assert data["total"] == 2
         for issue in data["issues"]:
             assert "Python" in (issue.get("repo_languages") or {})
-    
+
     def test_filter_by_javascript(self, authorized_client):
         client, _, session_factory = authorized_client
         session = session_factory()
         create_test_issues(session)
         session.close()
-        
+
         resp = client.get(
             "/api/issues",
             params={"language": "JavaScript"},
@@ -263,13 +261,13 @@ class TestLanguageFilter:
         data = resp.json()
         # Issue 1, 2 and 5 have JavaScript
         assert data["total"] == 3
-    
+
     def test_filter_by_go(self, authorized_client):
         client, _, session_factory = authorized_client
         session = session_factory()
         create_test_issues(session)
         session.close()
-        
+
         resp = client.get(
             "/api/issues",
             params={"language": "Go"},
@@ -279,13 +277,13 @@ class TestLanguageFilter:
         data = resp.json()
         assert data["total"] == 1
         assert "Go" in data["issues"][0].get("repo_languages", {})
-    
+
     def test_filter_by_nonexistent_language(self, authorized_client):
         client, _, session_factory = authorized_client
         session = session_factory()
         create_test_issues(session)
         session.close()
-        
+
         resp = client.get(
             "/api/issues",
             params={"language": "Rust"},
@@ -298,13 +296,13 @@ class TestLanguageFilter:
 
 class TestMinStarsFilter:
     """Tests for min_stars filter."""
-    
+
     def test_filter_min_stars_100(self, authorized_client):
         client, _, session_factory = authorized_client
         session = session_factory()
         create_test_issues(session)
         session.close()
-        
+
         resp = client.get(
             "/api/issues",
             params={"min_stars": 100},
@@ -315,13 +313,13 @@ class TestMinStarsFilter:
         assert data["total"] == 4  # All except 50 stars
         for issue in data["issues"]:
             assert issue["repo_stars"] >= 100
-    
+
     def test_filter_min_stars_500(self, authorized_client):
         client, _, session_factory = authorized_client
         session = session_factory()
         create_test_issues(session)
         session.close()
-        
+
         resp = client.get(
             "/api/issues",
             params={"min_stars": 500},
@@ -332,13 +330,13 @@ class TestMinStarsFilter:
         assert data["total"] == 3  # 500, 1000, 2000
         for issue in data["issues"]:
             assert issue["repo_stars"] >= 500
-    
+
     def test_filter_min_stars_1000(self, authorized_client):
         client, _, session_factory = authorized_client
         session = session_factory()
         create_test_issues(session)
         session.close()
-        
+
         resp = client.get(
             "/api/issues",
             params={"min_stars": 1000},
@@ -349,13 +347,13 @@ class TestMinStarsFilter:
         assert data["total"] == 2  # 1000, 2000
         for issue in data["issues"]:
             assert issue["repo_stars"] >= 1000
-    
+
     def test_filter_min_stars_too_high(self, authorized_client):
         client, _, session_factory = authorized_client
         session = session_factory()
         create_test_issues(session)
         session.close()
-        
+
         resp = client.get(
             "/api/issues",
             params={"min_stars": 10000},
@@ -368,13 +366,13 @@ class TestMinStarsFilter:
 
 class TestScoreRangeFilter:
     """Tests for score_range filter."""
-    
+
     def test_filter_score_high(self, authorized_client):
         client, _, session_factory = authorized_client
         session = session_factory()
         create_test_issues(session)
         session.close()
-        
+
         resp = client.get(
             "/api/issues",
             params={"score_range": "high"},
@@ -385,13 +383,13 @@ class TestScoreRangeFilter:
         assert data["total"] == 2  # 85, 90
         for issue in data["issues"]:
             assert issue["score"] >= 80
-    
+
     def test_filter_score_medium(self, authorized_client):
         client, _, session_factory = authorized_client
         session = session_factory()
         create_test_issues(session)
         session.close()
-        
+
         resp = client.get(
             "/api/issues",
             params={"score_range": "medium"},
@@ -402,13 +400,13 @@ class TestScoreRangeFilter:
         assert data["total"] == 2  # 65, 75
         for issue in data["issues"]:
             assert 50 <= issue["score"] < 80
-    
+
     def test_filter_score_low(self, authorized_client):
         client, _, session_factory = authorized_client
         session = session_factory()
         create_test_issues(session)
         session.close()
-        
+
         resp = client.get(
             "/api/issues",
             params={"score_range": "low"},
@@ -423,13 +421,13 @@ class TestScoreRangeFilter:
 
 class TestDaysBackFilter:
     """Tests for days_back filter."""
-    
+
     def test_filter_last_7_days(self, authorized_client):
         client, _, session_factory = authorized_client
         session = session_factory()
         create_test_issues(session)
         session.close()
-        
+
         resp = client.get(
             "/api/issues",
             params={"days_back": 7},
@@ -438,13 +436,13 @@ class TestDaysBackFilter:
         assert resp.status_code == 200
         data = resp.json()
         assert data["total"] == 2  # 3 days, 5 days
-    
+
     def test_filter_last_14_days(self, authorized_client):
         client, _, session_factory = authorized_client
         session = session_factory()
         create_test_issues(session)
         session.close()
-        
+
         resp = client.get(
             "/api/issues",
             params={"days_back": 14},
@@ -453,13 +451,13 @@ class TestDaysBackFilter:
         assert resp.status_code == 200
         data = resp.json()
         assert data["total"] == 3  # 3, 5, 10 days
-    
+
     def test_filter_last_30_days(self, authorized_client):
         client, _, session_factory = authorized_client
         session = session_factory()
         create_test_issues(session)
         session.close()
-        
+
         resp = client.get(
             "/api/issues",
             params={"days_back": 30},
@@ -472,13 +470,13 @@ class TestDaysBackFilter:
 
 class TestTechnologyFilter:
     """Tests for technology filter."""
-    
+
     def test_filter_by_python_tech(self, authorized_client):
         client, _, session_factory = authorized_client
         session = session_factory()
         create_test_issues(session)
         session.close()
-        
+
         resp = client.get(
             "/api/issues",
             params={"technology": "Python"},
@@ -487,13 +485,13 @@ class TestTechnologyFilter:
         assert resp.status_code == 200
         data = resp.json()
         assert data["total"] == 2  # Issues 1 and 4
-    
+
     def test_filter_by_react(self, authorized_client):
         client, _, session_factory = authorized_client
         session = session_factory()
         create_test_issues(session)
         session.close()
-        
+
         resp = client.get(
             "/api/issues",
             params={"technology": "React"},
@@ -502,13 +500,13 @@ class TestTechnologyFilter:
         assert resp.status_code == 200
         data = resp.json()
         assert data["total"] == 1
-    
+
     def test_filter_technology_case_insensitive(self, authorized_client):
         client, _, session_factory = authorized_client
         session = session_factory()
         create_test_issues(session)
         session.close()
-        
+
         # Should match "React" with lowercase
         resp = client.get(
             "/api/issues",
@@ -522,13 +520,13 @@ class TestTechnologyFilter:
 
 class TestCombinedFilters:
     """Tests for combining multiple filters."""
-    
+
     def test_difficulty_and_issue_type(self, authorized_client):
         client, _, session_factory = authorized_client
         session = session_factory()
         create_test_issues(session)
         session.close()
-        
+
         resp = client.get(
             "/api/issues",
             params={"difficulty": "beginner", "issue_type": "bug"},
@@ -539,13 +537,13 @@ class TestCombinedFilters:
         assert data["total"] == 1
         assert data["issues"][0]["difficulty"] == "beginner"
         assert data["issues"][0]["issue_type"] == "bug"
-    
+
     def test_language_and_min_stars(self, authorized_client):
         client, _, session_factory = authorized_client
         session = session_factory()
         create_test_issues(session)
         session.close()
-        
+
         resp = client.get(
             "/api/issues",
             params={"language": "JavaScript", "min_stars": 1000},
@@ -554,13 +552,13 @@ class TestCombinedFilters:
         assert resp.status_code == 200
         data = resp.json()
         assert data["total"] == 1  # Only issue 5 with 2000 stars
-    
+
     def test_difficulty_score_and_days(self, authorized_client):
         client, _, session_factory = authorized_client
         session = session_factory()
         create_test_issues(session)
         session.close()
-        
+
         resp = client.get(
             "/api/issues",
             params={
@@ -575,13 +573,13 @@ class TestCombinedFilters:
         # Issue 1: beginner, score 85, 5 days old
         # Issue 4: beginner, score 90, 3 days old
         assert data["total"] == 2
-    
+
     def test_all_filters_no_match(self, authorized_client):
         client, _, session_factory = authorized_client
         session = session_factory()
         create_test_issues(session)
         session.close()
-        
+
         resp = client.get(
             "/api/issues",
             params={
@@ -598,13 +596,13 @@ class TestCombinedFilters:
 
 class TestPagination:
     """Tests for pagination with filters."""
-    
+
     def test_pagination_with_filter(self, authorized_client):
         client, _, session_factory = authorized_client
         session = session_factory()
         create_test_issues(session)
         session.close()
-        
+
         # Get first page
         resp = client.get(
             "/api/issues",
@@ -615,7 +613,7 @@ class TestPagination:
         data = resp.json()
         assert len(data["issues"]) == 2
         assert data["total"] == 5
-        
+
         # Get second page
         resp = client.get(
             "/api/issues",
@@ -626,13 +624,13 @@ class TestPagination:
         data = resp.json()
         assert len(data["issues"]) == 2
         assert data["total"] == 5
-    
+
     def test_pagination_with_difficulty_filter(self, authorized_client):
         client, _, session_factory = authorized_client
         session = session_factory()
         create_test_issues(session)
         session.close()
-        
+
         resp = client.get(
             "/api/issues",
             params={"difficulty": "beginner", "limit": 1, "offset": 0},
@@ -642,7 +640,7 @@ class TestPagination:
         data = resp.json()
         assert len(data["issues"]) == 1
         assert data["total"] == 2
-        
+
         resp = client.get(
             "/api/issues",
             params={"difficulty": "beginner", "limit": 1, "offset": 1},
@@ -652,4 +650,3 @@ class TestPagination:
         data = resp.json()
         assert len(data["issues"]) == 1
         assert data["total"] == 2
-

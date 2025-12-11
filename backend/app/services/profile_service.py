@@ -5,18 +5,16 @@ Profile management service functions.
 import io
 import re
 from datetime import datetime
-from typing import Optional
 
 import httpx
-
 from sqlalchemy.orm import Session
 
-from core.parsing.skill_extractor import analyze_job_text
 from core.models import (
     PROFILE_SOURCE_GITHUB,
-    PROFILE_SOURCE_RESUME,
     PROFILE_SOURCE_MANUAL,
+    PROFILE_SOURCE_RESUME,
 )
+from core.parsing.skill_extractor import analyze_job_text
 
 from ..models import DevProfile, User
 from ..schemas import ProfileUpdateRequest
@@ -34,13 +32,13 @@ def update_profile(
 ) -> DevProfile:
     """
     Update profile with user-provided data.
-    
+
     When core profile fields (skills, experience_level, interests, preferred_languages)
     are modified, the profile_source is changed to "manual" to indicate user customization.
     """
     profile = get_profile(db, user)
     is_new_profile = profile is None
-    
+
     if not profile:
         profile = DevProfile(user_id=user.id)
         profile.profile_source = PROFILE_SOURCE_MANUAL
@@ -48,7 +46,7 @@ def update_profile(
 
     # Track if core fields are being modified
     core_fields_modified = False
-    
+
     if payload.skills is not None:
         profile.skills = payload.skills
         core_fields_modified = True
@@ -64,7 +62,7 @@ def update_profile(
     if payload.time_availability is not None:
         profile.time_availability_hours_per_week = payload.time_availability
         # Time availability is not a core field, doesn't change source
-    
+
     # If core fields were modified on an existing profile, mark as manual
     if core_fields_modified and not is_new_profile:
         profile.profile_source = PROFILE_SOURCE_MANUAL
@@ -77,15 +75,15 @@ def update_profile(
 def create_profile_from_github(
     db: Session,
     user: User,
-    github_username: Optional[str] = None,
+    github_username: str | None = None,
 ) -> DevProfile:
     """Create or update profile by fetching data from GitHub."""
     username = github_username or user.github_username
-    
+
     # Fetch user's repos to extract languages/skills
     languages = set()
     topics = set()
-    
+
     try:
         with httpx.Client(timeout=30) as client:
             # Fetch user's repos
@@ -115,7 +113,7 @@ def create_profile_from_github(
     profile.preferred_languages = list(languages)[:10]
     profile.experience_level = profile.experience_level or "intermediate"
     profile.time_availability_hours_per_week = profile.time_availability_hours_per_week or 10
-    
+
     # Track source and sync time
     profile.profile_source = PROFILE_SOURCE_GITHUB
     profile.last_github_sync = datetime.utcnow()
@@ -157,26 +155,26 @@ def get_profile_source_info(profile: DevProfile) -> dict:
 def _extract_text_from_pdf(file_content: bytes) -> str:
     """Extract text from PDF file content."""
     import PyPDF2
-    
+
     pdf_file = io.BytesIO(file_content)
     pdf_reader = PyPDF2.PdfReader(pdf_file)
-    
+
     text_parts = []
     for page in pdf_reader.pages:
         text = page.extract_text()
         if text:
             text_parts.append(text)
-    
+
     return "\n".join(text_parts)
 
 
 def _determine_experience_level(resume_text: str) -> str:
     """Determine experience level from resume text."""
     exp_patterns = [
-        r'(\d+)\+?\s*years?\s*(?:of\s+)?(?:experience|exp)',
-        r'(\d+)\+?\s*yrs?\s*(?:of\s+)?(?:experience|exp)',
+        r"(\d+)\+?\s*years?\s*(?:of\s+)?(?:experience|exp)",
+        r"(\d+)\+?\s*yrs?\s*(?:of\s+)?(?:experience|exp)",
     ]
-    
+
     experience_years = None
     for pattern in exp_patterns:
         match = re.search(pattern, resume_text.lower())
@@ -186,7 +184,7 @@ def _determine_experience_level(resume_text: str) -> str:
                 break
             except (ValueError, IndexError):
                 pass
-    
+
     if experience_years is None:
         return "intermediate"
     elif experience_years < 2:
@@ -207,44 +205,57 @@ def create_profile_from_resume(
     """Create or update profile by parsing a resume PDF."""
     # Extract text from PDF
     resume_text = _extract_text_from_pdf(file_content)
-    
+
     # Extract skills using skill extractor
     category, skills_with_categories, _ = analyze_job_text(resume_text)
-    
+
     # Get just the skill names
-    skills = list(set(skill for skill, _ in skills_with_categories))[:20]
-    
+    skills = list({skill for skill, _ in skills_with_categories})[:20]
+
     # Determine experience level from resume text
     experience_level = _determine_experience_level(resume_text)
-    
+
     # Extract programming languages (common ones)
     programming_languages = [
-        "Python", "JavaScript", "TypeScript", "Java", "C++", "C#", "Go", "Rust",
-        "Ruby", "PHP", "Swift", "Kotlin", "Scala", "R", "MATLAB", "Perl"
+        "Python",
+        "JavaScript",
+        "TypeScript",
+        "Java",
+        "C++",
+        "C#",
+        "Go",
+        "Rust",
+        "Ruby",
+        "PHP",
+        "Swift",
+        "Kotlin",
+        "Scala",
+        "R",
+        "MATLAB",
+        "Perl",
     ]
     preferred_languages = [
-        lang for lang in programming_languages
-        if lang.lower() in resume_text.lower()
+        lang for lang in programming_languages if lang.lower() in resume_text.lower()
     ][:10]
-    
+
     # Get or create profile
     profile = get_profile(db, user)
     if not profile:
         profile = DevProfile(user_id=user.id)
         db.add(profile)
-    
+
     # Update profile with extracted data
     profile.skills = skills
     profile.experience_level = experience_level
     profile.preferred_languages = preferred_languages
     profile.interests = profile.interests or []  # Keep existing interests
     profile.time_availability_hours_per_week = profile.time_availability_hours_per_week or 10
-    
+
     # Track source (resume replaces any previous source)
     profile.profile_source = PROFILE_SOURCE_RESUME
     # Clear GitHub sync time since this is now a resume-based profile
     profile.last_github_sync = None
-    
+
     db.commit()
     db.refresh(profile)
     return profile

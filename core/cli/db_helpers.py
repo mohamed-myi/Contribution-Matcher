@@ -7,16 +7,16 @@ These replace the deprecated SQLite functions from core.database.database.
 
 import csv
 import json
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
+from datetime import datetime
 
 from core.db import db
-from core.models import Issue, IssueTechnology, RepoMetadata
+from core.models import Issue, IssueTechnology
 
 
 def init_database():
     """Initialize the database connection and create tables."""
     from core.config import get_settings
+
     settings = get_settings()
     if not db.is_initialized:
         db.initialize(settings.database_url)
@@ -26,31 +26,35 @@ def init_database():
 def upsert_issue(
     title: str,
     url: str,
-    body: Optional[str] = None,
-    repo_owner: Optional[str] = None,
-    repo_name: Optional[str] = None,
-    repo_url: Optional[str] = None,
-    difficulty: Optional[str] = None,
-    issue_type: Optional[str] = None,
-    time_estimate: Optional[str] = None,
-    labels: Optional[List[str]] = None,
-    repo_stars: Optional[int] = None,
-    repo_forks: Optional[int] = None,
-    repo_languages: Optional[Dict[str, int]] = None,
-    repo_topics: Optional[List[str]] = None,
-    last_commit_date: Optional[str] = None,
-    contributor_count: Optional[int] = None,
+    body: str | None = None,
+    repo_owner: str | None = None,
+    repo_name: str | None = None,
+    repo_url: str | None = None,
+    difficulty: str | None = None,
+    issue_type: str | None = None,
+    time_estimate: str | None = None,
+    labels: list[str] | None = None,
+    repo_stars: int | None = None,
+    repo_forks: int | None = None,
+    repo_languages: dict[str, int] | None = None,
+    repo_topics: list[str] | None = None,
+    last_commit_date: str | None = None,
+    contributor_count: int | None = None,
     is_active: bool = True,
     user_id: int = 1,  # Default CLI user
 ) -> int:
     """Insert or update an issue using ORM."""
     with db.session() as session:
         # Find existing issue by URL
-        existing = session.query(Issue).filter(
-            Issue.user_id == user_id,
-            Issue.url == url,
-        ).first()
-        
+        existing = (
+            session.query(Issue)
+            .filter(
+                Issue.user_id == user_id,
+                Issue.url == url,
+            )
+            .first()
+        )
+
         if existing:
             existing.title = title
             existing.body = body
@@ -99,15 +103,13 @@ def upsert_issue(
 
 def replace_issue_technologies(
     issue_id: int,
-    technologies: List[Tuple[str, Optional[str]]],
+    technologies: list[tuple[str, str | None]],
 ) -> None:
     """Replace issue technologies for an issue using ORM."""
     with db.session() as session:
         # Clear existing
-        session.query(IssueTechnology).filter(
-            IssueTechnology.issue_id == issue_id
-        ).delete()
-        
+        session.query(IssueTechnology).filter(IssueTechnology.issue_id == issue_id).delete()
+
         # Add new
         for tech, category in technologies:
             tech_obj = IssueTechnology(
@@ -120,9 +122,9 @@ def replace_issue_technologies(
 
 def update_issue_label(issue_id: int, label: str) -> bool:
     """Update label for an issue using ORM."""
-    if label not in ['good', 'bad']:
+    if label not in ["good", "bad"]:
         return False
-    
+
     with db.session() as session:
         issue = session.query(Issue).filter(Issue.id == issue_id).first()
         if issue:
@@ -133,18 +135,18 @@ def update_issue_label(issue_id: int, label: str) -> bool:
 
 
 def query_issues(
-    difficulty: Optional[str] = None,
-    issue_type: Optional[str] = None,
-    label: Optional[str] = None,
-    is_active: Optional[bool] = None,
+    difficulty: str | None = None,
+    issue_type: str | None = None,
+    label: str | None = None,
+    is_active: bool | None = None,
     limit: int = 100,
     offset: int = 0,
     user_id: int = 1,
-) -> List[Dict]:
+) -> list[dict]:
     """Query issues using ORM."""
     with db.session() as session:
         query = session.query(Issue).filter(Issue.user_id == user_id)
-        
+
         if difficulty:
             query = query.filter(Issue.difficulty == difficulty)
         if issue_type:
@@ -153,83 +155,99 @@ def query_issues(
             query = query.filter(Issue.label == label)
         if is_active is not None:
             query = query.filter(Issue.is_active == is_active)
-        
+
         query = query.order_by(Issue.created_at.desc())
         query = query.offset(offset).limit(limit)
-        
+
         return [issue.to_dict() for issue in query.all()]
 
 
-def query_unlabeled_issues(limit: int = 100, user_id: int = 1) -> List[Dict]:
+def query_unlabeled_issues(limit: int = 100, user_id: int = 1) -> list[dict]:
     """Query unlabeled issues using ORM."""
     with db.session() as session:
-        issues = session.query(Issue).filter(
-            Issue.user_id == user_id,
-            Issue.label.is_(None),
-            Issue.is_active == True,
-        ).order_by(Issue.created_at.desc()).limit(limit).all()
-        
+        issues = (
+            session.query(Issue)
+            .filter(
+                Issue.user_id == user_id,
+                Issue.label.is_(None),
+                Issue.is_active,
+            )
+            .order_by(Issue.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+
         return [issue.to_dict() for issue in issues]
 
 
-def get_issue_technologies(issue_id: int) -> List[Tuple[str, Optional[str]]]:
+def get_issue_technologies(issue_id: int) -> list[tuple[str, str | None]]:
     """Get technologies for an issue using ORM."""
     with db.session() as session:
-        techs = session.query(IssueTechnology).filter(
-            IssueTechnology.issue_id == issue_id
-        ).all()
+        techs = session.query(IssueTechnology).filter(IssueTechnology.issue_id == issue_id).all()
         return [(t.technology, t.technology_category) for t in techs]
 
 
-def get_all_issue_urls(user_id: int = 1) -> List[str]:
+def get_all_issue_urls(user_id: int = 1) -> list[str]:
     """Get all active issue URLs using ORM."""
     with db.session() as session:
-        results = session.query(Issue.url).filter(
-            Issue.user_id == user_id,
-            Issue.is_active == True,
-            Issue.url.isnot(None),
-        ).all()
+        results = (
+            session.query(Issue.url)
+            .filter(
+                Issue.user_id == user_id,
+                Issue.is_active,
+                Issue.url.isnot(None),
+            )
+            .all()
+        )
         return [row[0] for row in results]
 
 
-def mark_issues_inactive(urls: List[str]) -> int:
+def mark_issues_inactive(urls: list[str]) -> int:
     """Mark issues as inactive by URL using ORM."""
     if not urls:
         return 0
-    
+
     with db.session() as session:
-        result = session.query(Issue).filter(
-            Issue.url.in_(urls)
-        ).update({"is_active": False}, synchronize_session=False)
+        result = (
+            session.query(Issue)
+            .filter(Issue.url.in_(urls))
+            .update({"is_active": False}, synchronize_session=False)
+        )
         return result
 
 
-def get_statistics(user_id: int = 1) -> Dict:
+def get_statistics(user_id: int = 1) -> dict:
     """Get database statistics using ORM."""
     from sqlalchemy import func
-    
+
     with db.session() as session:
-        total_issues = session.query(func.count(Issue.id)).filter(
-            Issue.user_id == user_id
-        ).scalar()
-        
-        active_issues = session.query(func.count(Issue.id)).filter(
-            Issue.user_id == user_id,
-            Issue.is_active == True,
-        ).scalar()
-        
-        labeled_issues = session.query(func.count(Issue.id)).filter(
-            Issue.user_id == user_id,
-            Issue.label.isnot(None),
-        ).scalar()
-        
+        total_issues = session.query(func.count(Issue.id)).filter(Issue.user_id == user_id).scalar()
+
+        active_issues = (
+            session.query(func.count(Issue.id))
+            .filter(
+                Issue.user_id == user_id,
+                Issue.is_active,
+            )
+            .scalar()
+        )
+
+        labeled_issues = (
+            session.query(func.count(Issue.id))
+            .filter(
+                Issue.user_id == user_id,
+                Issue.label.isnot(None),
+            )
+            .scalar()
+        )
+
         by_difficulty = dict(
             session.query(Issue.difficulty, func.count(Issue.id))
             .filter(Issue.user_id == user_id)
             .group_by(Issue.difficulty)
             .all()
         )
-        
+
         return {
             "total_issues": total_issues,
             "active_issues": active_issues,
@@ -238,34 +256,34 @@ def get_statistics(user_id: int = 1) -> Dict:
         }
 
 
-def get_variety_statistics(user_id: int = 1) -> Dict:
+def get_variety_statistics(user_id: int = 1) -> dict:
     """Get variety statistics using ORM."""
     from sqlalchemy import func
-    
+
     with db.session() as session:
         by_difficulty = dict(
             session.query(Issue.difficulty, func.count(Issue.id))
-            .filter(Issue.user_id == user_id, Issue.is_active == True)
+            .filter(Issue.user_id == user_id, Issue.is_active)
             .group_by(Issue.difficulty)
             .all()
         )
-        
+
         by_type = dict(
             session.query(Issue.issue_type, func.count(Issue.id))
-            .filter(Issue.user_id == user_id, Issue.is_active == True)
+            .filter(Issue.user_id == user_id, Issue.is_active)
             .group_by(Issue.issue_type)
             .all()
         )
-        
+
         top_repos = dict(
             session.query(Issue.repo_owner, func.count(Issue.id))
-            .filter(Issue.user_id == user_id, Issue.is_active == True)
+            .filter(Issue.user_id == user_id, Issue.is_active)
             .group_by(Issue.repo_owner)
             .order_by(func.count(Issue.id).desc())
             .limit(10)
             .all()
         )
-        
+
         return {
             "by_difficulty": by_difficulty,
             "by_type": by_type,
@@ -273,10 +291,10 @@ def get_variety_statistics(user_id: int = 1) -> Dict:
         }
 
 
-def get_labeling_statistics(user_id: int = 1) -> Dict:
+def get_labeling_statistics(user_id: int = 1) -> dict:
     """Get labeling statistics using ORM."""
     from sqlalchemy import func
-    
+
     with db.session() as session:
         by_label = dict(
             session.query(Issue.label, func.count(Issue.id))
@@ -284,7 +302,7 @@ def get_labeling_statistics(user_id: int = 1) -> Dict:
             .group_by(Issue.label)
             .all()
         )
-        
+
         return {
             "total_labeled": sum(by_label.values()) if by_label else 0,
             "by_label": by_label,
@@ -294,23 +312,23 @@ def get_labeling_statistics(user_id: int = 1) -> Dict:
 def export_to_csv(filepath: str, user_id: int = 1) -> int:
     """Export issues to CSV file using ORM."""
     issues = query_issues(is_active=True, limit=10000, user_id=user_id)
-    
+
     if not issues:
         return 0
-    
-    with open(filepath, 'w', newline='', encoding='utf-8') as f:
+
+    with open(filepath, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=issues[0].keys())
         writer.writeheader()
         writer.writerows(issues)
-    
+
     return len(issues)
 
 
 def export_to_json(filepath: str, user_id: int = 1) -> int:
     """Export issues to JSON file using ORM."""
     issues = query_issues(is_active=True, limit=10000, user_id=user_id)
-    
-    with open(filepath, 'w', encoding='utf-8') as f:
+
+    with open(filepath, "w", encoding="utf-8") as f:
         json.dump(issues, f, indent=2, default=str)
-    
+
     return len(issues)

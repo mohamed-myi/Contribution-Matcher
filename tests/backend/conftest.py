@@ -1,8 +1,7 @@
 import os
 import sys
-from typing import Callable, Iterator
-
 import tempfile
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
@@ -14,9 +13,9 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..
 if PROJECT_ROOT not in sys.path:
     sys.path.append(PROJECT_ROOT)
 
-from backend.app.main import create_app  # noqa: E402
-from backend.app.database import Base, get_db  # noqa: E402
 from backend.app.auth.dependencies import get_current_user  # noqa: E402
+from backend.app.database import Base, get_db  # noqa: E402
+from backend.app.main import create_app  # noqa: E402
 from backend.app.models import User  # noqa: E402
 
 
@@ -51,7 +50,9 @@ def test_app_client() -> Iterator[tuple[TestClient, sessionmaker]]:
 
 
 @pytest.fixture
-def authorized_client(test_app_client) -> Iterator[tuple[TestClient, Callable[[], User], sessionmaker]]:
+def authorized_client(
+    test_app_client,
+) -> Iterator[tuple[TestClient, Callable[[], User], sessionmaker]]:
     client, TestingSessionLocal = test_app_client
     session = TestingSessionLocal()
     user = User(
@@ -77,4 +78,3 @@ def authorized_client(test_app_client) -> Iterator[tuple[TestClient, Callable[[]
     yield client, override_current_user, TestingSessionLocal
 
     client.app.dependency_overrides.pop(get_current_user, None)
-

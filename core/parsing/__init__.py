@@ -17,4 +17,3 @@ __all__ = [
     "classify_issue_type",
     "analyze_job_text",
 ]
-

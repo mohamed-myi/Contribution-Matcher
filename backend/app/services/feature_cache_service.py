@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
@@ -21,7 +20,6 @@ from core.scoring.ml_trainer import extract_base_features
 from ..models import DevProfile, Issue, User
 from . import profile_service
 
-
 # Default model directory for user ML models
 DEFAULT_MODEL_DIR = Path("models/users")
 
@@ -29,7 +27,7 @@ DEFAULT_MODEL_DIR = Path("models/users")
 @dataclass
 class ScoreBreakdown:
     """Score breakdown result with component scores."""
-    
+
     skill_match_pct: float
     experience_score: float
     repo_quality_score: float
@@ -37,9 +35,9 @@ class ScoreBreakdown:
     time_match_score: float
     interest_match_score: float
     total_score: float
-    raw_breakdown: Dict
-    
-    def to_dict(self) -> Dict:
+    raw_breakdown: dict
+
+    def to_dict(self) -> dict:
         """Convert breakdown to dictionary representation."""
         return {
             "skill_match_pct": self.skill_match_pct,
@@ -56,9 +54,9 @@ class ScoreBreakdown:
 def get_model_dir() -> Path:
     """
     Get the directory path for storing user ML models.
-    
+
     Creates the directory if it doesn't exist.
-    
+
     Returns:
         Path to the model directory.
     """
@@ -67,13 +65,13 @@ def get_model_dir() -> Path:
     return model_dir
 
 
-def _profile_to_dict(profile: Optional[DevProfile]) -> Dict:
+def _profile_to_dict(profile: DevProfile | None) -> dict:
     """
     Convert a DevProfile to a dictionary format suitable for scoring.
-    
+
     Args:
         profile: DevProfile ORM object or None.
-        
+
     Returns:
         Dictionary with profile data for scoring functions.
     """
@@ -84,7 +82,7 @@ def _profile_to_dict(profile: Optional[DevProfile]) -> Dict:
             "interests": [],
             "time_availability_hours_per_week": 10,
         }
-    
+
     return {
         "skills": profile.skills or [],
         "experience_level": profile.experience_level or "intermediate",
@@ -94,13 +92,13 @@ def _profile_to_dict(profile: Optional[DevProfile]) -> Dict:
     }
 
 
-def _issue_to_dict(issue: Issue) -> Dict:
+def _issue_to_dict(issue: Issue) -> dict:
     """
     Convert an Issue ORM object to a dictionary format suitable for scoring.
-    
+
     Args:
         issue: Issue ORM object.
-        
+
     Returns:
         Dictionary with issue data for scoring functions.
     """
@@ -132,20 +130,20 @@ def get_breakdown_and_features(
     db: Session,
     user: User,
     issue: Issue,
-) -> Tuple[ScoreBreakdown, List[float]]:
+) -> tuple[ScoreBreakdown, list[float]]:
     """
     Compute score breakdown and ML features for an issue.
-    
+
     This function:
     1. Loads the user's profile
     2. Computes the match breakdown between profile and issue
     3. Extracts numerical features for ML training
-    
+
     Args:
         db: Database session.
         user: User for whom to compute the score.
         issue: Issue to score.
-        
+
     Returns:
         Tuple of (ScoreBreakdown, feature_list) where feature_list is suitable
         for ML model training.
@@ -153,52 +151,47 @@ def get_breakdown_and_features(
     # Get user's profile
     profile = profile_service.get_profile(db, user)
     profile_dict = _profile_to_dict(profile)
-    
+
     # Convert issue to dict for scoring functions
     issue_dict = _issue_to_dict(issue)
-    
+
     # Compute match breakdown
     raw_breakdown = get_match_breakdown(profile_dict, issue_dict, session=db)
-    
+
     # Extract component scores
     skills = raw_breakdown.get("skills", {})
     skill_match_pct = skills.get("match_percentage", 0.0)
-    
+
     experience = raw_breakdown.get("experience", {})
     experience_score = experience.get("score", 0.0)
-    
+
     repo_quality = raw_breakdown.get("repo_quality", {})
     repo_quality_score = repo_quality.get("score", 0.0)
-    
+
     freshness = raw_breakdown.get("freshness", {})
     freshness_score = freshness.get("score", 0.0)
-    
+
     time_match = raw_breakdown.get("time_match", {})
     time_match_score = time_match.get("score", 0.0)
-    
+
     interest_match = raw_breakdown.get("interest_match", {})
     interest_match_score = interest_match.get("score", 0.0)
-    
+
     # Compute total score using weights from constants
     from core.constants import (
         SKILL_MATCH_WEIGHT,
-        EXPERIENCE_MATCH_WEIGHT,
-        REPO_QUALITY_WEIGHT,
-        FRESHNESS_WEIGHT,
-        TIME_MATCH_WEIGHT,
-        INTEREST_MATCH_WEIGHT,
     )
-    
+
     skill_weighted = (skill_match_pct / 100.0) * SKILL_MATCH_WEIGHT
     total_score = (
-        skill_weighted +
-        experience_score +
-        repo_quality_score +
-        freshness_score +
-        time_match_score +
-        interest_match_score
+        skill_weighted
+        + experience_score
+        + repo_quality_score
+        + freshness_score
+        + time_match_score
+        + interest_match_score
     )
-    
+
     breakdown = ScoreBreakdown(
         skill_match_pct=skill_match_pct,
         experience_score=experience_score,
@@ -209,20 +202,20 @@ def get_breakdown_and_features(
         total_score=total_score,
         raw_breakdown=raw_breakdown,
     )
-    
+
     # Extract features for ML training
     features = extract_base_features(issue_dict, profile_dict, session=db)
-    
+
     return breakdown, features
 
 
-def invalidate_cache(user_id: int, issue_id: Optional[int] = None) -> None:
+def invalidate_cache(user_id: int, issue_id: int | None = None) -> None:
     """
     Invalidate cached scores for a user or specific issue.
-    
+
     This is a placeholder for future Redis-based caching.
     Currently a no-op since we compute on demand.
-    
+
     Args:
         user_id: User ID to invalidate cache for.
         issue_id: Optional specific issue ID to invalidate.

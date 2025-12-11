@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from ..auth.dependencies import get_current_user
 from ..database import get_db
 from ..models import User
-from ..schemas import ScoreBreakdownResponse, TopMatchesResponse, IssueResponse
+from ..schemas import ScoreBreakdownResponse, TopMatchesResponse
 from ..services import scoring_service
 
 router = APIRouter(prefix="/scoring", tags=["scoring"])

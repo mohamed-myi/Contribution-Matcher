@@ -1,9 +1,8 @@
 from datetime import datetime
 
 from backend.app.models import Issue
-from backend.app.services import issue_service
-from core.api import github_api
 from core import parsing
+from core.api import github_api
 from core.parsing import skill_extractor
 
 
@@ -19,9 +18,7 @@ def test_issue_discovery_persists_results(monkeypatch, authorized_client):
     }
 
     # Patch at the source modules
-    monkeypatch.setattr(
-        github_api, "search_issues", lambda **kwargs: [fake_issue]
-    )
+    monkeypatch.setattr(github_api, "search_issues", lambda **kwargs: [fake_issue])
     monkeypatch.setattr(
         github_api,
         "get_repo_metadata_from_api",

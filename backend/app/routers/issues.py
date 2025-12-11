@@ -8,23 +8,22 @@ import csv
 import io
 import json
 from enum import Enum
-from typing import Literal, Optional
+from typing import Literal
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
+from core.cache import CacheKeys, cache
 from core.repositories import IssueRepository, ProfileRepository
 from core.services import ScoringService
-from core.cache import cache, CacheKeys
 
 from ..auth.dependencies import get_current_user
 from ..database import get_db
-from ..models import User, IssueLabel, IssueNote, IssueBookmark
+from ..models import IssueBookmark, IssueLabel, IssueNote, User
 from ..schemas import (
     IssueDetailResponse,
     IssueDiscoverRequest,
-    IssueFilterParams,
     IssueListResponse,
     IssueResponse,
     IssueStatsResponse,
@@ -41,8 +40,10 @@ router = APIRouter(prefix="/issues", tags=["issues"])
 # Filter Parameter Validation Enums
 # =============================================================================
 
+
 class DifficultyFilter(str, Enum):
     """Valid difficulty filter values."""
+
     beginner = "beginner"
     intermediate = "intermediate"
     advanced = "advanced"
@@ -50,6 +51,7 @@ class DifficultyFilter(str, Enum):
 
 class IssueTypeFilter(str, Enum):
     """Valid issue type filter values."""
+
     bug = "bug"
     feature = "feature"
     documentation = "documentation"
@@ -60,13 +62,15 @@ class IssueTypeFilter(str, Enum):
 
 class ScoreRangeFilter(str, Enum):
     """Valid score range filter values."""
-    high = "high"      # 80+
+
+    high = "high"  # 80+
     medium = "medium"  # 50-79
-    low = "low"        # <50
+    low = "low"  # <50
 
 
 class OrderByFilter(str, Enum):
     """Valid order_by filter values."""
+
     created_at = "created_at"
     score = "score"
     repo_stars = "repo_stars"
@@ -76,6 +80,7 @@ class OrderByFilter(str, Enum):
 # =============================================================================
 # Discovery Endpoints
 # =============================================================================
+
 
 @router.post("/discover", response_model=IssueListResponse)
 def discover_issues(
@@ -99,14 +104,14 @@ def discover_issues_async(
     """Asynchronous issue discovery using Celery."""
     try:
         from workers.tasks import discover_issues_task
-        
+
         task = discover_issues_task.delay(
             user_id=current_user.id,
             labels=request.labels,
             language=request.language,
             limit=request.limit,
         )
-        
+
         return {
             "task_id": task.id,
             "status": "queued",
@@ -127,35 +132,42 @@ def get_discovery_task_status(
     """Check status of an async discovery task."""
     try:
         from workers.celery_app import celery_app
-        
+
         result = celery_app.AsyncResult(task_id)
         response = {"task_id": task_id, "status": result.status}
-        
+
         if result.ready():
             if result.successful():
                 response["result"] = result.result
             else:
                 response["error"] = str(result.result)
-        
+
         return response
     except ImportError:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Celery not available")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Celery not available"
+        )
 
 
 # =============================================================================
 # List & Query Endpoints
 # =============================================================================
 
+
 @router.get("", response_model=IssueListResponse)
 def list_issues(
-    difficulty: Optional[DifficultyFilter] = Query(None, description="Filter by difficulty level"),
-    technology: Optional[str] = Query(None, description="Filter by technology"),
-    language: Optional[str] = Query(None, description="Filter by programming language"),
-    repo_owner: Optional[str] = Query(None, description="Filter by repository owner"),
-    issue_type: Optional[IssueTypeFilter] = Query(None, description="Filter by issue type"),
-    days_back: Optional[int] = Query(None, ge=1, le=365, description="Filter issues created within N days"),
-    min_stars: Optional[int] = Query(None, ge=0, le=1000000, description="Minimum repository stars"),
-    score_range: Optional[ScoreRangeFilter] = Query(None, description="Score range: 'high' (80+), 'medium' (50-79), 'low' (<50)"),
+    difficulty: DifficultyFilter | None = Query(None, description="Filter by difficulty level"),
+    technology: str | None = Query(None, description="Filter by technology"),
+    language: str | None = Query(None, description="Filter by programming language"),
+    repo_owner: str | None = Query(None, description="Filter by repository owner"),
+    issue_type: IssueTypeFilter | None = Query(None, description="Filter by issue type"),
+    days_back: int | None = Query(
+        None, ge=1, le=365, description="Filter issues created within N days"
+    ),
+    min_stars: int | None = Query(None, ge=0, le=1000000, description="Minimum repository stars"),
+    score_range: ScoreRangeFilter | None = Query(
+        None, description="Score range: 'high' (80+), 'medium' (50-79), 'low' (<50)"
+    ),
     limit: int = Query(20, ge=1, le=100, description="Number of results per page"),
     offset: int = Query(0, ge=0, le=10000, description="Pagination offset"),
     order_by: OrderByFilter = Query(OrderByFilter.created_at, description="Sort field"),
@@ -175,7 +187,7 @@ def list_issues(
         "order_by": order_by.value,
         "is_active": True,
     }
-    
+
     repo = IssueRepository(db)
     issues, total, bookmarked_ids = repo.list_with_bookmarks(
         user_id=current_user.id,
@@ -183,11 +195,11 @@ def list_issues(
         offset=offset,
         limit=limit,
     )
-    
+
     # Use batch serialization to avoid N+1 queries
     issue_dicts = issue_service.batch_issue_to_dict(issues, bookmarked_ids)
     issue_responses = [IssueResponse(**d) for d in issue_dicts]
-    
+
     return IssueListResponse(issues=issue_responses, total=total)
 
 
@@ -213,13 +225,13 @@ def get_top_matches(
     """Get top matching issues based on profile."""
     profile_repo = ProfileRepository(db)
     profile = profile_repo.get_by_user_id(current_user.id)
-    
+
     if not profile:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Profile required for matching. Create a profile first.",
         )
-    
+
     profile_data = {
         "skills": profile.skills or [],
         "experience_level": profile.experience_level,
@@ -227,10 +239,10 @@ def get_top_matches(
         "preferred_languages": profile.preferred_languages or [],
         "time_availability_hours_per_week": profile.time_availability_hours_per_week,
     }
-    
+
     issue_repo = IssueRepository(db)
     scoring_service = ScoringService(issue_repo)
-    
+
     try:
         top_matches = scoring_service.get_top_matches(
             user_id=current_user.id,
@@ -249,19 +261,21 @@ def get_stats(
 ):
     """Get issue statistics (cached for 5 minutes)."""
     cache_key = CacheKeys.user_stats(current_user.id)
-    
+
     # Try to get from cache
     cached_stats = cache.get_json(cache_key)
     if cached_stats is not None:
         return IssueStatsResponse(**cached_stats)
-    
+
     # Compute stats
     repo = IssueRepository(db)
     stats = repo.get_variety_stats(current_user.id)
-    
+
     labeled_count = db.query(IssueLabel).filter(IssueLabel.user_id == current_user.id).count()
-    bookmark_count = db.query(IssueBookmark).filter(IssueBookmark.user_id == current_user.id).count()
-    
+    bookmark_count = (
+        db.query(IssueBookmark).filter(IssueBookmark.user_id == current_user.id).count()
+    )
+
     result = {
         "total": stats.get("total", 0),
         "bookmarked": bookmark_count,
@@ -269,10 +283,10 @@ def get_stats(
         "top_score": None,
         "by_difficulty": stats.get("by_difficulty", {}),
     }
-    
+
     # Cache for 5 minutes
     cache.set_json(cache_key, result, CacheKeys.TTL_SHORT)
-    
+
     return IssueStatsResponse(**result)
 
 
@@ -283,11 +297,11 @@ def get_staleness_stats(
 ):
     """
     Get statistics about stale issues.
-    
+
     Returns counts of issues needing verification.
     """
     from ..services import staleness_service
-    
+
     return staleness_service.get_stale_issues_count(db, current_user.id)
 
 
@@ -300,24 +314,25 @@ def bulk_verify_issues(
 ):
     """
     Bulk verify issues that haven't been checked recently.
-    
+
     Useful for keeping issue status up-to-date.
     """
     from ..services import staleness_service
-    
+
     result = staleness_service.bulk_verify_issues(
         db=db,
         user_id=current_user.id,
         limit=limit,
         min_age_days=min_age_days,
     )
-    
+
     return result
 
 
 # =============================================================================
 # Export Endpoints
 # =============================================================================
+
 
 @router.get("/export")
 def export_issues(
@@ -340,42 +355,55 @@ def export_issues(
             limit=1000,
             skip_count=True,  # Skip count for export (not needed)
         )
-    
+
     # Convert to dicts using batch serialization
     issues_data = issue_service.batch_issue_to_dict(issues, bookmarked_ids)
-    
+
     if format == "json":
         json_content = json.dumps(issues_data, indent=2, default=str)
         return StreamingResponse(
             io.BytesIO(json_content.encode()),
             media_type="application/json",
-            headers={"Content-Disposition": "attachment; filename=issues.json"}
+            headers={"Content-Disposition": "attachment; filename=issues.json"},
         )
     else:
         output = io.StringIO()
         if issues_data:
-            fieldnames = ["id", "title", "url", "difficulty", "issue_type", 
-                         "repo_owner", "repo_name", "repo_stars", "score", 
-                         "technologies", "labels", "created_at", "is_bookmarked"]
-            writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction='ignore')
+            fieldnames = [
+                "id",
+                "title",
+                "url",
+                "difficulty",
+                "issue_type",
+                "repo_owner",
+                "repo_name",
+                "repo_stars",
+                "score",
+                "technologies",
+                "labels",
+                "created_at",
+                "is_bookmarked",
+            ]
+            writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
             writer.writeheader()
             for issue in issues_data:
                 row = {**issue}
                 row["technologies"] = ", ".join(issue.get("technologies", []))
                 row["labels"] = ", ".join(issue.get("labels", []))
                 writer.writerow(row)
-        
+
         output.seek(0)
         return StreamingResponse(
             io.BytesIO(output.getvalue().encode()),
             media_type="text/csv",
-            headers={"Content-Disposition": "attachment; filename=issues.csv"}
+            headers={"Content-Disposition": "attachment; filename=issues.csv"},
         )
 
 
 # =============================================================================
 # Single Issue Endpoints
 # =============================================================================
+
 
 @router.get("/{issue_id}", response_model=IssueDetailResponse)
 def get_issue(
@@ -386,15 +414,17 @@ def get_issue(
     """Get detailed information about an issue."""
     repo = IssueRepository(db)
     issue = repo.get_by_id(issue_id, current_user.id)
-    
+
     if not issue:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Issue not found")
-    
-    is_bookmarked = db.query(IssueBookmark).filter(
-        IssueBookmark.user_id == current_user.id,
-        IssueBookmark.issue_id == issue_id
-    ).first() is not None
-    
+
+    is_bookmarked = (
+        db.query(IssueBookmark)
+        .filter(IssueBookmark.user_id == current_user.id, IssueBookmark.issue_id == issue_id)
+        .first()
+        is not None
+    )
+
     return IssueDetailResponse(**issue_service.issue_to_detail_dict(issue, is_bookmarked))
 
 
@@ -429,22 +459,23 @@ def score_issue(
     """Score a specific issue against user profile."""
     try:
         from workers.tasks import score_single_issue_task
+
         task = score_single_issue_task.delay(current_user.id, issue_id)
         return {"task_id": task.id, "status": "scoring_queued"}
     except ImportError:
         # Synchronous fallback
         repo = IssueRepository(db)
         issue = repo.get_by_id(issue_id, current_user.id)
-        
+
         if not issue:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Issue not found")
-        
+
         profile_repo = ProfileRepository(db)
         profile = profile_repo.get_by_user_id(current_user.id)
-        
+
         if not profile:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Profile required")
-        
+
         scoring_service = ScoringService(repo)
         result = scoring_service.score_issue(
             issue.to_dict(),
@@ -456,15 +487,16 @@ def score_issue(
                 "time_availability_hours_per_week": profile.time_availability_hours_per_week,
             },
         )
-        
+
         repo.update_cached_scores({issue_id: result["total_score"]})
-        
+
         return {"score": result["total_score"], "breakdown": result["breakdown"]}
 
 
 # =============================================================================
 # Issue Notes Endpoints
 # =============================================================================
+
 
 @router.get("/{issue_id}/notes", response_model=NotesListResponse)
 def get_issue_notes(
@@ -475,10 +507,10 @@ def get_issue_notes(
     """Get all notes for an issue."""
     repo = IssueRepository(db)
     issue = repo.get_by_id(issue_id, current_user.id)
-    
+
     if not issue:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Issue not found")
-    
+
     notes = (
         db.query(IssueNote)
         .filter(IssueNote.user_id == current_user.id, IssueNote.issue_id == issue_id)
@@ -498,10 +530,10 @@ def create_issue_note(
     """Add a note to an issue."""
     repo = IssueRepository(db)
     issue = repo.get_by_id(issue_id, current_user.id)
-    
+
     if not issue:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Issue not found")
-    
+
     note = IssueNote(user_id=current_user.id, issue_id=issue_id, content=payload.content)
     db.add(note)
     db.commit()
@@ -528,7 +560,7 @@ def delete_issue_note(
     )
     if not note:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note not found")
-    
+
     db.delete(note)
     db.commit()
     return {"status": "deleted"}
@@ -538,6 +570,7 @@ def delete_issue_note(
 # Staleness & Verification Endpoints
 # =============================================================================
 
+
 @router.post("/{issue_id}/verify-status")
 def verify_issue_status(
     issue_id: int,
@@ -546,25 +579,25 @@ def verify_issue_status(
 ):
     """
     Verify the current status of an issue with GitHub API.
-    
+
     Checks if the issue is still open or has been closed.
     """
     from ..services import staleness_service
-    
+
     repo = IssueRepository(db)
     issue = repo.get_by_id(issue_id, current_user.id)
-    
+
     if not issue:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Issue not found")
-    
+
     result = staleness_service.verify_issue_status(db, issue)
-    
+
     if not result.get("verified"):
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Failed to verify issue: {result.get('error', 'Unknown error')}"
+            detail=f"Failed to verify issue: {result.get('error', 'Unknown error')}",
         )
-    
+
     return {
         "issue_id": issue_id,
         "status": result["status"],

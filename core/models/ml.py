@@ -17,10 +17,11 @@ if TYPE_CHECKING:
 class UserMLModel(Base):
     """
     User's personalized ML model for issue scoring.
-    
+
     Stores trained model paths and performance metrics.
     Each user can have their own trained model based on their feedback.
     """
+
     __tablename__ = "user_ml_models"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -34,4 +35,3 @@ class UserMLModel(Base):
     trained_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     user: Mapped["User"] = relationship("User", back_populates="ml_models")
-

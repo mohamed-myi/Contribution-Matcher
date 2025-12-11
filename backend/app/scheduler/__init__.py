@@ -104,7 +104,7 @@ def shutdown_scheduler() -> None:
         logger.info("Scheduler shut down")
 
 
-def list_jobs() -> List[Dict[str, Any]]:
+def list_jobs() -> list[dict[str, Any]]:
     items = []
     for job in scheduler.get_jobs():
         items.append(
@@ -134,4 +134,3 @@ def trigger_job(job_id: str, **kwargs) -> None:
 def reschedule_job(job_id: str, cron: str) -> None:
     trigger = _cron(cron)
     scheduler.reschedule_job(job_id, trigger=trigger)
-

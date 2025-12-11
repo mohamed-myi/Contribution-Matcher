@@ -8,30 +8,30 @@ Provides centralized dependencies for:
 - Caching
 """
 
-from typing import Generator
+from collections.abc import Generator
 
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
+from core.cache import cache
 from core.db import db as core_db, get_db as core_get_db
 from core.repositories import (
     IssueRepository,
-    UserRepository,
     ProfileRepository,
     RepoMetadataRepository,
     TokenBlacklistRepository,
+    UserRepository,
 )
 from core.services import ScoringService
-from core.cache import cache
 
-from ..database import get_db
 from ..auth.dependencies import get_current_user
+from ..database import get_db
 from ..models import User
-
 
 # =============================================================================
 # Repository Dependencies
 # =============================================================================
+
 
 def get_issue_repository(db: Session = Depends(get_db)) -> IssueRepository:
     """Get IssueRepository instance."""
@@ -62,6 +62,7 @@ def get_token_blacklist_repository(db: Session = Depends(get_db)) -> TokenBlackl
 # Service Dependencies
 # =============================================================================
 
+
 def get_scoring_service(
     issue_repo: IssueRepository = Depends(get_issue_repository),
 ) -> ScoringService:
@@ -72,6 +73,7 @@ def get_scoring_service(
 # =============================================================================
 # Cache Dependencies
 # =============================================================================
+
 
 def get_cache():
     """Get Redis cache instance."""
@@ -84,16 +86,17 @@ def get_cache():
 # Combined Dependencies
 # =============================================================================
 
+
 class RequestContext:
     """
     Request context with commonly needed dependencies.
-    
+
     Usage:
         @router.get("/endpoint")
         def endpoint(ctx: RequestContext = Depends(get_request_context)):
             issues = ctx.issue_repo.list_with_bookmarks(ctx.user.id, filters)
     """
-    
+
     def __init__(
         self,
         db: Session,
@@ -141,4 +144,3 @@ __all__ = [
     "RequestContext",
     "get_request_context",
 ]
-

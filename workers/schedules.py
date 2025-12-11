@@ -18,9 +18,9 @@ settings = get_settings()
 def get_beat_schedule():
     """
     Get the Celery Beat schedule configuration.
-    
+
     Schedule is configurable via environment variables.
-    
+
     Returns:
         Dictionary of scheduled tasks
     """
@@ -47,7 +47,6 @@ def get_beat_schedule():
             },
             "options": {"queue": "discovery"},
         },
-        
         # =================================================================
         # Cleanup Tasks (Daily)
         # =================================================================
@@ -61,7 +60,6 @@ def get_beat_schedule():
             "kwargs": {"limit": 50},
             "options": {"queue": "discovery"},
         },
-        
         # =================================================================
         # Scoring Tasks (After Discovery)
         # =================================================================
@@ -75,7 +73,6 @@ def get_beat_schedule():
             "kwargs": {"batch_size": 100},
             "options": {"queue": "scoring"},
         },
-        
         # =================================================================
         # ML Tasks (Weekly)
         # =================================================================
@@ -93,7 +90,6 @@ def get_beat_schedule():
             },
             "options": {"queue": "ml"},
         },
-        
         "generate-embeddings-daily": {
             "task": "workers.tasks.ml_tasks.generate_embeddings",
             "schedule": crontab(
@@ -104,7 +100,6 @@ def get_beat_schedule():
             "kwargs": {"batch_size": 50},
             "options": {"queue": "ml"},
         },
-        
         # =================================================================
         # Maintenance Tasks (Weekly)
         # =================================================================
@@ -125,11 +120,10 @@ def get_beat_schedule():
 def apply_beat_schedule(celery_app):
     """
     Apply the beat schedule to a Celery app.
-    
+
     Args:
         celery_app: Celery application instance
     """
     if settings.enable_scheduler:
         celery_app.conf.beat_schedule = get_beat_schedule()
         celery_app.conf.beat_schedule_filename = "celerybeat-schedule"
-

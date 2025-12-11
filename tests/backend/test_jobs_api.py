@@ -4,14 +4,14 @@ from backend.app.routers import jobs as jobs_router
 def test_jobs_api_requires_authentication(test_app_client):
     """Test that jobs API requires authentication."""
     client, _ = test_app_client
-    
+
     # All jobs endpoints should return 401 without authentication
     resp = client.get("/api/jobs")
     assert resp.status_code == 401
-    
+
     resp = client.post("/api/jobs/run", json={"job_id": "test"})
     assert resp.status_code == 401
-    
+
     resp = client.post("/api/jobs/reschedule", json={"job_id": "test", "cron": "* * * * *"})
     assert resp.status_code == 401
 
@@ -92,4 +92,3 @@ def test_jobs_api_reschedule(monkeypatch, authorized_client):
     )
     assert resp.status_code == 200
     assert captured == {"job_id": "discover_all", "cron": "0 12 * * *"}
-

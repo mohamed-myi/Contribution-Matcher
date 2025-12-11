@@ -36,7 +36,7 @@ def _ensure_scheduler_enabled():
 def get_jobs(current_user: User = Depends(get_current_user)):
     """
     List all scheduled jobs.
-    
+
     Requires authentication.
     """
     _ensure_scheduler_enabled()
@@ -50,7 +50,7 @@ def run_job(
 ):
     """
     Manually trigger a scheduled job.
-    
+
     Requires authentication. The job will run with the current user's context
     if user_id is not specified in the request.
     """
@@ -71,7 +71,7 @@ def update_schedule(
 ):
     """
     Update the schedule for a job.
-    
+
     Requires authentication.
     """
     _ensure_scheduler_enabled()
@@ -80,4 +80,3 @@ def update_schedule(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     return {"status": "updated"}
-

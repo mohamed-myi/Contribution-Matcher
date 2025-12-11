@@ -3,11 +3,8 @@ Pytest fixtures for Contribution Matcher tests.
 
 Uses ORM pattern with SQLAlchemy for database operations.
 """
-import json
+
 import os
-import tempfile
-from datetime import datetime, timedelta
-from typing import Dict, List
 from unittest.mock import patch
 
 import pytest
@@ -15,7 +12,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from core.db import Base
-from core.models import Issue, IssueTechnology, RepoMetadata, DevProfile
+from core.models import Issue, IssueTechnology
 from core.profile import save_dev_profile
 
 
@@ -23,23 +20,23 @@ from core.profile import save_dev_profile
 def test_db():
     """Create a fresh test database for each test using ORM."""
     test_db_path = "test_contribution_matcher.db"
-    
+
     # Remove test database if it exists
     if os.path.exists(test_db_path):
         os.remove(test_db_path)
-    
+
     # Create engine and tables
     engine = create_engine(
         f"sqlite:///{test_db_path}",
         connect_args={"check_same_thread": False},
     )
     Base.metadata.create_all(bind=engine)
-    
+
     # Create session factory
     TestingSessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
-    
+
     yield test_db_path, TestingSessionLocal, engine
-    
+
     # Cleanup after test
     engine.dispose()
     if os.path.exists(test_db_path):
@@ -83,11 +80,7 @@ def sample_github_issue():
         "html_url": "https://github.com/testowner/testrepo/issues/123",
         "url": "https://api.github.com/repos/testowner/testrepo/issues/123",
         "repository_url": "https://api.github.com/repos/testowner/testrepo",
-        "labels": [
-            {"name": "bug"},
-            {"name": "good first issue"},
-            {"name": "python"}
-        ],
+        "labels": [{"name": "bug"}, {"name": "good first issue"}, {"name": "python"}],
         "state": "open",
         "created_at": "2024-01-15T10:00:00Z",
         "updated_at": "2024-01-20T15:30:00Z",
@@ -136,6 +129,7 @@ def sample_parsed_issue():
 def _create_test_user(session):
     """Helper to create a test user for issues."""
     from core.models import User
+
     user = User(
         github_id="test_user_123",
         github_username="testuser",
@@ -171,7 +165,7 @@ def _create_issue_with_technologies(session, user_id, issue_data, technologies=N
     )
     session.add(issue)
     session.flush()
-    
+
     # Add technologies
     if technologies:
         for tech, category in technologies:
@@ -182,7 +176,7 @@ def _create_issue_with_technologies(session, user_id, issue_data, technologies=N
             )
             session.add(tech_obj)
         session.flush()
-    
+
     return issue
 
 
@@ -204,7 +198,7 @@ def sample_issue_in_db(test_session, sample_parsed_issue):
 def multiple_issues_in_db(test_session):
     """Create multiple sample issues in the test database using ORM."""
     user = _create_test_user(test_session)
-    
+
     issues = [
         {
             "title": "Beginner Python bug fix",
@@ -246,15 +240,13 @@ def multiple_issues_in_db(test_session):
             "technologies": [],
         },
     ]
-    
+
     issue_ids = []
     for issue_data in issues:
         technologies = issue_data.pop("technologies", [])
-        issue = _create_issue_with_technologies(
-            test_session, user.id, issue_data, technologies
-        )
+        issue = _create_issue_with_technologies(test_session, user.id, issue_data, technologies)
         issue_ids.append(issue.id)
-    
+
     test_session.commit()
     return issue_ids, user.id
 
@@ -264,10 +256,10 @@ def labeled_issues_for_ml(test_session, sample_profile):
     """Create labeled issues for ML training tests using ORM."""
     # Create user first
     user = _create_test_user(test_session)
-    
+
     # Save profile
     save_dev_profile(sample_profile)
-    
+
     # Create issues with labels
     issues = [
         {
@@ -299,15 +291,13 @@ def labeled_issues_for_ml(test_session, sample_profile):
             "label": "bad",
         },
     ]
-    
+
     issue_ids = []
     for issue_data in issues:
         technologies = issue_data.pop("technologies", [])
-        issue = _create_issue_with_technologies(
-            test_session, user.id, issue_data, technologies
-        )
+        issue = _create_issue_with_technologies(test_session, user.id, issue_data, technologies)
         issue_ids.append(issue.id)
-    
+
     test_session.commit()
     return issue_ids, user.id
 
@@ -315,13 +305,12 @@ def labeled_issues_for_ml(test_session, sample_profile):
 @pytest.fixture
 def mock_github_api():
     """Mock GitHub API responses."""
-    with patch('github_api._make_request') as mock_request:
+    with patch("github_api._make_request") as mock_request:
         yield mock_request
 
 
 @pytest.fixture
 def mock_requests_get():
     """Mock requests.get for GitHub API calls."""
-    with patch('requests.get') as mock_get:
+    with patch("requests.get") as mock_get:
         yield mock_get
-

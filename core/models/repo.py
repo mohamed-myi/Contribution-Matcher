@@ -16,10 +16,11 @@ from .base import Base
 class RepoMetadata(Base):
     """
     Cached repository metadata.
-    
+
     Reduces GitHub API calls by caching repo information.
     Cache validity is controlled by CACHE_VALIDITY_DAYS setting.
     """
+
     __tablename__ = "repo_metadata"
     __table_args__ = (
         UniqueConstraint("repo_owner", "repo_name", name="uq_repo_metadata_owner_name"),
@@ -35,7 +36,7 @@ class RepoMetadata(Base):
     last_commit_date: Mapped[Optional[str]] = mapped_column(String(64))
     contributor_count: Mapped[Optional[int]] = mapped_column(Integer)
     cached_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    
+
     def is_stale(self, validity_days: int = 7) -> bool:
         """
         Determine whether cached metadata has exceeded its validity window.
@@ -47,11 +48,12 @@ class RepoMetadata(Base):
             True if cache is older than validity_days; otherwise False.
         """
         from datetime import timedelta
+
         if not self.cached_at:
             return True
         age = datetime.utcnow() - self.cached_at
         return age > timedelta(days=validity_days)
-    
+
     def to_dict(self) -> Dict:
         """
         Serialize the repository metadata for downstream consumers.
@@ -68,4 +70,3 @@ class RepoMetadata(Base):
             "contributor_count": self.contributor_count,
             "cached_at": self.cached_at.isoformat() if self.cached_at else None,
         }
-

@@ -1,8 +1,5 @@
-import pytest
-
-from backend.app.auth import github_oauth
-from backend.app.routers import auth as auth_router
 from backend.app.models import User
+from backend.app.routers import auth as auth_router
 
 
 def test_auth_login_redirects_to_github(test_app_client):
@@ -112,7 +109,7 @@ def test_auth_callback_uses_code_exchange_when_redis_available(monkeypatch, test
         "_validate_and_consume_oauth_state",
         lambda state: True,
     )
-    
+
     # Mock auth code storage to return True (simulating Redis available)
     monkeypatch.setattr(
         auth_router,
@@ -142,14 +139,14 @@ def test_auth_callback_uses_code_exchange_when_redis_available(monkeypatch, test
 def test_auth_token_exchange_success(monkeypatch, test_app_client):
     """Test that /auth/token exchanges auth code for JWT."""
     client, _ = test_app_client
-    
+
     # Mock the auth code exchange to return a valid token
     monkeypatch.setattr(
         auth_router,
         "_exchange_auth_code",
         lambda code: ("jwt_token_here", 123),
     )
-    
+
     resp = client.post("/api/v1/auth/token", params={"code": "valid_auth_code"})
     assert resp.status_code == 200
     data = resp.json()
@@ -160,14 +157,14 @@ def test_auth_token_exchange_success(monkeypatch, test_app_client):
 def test_auth_token_exchange_invalid_code(monkeypatch, test_app_client):
     """Test that /auth/token rejects invalid auth codes."""
     client, _ = test_app_client
-    
+
     # Mock the auth code exchange to return None (invalid code)
     monkeypatch.setattr(
         auth_router,
         "_exchange_auth_code",
         lambda code: (None, None),
     )
-    
+
     resp = client.post("/api/v1/auth/token", params={"code": "invalid_code"})
     assert resp.status_code == 401
 
@@ -183,92 +180,94 @@ def test_auth_me_protected(test_app_client):
 # Account Lockout Tests
 # =============================================================================
 
+
 class TestAccountLockout:
     """Tests for account lockout mechanism."""
-    
+
     def test_lockout_after_repeated_failures(self):
         """Test that account gets locked out after repeated authentication failures."""
-        from core.security import get_account_lockout, AccountLockout
-        
+        from core.security import AccountLockout
+
         # Create a fresh lockout instance for testing
         lockout = AccountLockout()
         test_ip = "192.168.1.100"
-        
+
         # Initially not locked
         result = lockout.check(test_ip)
         assert not result.is_locked
         assert result.failure_count == 0
-        
+
         # Record failures - should not be locked after 2 failures
         lockout.record_failure(test_ip)
         lockout.record_failure(test_ip)
         result = lockout.check(test_ip)
         assert not result.is_locked
         assert result.failure_count == 2
-        
+
         # After 3rd failure, should be locked for 1 minute
         result = lockout.record_failure(test_ip)
         assert result.is_locked
         assert result.failure_count == 3
         assert result.retry_after == 60  # 1 minute
-    
+
     def test_lockout_progressive_duration(self):
         """Test that lockout duration increases with more failures."""
         from core.security import AccountLockout
-        
+
         lockout = AccountLockout()
         test_ip = "192.168.1.101"
-        
+
         # Record 3 failures -> 1 minute lockout
         for _ in range(3):
             result = lockout.record_failure(test_ip)
         assert result.retry_after == 60
-        
+
         # Record 2 more (5 total) -> 5 minute lockout
         for _ in range(2):
             result = lockout.record_failure(test_ip)
         assert result.retry_after == 300  # 5 minutes
-        
+
         # Record 2 more (7 total) -> 15 minute lockout
         for _ in range(2):
             result = lockout.record_failure(test_ip)
         assert result.retry_after == 900  # 15 minutes
-        
+
         # Record 3 more (10 total) -> 1 hour lockout
         for _ in range(3):
             result = lockout.record_failure(test_ip)
         assert result.retry_after == 3600  # 1 hour
-    
+
     def test_lockout_clear_on_success(self):
         """Test that lockout is cleared after successful authentication."""
         from core.security import AccountLockout
-        
+
         lockout = AccountLockout()
         test_ip = "192.168.1.102"
-        
+
         # Create some failures
         for _ in range(5):
             lockout.record_failure(test_ip)
-        
+
         result = lockout.check(test_ip)
         assert result.is_locked
         assert result.failure_count == 5
-        
+
         # Clear on success
         lockout.clear(test_ip)
-        
+
         # Should be unlocked with 0 failures
         result = lockout.check(test_ip)
         assert not result.is_locked
         assert result.failure_count == 0
-    
+
     def test_lockout_blocks_oauth_callback(self, monkeypatch, test_app_client):
         """Test that locked out IPs are blocked from OAuth callback."""
-        from core.security import AccountLockout, get_account_lockout
         from unittest.mock import MagicMock
-        
+
+        from core.security import AccountLockout
+
         client, _ = test_app_client
-        
+
         # Create a mock lockout that always reports locked
         mock_lockout = MagicMock(spec=AccountLockout)
         mock_lockout.check.return_value = MagicMock(
@@ -277,40 +276,40 @@ class TestAccountLockout:
             lockout_until=9999999999,
             retry_after=3600,
         )
-        
+
         # Patch the singleton to return our mock
         monkeypatch.setattr(
             "backend.app.routers.auth.get_account_lockout",
             lambda: mock_lockout,
         )
-        
+
         # Attempt OAuth callback
         resp = client.get(
             "/api/v1/auth/callback",
             params={"code": "any_code", "state": "any_state"},
             follow_redirects=False,
         )
-        
+
         assert resp.status_code in (302, 307)
         location = resp.headers.get("location", "")
         assert "error=too_many_attempts" in location
         assert "retry_after=3600" in location
-    
+
     def test_lockout_different_ips_independent(self):
         """Test that different IPs have independent lockout tracking."""
         from core.security import AccountLockout
-        
+
         lockout = AccountLockout()
         ip1 = "192.168.1.200"
         ip2 = "192.168.1.201"
-        
+
         # Lock out ip1
         for _ in range(5):
             lockout.record_failure(ip1)
-        
+
         # ip1 should be locked
         assert lockout.check(ip1).is_locked
-        
+
         # ip2 should not be locked
         assert not lockout.check(ip2).is_locked
         assert lockout.check(ip2).failure_count == 0

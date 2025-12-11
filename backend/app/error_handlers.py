@@ -6,12 +6,12 @@ Security:
 - Generic error messages for 500 errors to prevent information disclosure
 """
 
+import structlog
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from core.logging import get_logger
-import structlog
 
 logger = get_logger("backend.errors")
 
@@ -19,7 +19,7 @@ logger = get_logger("backend.errors")
 def _get_request_id() -> str:
     """
     Get the current request ID from context.
-    
+
     Used for server-side logging only - NOT exposed to clients.
     """
     try:
@@ -32,7 +32,7 @@ def _get_request_id() -> str:
 def _response_payload(detail: str, status_code: int) -> dict:
     """
     Create error response payload.
-    
+
     Security: Does NOT include request_id to prevent information disclosure.
     Request IDs are still logged server-side for debugging.
     """

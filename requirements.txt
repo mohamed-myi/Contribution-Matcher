@@ -6,7 +6,7 @@ pyyaml==6.0.3
 # Web framework
 fastapi==0.115.7
 uvicorn[standard]==0.30.6
-gunicorn==21.2.0
+gunicorn>=22.0.0
 
 # Database
 sqlalchemy==2.0.35
@@ -14,7 +14,7 @@ psycopg2-binary==2.9.9
 alembic==1.14.0
 
 # Authentication
-python-jose[cryptography]==3.3.0
+python-jose[cryptography]>=3.4.0
 python-multipart==0.0.20
 
 # HTTP client
@@ -43,4 +43,4 @@ pytest-cov==5.0.0
 
 # Code quality (dev)
 ruff==0.13.1
-black==24.0.0
+black>=24.3.0

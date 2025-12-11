@@ -94,4 +94,5 @@ class BaseRepository(Generic[T]):
         for key, value in filters.items():
             if hasattr(self.model, key):
                 query = query.filter(getattr(self.model, key) == value)
-        return self.session.query(query.exists()).scalar()
+        result = self.session.query(query.exists()).scalar()
+        return bool(result) if result is not None else False

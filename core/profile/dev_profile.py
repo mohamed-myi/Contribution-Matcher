@@ -145,7 +145,9 @@ def create_profile_from_resume(pdf_path: str) -> dict:
         with open(pdf_path, "rb") as f:
             pdf_reader = PyPDF2.PdfReader(f)
             for page in pdf_reader.pages:
-                text_parts.append(page.extract_text())
+                text = page.extract_text()
+                if text:
+                    text_parts.append(text)
     elif PDF_LIBRARY == "pdfplumber":
         with pdfplumber.open(pdf_path) as pdf:
             for page in pdf.pages:

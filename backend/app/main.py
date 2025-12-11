@@ -5,7 +5,7 @@ Uses structured logging from core.logging module.
 Includes security validation and rate limiting.
 """
 
-import time
+import asyncio
 from collections.abc import Callable
 
 from fastapi import Depends, FastAPI, Request, Response, status
@@ -111,7 +111,7 @@ def validate_security_on_startup():
         raise
 
 
-def check_database_health(max_retries: int = 3, retry_delay: float = 2.0) -> bool:
+async def check_database_health(max_retries: int = 3, retry_delay: float = 2.0) -> bool:
     """
     Check database connectivity with retry logic.
 
@@ -142,7 +142,7 @@ def check_database_health(max_retries: int = 3, retry_delay: float = 2.0) -> boo
                 error=str(e),
             )
             if attempt < max_retries - 1:
-                time.sleep(retry_delay * (attempt + 1))  # Exponential backoff
+                await asyncio.sleep(retry_delay * (attempt + 1))  # Exponential backoff
 
     raise RuntimeError(
         f"Database unreachable after {max_retries} attempts. "
@@ -251,7 +251,7 @@ def create_app() -> FastAPI:
         logger.info("database_initialized")
 
         # Verify database connectivity with retry
-        check_database_health(max_retries=3, retry_delay=2.0)
+        await check_database_health(max_retries=3, retry_delay=2.0)
 
         # Initialize cache
         cache.initialize()

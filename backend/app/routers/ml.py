@@ -129,7 +129,7 @@ def remove_issue_label(
 
 @router.post("/train", response_model=ModelInfoResponse)
 def train_model(
-    payload: TrainModelRequest = None,
+    payload: TrainModelRequest | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -141,7 +141,7 @@ def train_model(
 
 @router.post("/evaluate")
 def evaluate_model(
-    payload: EvaluateModelRequest = None,
+    payload: EvaluateModelRequest | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

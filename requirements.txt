@@ -46,3 +46,7 @@ pytest-cov==5.0.0
 # Code quality (dev)
 ruff==0.13.1
 black>=24.3.0
+
+# Type stubs for mypy
+types-requests>=2.32.0
+types-Markdown>=3.5.0

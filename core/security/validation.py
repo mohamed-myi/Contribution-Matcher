@@ -237,25 +237,29 @@ def validate_security_config(
         if warning:
             warnings.append(warning)
 
+    # Filter out None values
+    errors_filtered = [e for e in errors if e is not None]
+    warnings_filtered = [w for w in warnings if w is not None]
+
     # Log results
-    if errors:
-        for error in errors:
+    if errors_filtered:
+        for error in errors_filtered:
             logger.error("config_validation_error", error=error)
 
-    if warnings:
-        for warning in warnings:
+    if warnings_filtered:
+        for warning in warnings_filtered:
             logger.warning("config_validation_warning", warning=warning)
 
     result = ValidationResult(
-        valid=len(errors) == 0,
-        errors=errors,
-        warnings=warnings,
+        valid=len(errors_filtered) == 0,
+        errors=errors_filtered,
+        warnings=warnings_filtered,
     )
 
-    if strict and (errors or warnings):
-        raise SecurityConfigError(errors + warnings)
-    elif errors:
-        raise SecurityConfigError(errors)
+    if strict and (errors_filtered or warnings_filtered):
+        raise SecurityConfigError(errors_filtered + warnings_filtered)
+    elif errors_filtered:
+        raise SecurityConfigError(errors_filtered)
 
     return result
 

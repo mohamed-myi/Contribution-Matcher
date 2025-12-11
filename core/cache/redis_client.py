@@ -10,16 +10,21 @@ Provides a singleton Redis client with:
 
 import json
 import pickle
-from typing import Any, Optional, TypeVar
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, Optional, TypeVar
 
-try:
+if TYPE_CHECKING:
     import redis
     from redis.exceptions import ConnectionError, TimeoutError
+else:
+    try:
+        import redis
+        from redis.exceptions import ConnectionError, TimeoutError
 
-    REDIS_AVAILABLE = True
-except ImportError:
-    REDIS_AVAILABLE = False
-    redis = None
+        REDIS_AVAILABLE = True
+    except ImportError:
+        REDIS_AVAILABLE = False
+        redis = None  # type: ignore[assignment]
 
 from core.config import get_settings
 from core.logging import get_logger
@@ -154,11 +159,18 @@ class RedisCache:
         if not self.is_available:
             return None
 
+        client = self.client
+        if client is None:
+            return None
+
         try:
-            data = self.client.get(key)
+            data = client.get(key)
             if data is None:
                 return None
-            return json.loads(data.decode("utf-8"))
+            if isinstance(data, bytes):
+                return json.loads(data.decode("utf-8"))
+            # Handle case where data might be a string or other type
+            return json.loads(data) if isinstance(data, (str, bytes)) else data
         except (json.JSONDecodeError, ConnectionError, TimeoutError) as e:
             logger.debug("cache_get_error", key=key, error=str(e))
             return None
@@ -183,9 +195,13 @@ class RedisCache:
         if not self.is_available:
             return False
 
+        client = self.client
+        if client is None:
+            return False
+
         try:
             serialized = json.dumps(value).encode("utf-8")
-            self.client.setex(key, ttl, serialized)
+            client.setex(key, ttl, serialized)
             return True
         except (TypeError, ConnectionError, TimeoutError) as e:
             logger.debug("cache_set_error", key=key, error=str(e))
@@ -194,9 +210,9 @@ class RedisCache:
     def get_json_or_compute(
         self,
         key: str,
-        compute_fn: callable,
+        compute_fn: Callable[[], dict[Any, Any]],
         ttl: int = 3600,
-    ) -> dict | None:
+    ) -> dict[Any, Any] | None:
         """
         Get from cache or compute and cache the result.
 
@@ -234,11 +250,18 @@ class RedisCache:
         if not self.is_available:
             return None
 
+        client = self.client
+        if client is None:
+            return None
+
         try:
-            data = self.client.get(key)
+            data = client.get(key)
             if data is None:
                 return None
-            return pickle.loads(data)
+            if isinstance(data, bytes):
+                return pickle.loads(data)
+            # Handle case where data might already be unpickled
+            return data
         except (pickle.UnpicklingError, ConnectionError, TimeoutError) as e:
             logger.debug("cache_get_model_error", key=key, error=str(e))
             return None
@@ -263,9 +286,13 @@ class RedisCache:
         if not self.is_available:
             return False
 
+        client = self.client
+        if client is None:
+            return False
+
         try:
             serialized = pickle.dumps(value)
-            self.client.setex(key, ttl, serialized)
+            client.setex(key, ttl, serialized)
             return True
         except (pickle.PicklingError, ConnectionError, TimeoutError) as e:
             logger.debug("cache_set_model_error", key=key, error=str(e))
@@ -280,8 +307,12 @@ class RedisCache:
         if not self.is_available:
             return False
 
+        client = self.client
+        if client is None:
+            return False
+
         try:
-            self.client.delete(key)
+            client.delete(key)
             return True
         except (ConnectionError, TimeoutError):
             return False
@@ -299,10 +330,15 @@ class RedisCache:
         if not self.is_available:
             return 0
 
+        client = self.client
+        if client is None:
+            return 0
+
         try:
-            keys = self.client.keys(pattern)
+            keys = client.keys(pattern)
             if keys:
-                return self.client.delete(*keys)
+                deleted = client.delete(*keys)
+                return int(deleted) if deleted is not None else 0
             return 0
         except (ConnectionError, TimeoutError):
             return 0
@@ -312,8 +348,13 @@ class RedisCache:
         if not self.is_available:
             return False
 
+        client = self.client
+        if client is None:
+            return False
+
         try:
-            return bool(self.client.exists(key))
+            result = client.exists(key)
+            return bool(result) if result is not None else False
         except (ConnectionError, TimeoutError):
             return False
 
@@ -322,8 +363,13 @@ class RedisCache:
         if not self.is_available:
             return -1
 
+        client = self.client
+        if client is None:
+            return -1
+
         try:
-            return self.client.ttl(key)
+            result = client.ttl(key)
+            return int(result) if result is not None else -1
         except (ConnectionError, TimeoutError):
             return -1
 
@@ -336,8 +382,12 @@ class RedisCache:
         if not self.is_available:
             return False
 
+        client = self.client
+        if client is None:
+            return False
+
         try:
-            self.client.flushdb()
+            client.flushdb()
             return True
         except (ConnectionError, TimeoutError):
             return False
@@ -359,12 +409,26 @@ class RedisCache:
         }
 
         if self.is_available:
+            client = self.client
+            if client is None:
+                status["status"] = "unavailable"
+                return status
+
             try:
-                info = self.client.info("memory")
-                status["memory_used"] = info.get("used_memory_human", "unknown")
-                status["connected_clients"] = self.client.info("clients").get(
-                    "connected_clients", 0
-                )
+                memory_info = client.info("memory")
+                clients_info = client.info("clients")
+
+                # Handle both dict and string responses
+                if isinstance(memory_info, dict):
+                    status["memory_used"] = memory_info.get("used_memory_human", "unknown")
+                else:
+                    status["memory_used"] = "unknown"
+
+                if isinstance(clients_info, dict):
+                    status["connected_clients"] = clients_info.get("connected_clients", 0)
+                else:
+                    status["connected_clients"] = 0
+
                 status["status"] = "healthy"
             except (ConnectionError, TimeoutError):
                 status["status"] = "degraded"

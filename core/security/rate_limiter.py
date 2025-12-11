@@ -632,6 +632,9 @@ class RateLimiter:
 
         try:
             client = cache.client
+            if client is None:
+                return False
+
             pipe = client.pipeline()
 
             # Remove old entries outside the window
@@ -644,12 +647,18 @@ class RateLimiter:
             pipe.zrange(key, 0, 0, withscores=True)
 
             results = pipe.execute()
-            current_count = results[1]
+            if not isinstance(results, (list, tuple)) or len(results) < 3:
+                return False
+            current_count = results[1] if results[1] is not None else 0
             oldest_entry = results[2]
 
             # Calculate reset time
-            if oldest_entry:
-                reset_at = int(oldest_entry[0][1]) + config["window"]
+            if oldest_entry and isinstance(oldest_entry, list) and len(oldest_entry) > 0:
+                entry = oldest_entry[0]
+                if isinstance(entry, (list, tuple)) and len(entry) > 1:
+                    reset_at = int(entry[1]) + config["window"]
+                else:
+                    reset_at = now + config["window"]
             else:
                 reset_at = now + config["window"]
 
@@ -657,7 +666,7 @@ class RateLimiter:
             remaining = max(0, config["limit"] - current_count - cost)
             allowed = current_count + cost <= config["limit"]
 
-            if allowed:
+            if allowed and client is not None:
                 # Record this request
                 client.zadd(key, {f"{now}:{cost}": now})
                 client.expire(key, config["window"])
@@ -736,6 +745,8 @@ class RateLimiter:
 
         try:
             client = cache.client
+            if client is None:
+                return
             client.zadd(key, {f"{now}:1": now})
             client.expire(key, config["window"])
 
@@ -830,14 +841,21 @@ class RateLimiter:
 
         try:
             client = cache.client
+            if client is None:
+                return {}
 
             # Clean old entries and count
             client.zremrangebyscore(key, 0, window_start)
             current_count = client.zcard(key)
-            oldest = client.zrange(key, 0, 0, withscores=True)
+            oldest_result = client.zrange(key, 0, 0, withscores=True)
+            oldest = oldest_result if isinstance(oldest_result, list) else []
 
-            if oldest:
-                reset_at = int(oldest[0][1]) + config["window"]
+            if oldest and isinstance(oldest, list) and len(oldest) > 0:
+                oldest_entry = oldest[0]
+                if isinstance(oldest_entry, (list, tuple)) and len(oldest_entry) > 1:
+                    reset_at = int(oldest_entry[1]) + config["window"]
+                else:
+                    reset_at = now + config["window"]
             else:
                 reset_at = now + config["window"]
 

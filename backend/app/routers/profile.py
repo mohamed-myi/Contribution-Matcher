@@ -219,8 +219,8 @@ def create_profile(
 
 @router.post("/from-github", response_model=ProfileResponse)
 def create_profile_from_github(
-    payload: GitHubProfileRequest = None,
-    background_tasks: BackgroundTasks = None,
+    payload: GitHubProfileRequest | None = None,
+    background_tasks: BackgroundTasks | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

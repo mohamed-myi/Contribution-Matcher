@@ -24,7 +24,7 @@ def _get_issue_technologies_orm(issue_id: int, session) -> list[tuple[str, str |
         raise
 
 
-def _query_issues_orm(session, user_id: int = None, limit: int = 100) -> list[dict]:
+def _query_issues_orm(session, user_id: int | None = None, limit: int = 100) -> list[dict]:
     """Query issues using ORM and return as dictionaries."""
     from core.models import Issue
 
@@ -579,7 +579,7 @@ def score_profile_against_all_issues(
     issue_ids: list[int] | None = None,
     limit: int | None = None,
     session=None,
-    user_id: int = None,
+    user_id: int | None = None,
 ) -> list[dict]:
     """
     Score a profile against multiple issues.
@@ -638,7 +638,7 @@ def get_top_matches(
     profile: dict | None = None,
     limit: int = 10,
     session=None,
-    user_id: int = None,
+    user_id: int | None = None,
 ) -> list[dict]:
     """
     Retrieve the top matching issues for a profile.

@@ -241,12 +241,13 @@ def get_statistics(user_id: int = 1) -> dict:
             .scalar()
         )
 
-        by_difficulty = dict(
+        difficulty_results = (
             session.query(Issue.difficulty, func.count(Issue.id))
             .filter(Issue.user_id == user_id)
             .group_by(Issue.difficulty)
             .all()
         )
+        by_difficulty: dict[str | None, int] = {row[0]: row[1] for row in difficulty_results}
 
         return {
             "total_issues": total_issues,
@@ -261,21 +262,23 @@ def get_variety_statistics(user_id: int = 1) -> dict:
     from sqlalchemy import func
 
     with db.session() as session:
-        by_difficulty = dict(
+        difficulty_results = (
             session.query(Issue.difficulty, func.count(Issue.id))
             .filter(Issue.user_id == user_id, Issue.is_active)
             .group_by(Issue.difficulty)
             .all()
         )
+        by_difficulty: dict[str | None, int] = {row[0]: row[1] for row in difficulty_results}
 
-        by_type = dict(
+        type_results = (
             session.query(Issue.issue_type, func.count(Issue.id))
             .filter(Issue.user_id == user_id, Issue.is_active)
             .group_by(Issue.issue_type)
             .all()
         )
+        by_type: dict[str | None, int] = {row[0]: row[1] for row in type_results}
 
-        top_repos = dict(
+        repo_results = (
             session.query(Issue.repo_owner, func.count(Issue.id))
             .filter(Issue.user_id == user_id, Issue.is_active)
             .group_by(Issue.repo_owner)
@@ -283,6 +286,7 @@ def get_variety_statistics(user_id: int = 1) -> dict:
             .limit(10)
             .all()
         )
+        top_repos: dict[str, int] = {row[0]: row[1] for row in repo_results}
 
         return {
             "by_difficulty": by_difficulty,
@@ -296,12 +300,13 @@ def get_labeling_statistics(user_id: int = 1) -> dict:
     from sqlalchemy import func
 
     with db.session() as session:
-        by_label = dict(
+        label_results = (
             session.query(Issue.label, func.count(Issue.id))
             .filter(Issue.user_id == user_id, Issue.label.isnot(None))
             .group_by(Issue.label)
             .all()
         )
+        by_label: dict[str | None, int] = {row[0]: row[1] for row in label_results}
 
         return {
             "total_labeled": sum(by_label.values()) if by_label else 0,

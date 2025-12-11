@@ -6,21 +6,24 @@ Provides secure storage for sensitive data like GitHub access tokens.
 
 import os
 from functools import lru_cache
-from typing import Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from core.logging import get_logger
 
 logger = get_logger("security.encryption")
 
 # Try to import cryptography, provide fallback message if not available
-try:
+if TYPE_CHECKING:
     from cryptography.fernet import Fernet, InvalidToken
+else:
+    try:
+        from cryptography.fernet import Fernet, InvalidToken
 
-    CRYPTOGRAPHY_AVAILABLE = True
-except ImportError:
-    CRYPTOGRAPHY_AVAILABLE = False
-    Fernet = None
-    InvalidToken = Exception
+        CRYPTOGRAPHY_AVAILABLE = True
+    except ImportError:
+        CRYPTOGRAPHY_AVAILABLE = False
+        Fernet = None  # type: ignore[assignment]
+        InvalidToken = Exception  # type: ignore[assignment]
 
 
 class EncryptionError(Exception):
@@ -51,7 +54,7 @@ class TokenEncryption:
     """
 
     _instance: Optional["TokenEncryption"] = None
-    _fernet: Optional["Fernet"] = None
+    _fernet: Any | None = None  # Fernet type when available
     _initialized: bool = False
     _available: bool = False
 
@@ -144,6 +147,9 @@ class TokenEncryption:
         if not self.is_available:
             raise EncryptionError("Encryption is not available")
 
+        if self._fernet is None:
+            raise EncryptionError("Encryption not initialized")
+
         try:
             encrypted = self._fernet.encrypt(plaintext.encode())
             return encrypted.decode()
@@ -167,10 +173,13 @@ class TokenEncryption:
         if not self.is_available:
             raise EncryptionError("Encryption is not available")
 
+        if self._fernet is None:
+            raise EncryptionError("Encryption not initialized")
+
         try:
             decrypted = self._fernet.decrypt(ciphertext.encode())
             return decrypted.decode()
-        except InvalidToken:
+        except InvalidToken:  # type: ignore[misc]
             logger.error("decrypt_invalid_token")
             raise EncryptionError("Invalid token - decryption failed")
         except Exception as e:
@@ -252,12 +261,12 @@ class TokenEncryption:
         Returns:
             Data encrypted with new key
         """
-        if not CRYPTOGRAPHY_AVAILABLE:
+        if not CRYPTOGRAPHY_AVAILABLE or Fernet is None:
             raise EncryptionError("cryptography package not installed")
 
         try:
-            old_fernet = Fernet(old_key.encode())
-            new_fernet = Fernet(new_key.encode())
+            old_fernet = Fernet(old_key.encode())  # type: ignore[misc]
+            new_fernet = Fernet(new_key.encode())  # type: ignore[misc]
 
             plaintext = old_fernet.decrypt(ciphertext.encode())
             return new_fernet.encrypt(plaintext).decode()

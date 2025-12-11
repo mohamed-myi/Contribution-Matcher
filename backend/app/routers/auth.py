@@ -360,7 +360,7 @@ def oauth_callback(
 @router.post("/token")
 def exchange_token(
     code: str = Query(...),
-    response: Response = None,
+    response: Response | None = None,
 ):
     """
     Exchange an auth code for a JWT token.

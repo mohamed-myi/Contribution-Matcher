@@ -49,7 +49,7 @@ def create_profile_from_github(username: str) -> dict:
     repos = repos_response.json() if repos_response.status_code == 200 else []
 
     # Extract languages from all repos
-    all_languages = {}
+    all_languages: dict[str, int] = {}
     interests = set()
 
     for repo in repos[:50]:  # Limit to 50 most recent repos

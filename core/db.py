@@ -43,6 +43,7 @@ class DatabaseManager:
     """
 
     _instance: Optional["DatabaseManager"] = None
+    _initialized: bool = False
 
     def __new__(cls) -> "DatabaseManager":
         if cls._instance is None:
@@ -69,7 +70,7 @@ class DatabaseManager:
 
         if is_sqlite:
             connect_args = {"check_same_thread": False}
-            pool_class = StaticPool
+            pool_class: type[StaticPool | QueuePool] = StaticPool
             pool_config = {}
         else:
             connect_args = {}
@@ -187,13 +188,17 @@ class DatabaseManager:
         if isinstance(pool, StaticPool):
             return {"type": "StaticPool", "note": "Single connection (SQLite)"}
 
-        return {
-            "type": "QueuePool",
-            "size": pool.size(),
-            "checked_in": pool.checkedin(),
-            "checked_out": pool.checkedout(),
-            "overflow": pool.overflow(),
-        }
+        if isinstance(pool, QueuePool):
+            return {
+                "type": "QueuePool",
+                "size": pool.size(),
+                "checked_in": pool.checkedin(),
+                "checked_out": pool.checkedout(),
+                "overflow": pool.overflow(),
+            }
+
+        # Fallback for other pool types
+        return {"type": type(pool).__name__}
 
     def reset(self) -> None:
         """Reset database manager. Disposes engine and clears singleton state."""

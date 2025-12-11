@@ -319,18 +319,20 @@ class IssueRepository(BaseRepository[Issue]):
         )
 
         # Count by difficulty
-        difficulty_counts = dict(
+        difficulty_results = (
             base_query.with_entities(Issue.difficulty, func.count(Issue.id))
             .group_by(Issue.difficulty)
             .all()
         )
+        difficulty_counts: dict[str | None, int] = {row[0]: row[1] for row in difficulty_results}
 
         # Count by issue type
-        type_counts = dict(
+        type_results = (
             base_query.with_entities(Issue.issue_type, func.count(Issue.id))
             .group_by(Issue.issue_type)
             .all()
         )
+        type_counts: dict[str | None, int] = {row[0]: row[1] for row in type_results}
 
         # Total count
         total = base_query.count()

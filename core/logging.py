@@ -4,7 +4,7 @@ import logging
 import os
 import sys
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, MutableMapping
 from functools import lru_cache, wraps
 from typing import Any, TypeVar
 
@@ -23,8 +23,8 @@ def _is_development() -> bool:
 
 
 def _add_app_context(
-    logger: logging.Logger, method_name: str, event_dict: dict[str, Any]
-) -> dict[str, Any]:
+    logger: Any, method_name: str, event_dict: MutableMapping[str, Any]
+) -> Mapping[str, Any] | str | bytes | bytearray | tuple[Any, ...]:
     """Add application context to log entries."""
     event_dict["app"] = "contribution_matcher"
     return event_dict
@@ -78,7 +78,7 @@ def get_logger(name: str = __name__) -> structlog.stdlib.BoundLogger:
     """Get a structured logger instance."""
     if not structlog.is_configured():
         configure_logging()
-    return structlog.get_logger(name)
+    return structlog.get_logger(name)  # type: ignore[return-value]
 
 
 # =============================================================================

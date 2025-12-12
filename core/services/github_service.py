@@ -105,7 +105,7 @@ class GitHubService:
             info = RateLimitInfo(
                 remaining=core.get("remaining", 5000),
                 limit=core.get("limit", 5000),
-                reset_at=datetime.utcfromtimestamp(core.get("reset", 0)),
+                reset_at=datetime.fromtimestamp(core.get("reset", 0), tz=timezone.utc),
             )
 
             # Cache for 1 minute
@@ -126,7 +126,7 @@ class GitHubService:
         info = RateLimitInfo(
             remaining=remaining,
             limit=5000,  # Default
-            reset_at=datetime.utcfromtimestamp(reset_timestamp),
+            reset_at=datetime.fromtimestamp(reset_timestamp, tz=timezone.utc),
         )
         cache.set_json(CacheKeys.GITHUB_RATE_LIMIT, info.to_dict(), ttl=60)
 

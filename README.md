@@ -231,7 +231,7 @@ python main.py train-model                    # Train ML model
 ## Docker Deployment
 
 ```bash
-cp infrastructure/docker/env.example .env
+cp .env.example .env
 docker-compose up -d
 docker-compose exec api alembic upgrade head
 ```

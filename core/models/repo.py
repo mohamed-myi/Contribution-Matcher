@@ -4,7 +4,7 @@ Repository metadata SQLAlchemy model.
 Used for caching repository information to reduce GitHub API calls.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import JSON, DateTime, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
@@ -34,7 +34,9 @@ class RepoMetadata(Base):
     topics: Mapped[list[str] | None] = mapped_column(JSON)
     last_commit_date: Mapped[str | None] = mapped_column(String(64))
     contributor_count: Mapped[int | None] = mapped_column(Integer)
-    cached_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    cached_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
 
     def is_stale(self, validity_days: int = 7) -> bool:
         """
@@ -50,7 +52,12 @@ class RepoMetadata(Base):
 
         if not self.cached_at:
             return True
-        age = datetime.utcnow() - self.cached_at
+        cached_at = self.cached_at
+        if cached_at.tzinfo is None:
+            cached_at = cached_at.replace(tzinfo=timezone.utc)
+        else:
+            cached_at = cached_at.astimezone(timezone.utc)
+        age = datetime.now(timezone.utc) - cached_at
         return age > timedelta(days=validity_days)
 
     def to_dict(self) -> dict:

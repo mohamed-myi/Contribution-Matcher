@@ -4,7 +4,7 @@ Staleness detection service for verifying issue status with GitHub.
 Checks if issues are still open and marks them appropriately.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -63,7 +63,7 @@ def verify_issue_status(db: Session, issue: Issue) -> dict:
         status_changed = previous_state != github_state
 
         # Update issue
-        issue.last_verified_at = datetime.utcnow()
+        issue.last_verified_at = datetime.now(timezone.utc)
         issue.github_state = github_state
 
         result = {
@@ -79,7 +79,7 @@ def verify_issue_status(db: Session, issue: Issue) -> dict:
             close_reason = CLOSE_REASON_MAP.get(state_reason, state_reason)
 
             issue.is_active = False
-            issue.closed_at = datetime.utcnow()
+            issue.closed_at = datetime.now(timezone.utc)
             issue.close_reason = close_reason
 
             result["close_reason"] = close_reason
@@ -122,7 +122,7 @@ def bulk_verify_issues(
 
     from sqlalchemy import or_
 
-    cutoff = datetime.utcnow() - timedelta(days=min_age_days)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=min_age_days)
 
     # Get issues that need verification
     issues = (
@@ -202,7 +202,7 @@ def get_stale_issues_count(db: Session, user_id: int) -> dict:
 
     from sqlalchemy import func
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     stale_cutoff = now - timedelta(days=7)
     very_stale_cutoff = now - timedelta(days=30)
 
@@ -260,7 +260,7 @@ def mark_issues_closed(
 
     Returns number of issues updated.
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     result = (
         db.query(Issue)

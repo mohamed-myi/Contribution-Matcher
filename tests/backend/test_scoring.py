@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from backend.app.models import DevProfile, Issue, IssueTechnology
 
@@ -31,8 +31,8 @@ def test_top_matches_returns_scores(authorized_client):
         repo_owner="foo",
         repo_name="bar",
         repo_topics=["web"],
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
         repo_stars=50,
         repo_forks=5,
         contributor_count=10,
@@ -66,8 +66,8 @@ def test_score_single_issue(authorized_client):
         repo_owner="foo",
         repo_name="baz",
         repo_topics=["automation"],
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
     )
     session.add(issue)
     session.flush()

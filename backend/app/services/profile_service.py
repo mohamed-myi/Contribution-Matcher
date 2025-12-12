@@ -4,7 +4,7 @@ Profile management service functions.
 
 import io
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 
 import httpx
 from sqlalchemy.orm import Session
@@ -116,7 +116,7 @@ def create_profile_from_github(
 
     # Track source and sync time
     profile.profile_source = PROFILE_SOURCE_GITHUB
-    profile.last_github_sync = datetime.utcnow()
+    profile.last_github_sync = datetime.now(timezone.utc)
 
     db.commit()
     db.refresh(profile)

@@ -2,7 +2,7 @@
 Tests for issue staleness detection and verification.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from backend.app.models import Issue
 
@@ -15,7 +15,7 @@ def create_test_issue(session, user_id=1, **kwargs):
         "url": "https://github.com/test/repo/issues/1",
         "difficulty": "beginner",
         "is_active": True,
-        "created_at": datetime.utcnow(),
+        "created_at": datetime.now(timezone.utc),
     }
     defaults.update(kwargs)
     issue = Issue(**defaults)
@@ -44,7 +44,9 @@ class TestStalenessProperties:
         _, _, session_factory = authorized_client
         session = session_factory()
 
-        issue = create_test_issue(session, last_verified_at=datetime.utcnow() - timedelta(days=3))
+        issue = create_test_issue(
+            session, last_verified_at=datetime.now(timezone.utc) - timedelta(days=3)
+        )
 
         assert issue.is_stale is False
         assert issue.is_very_stale is False
@@ -56,7 +58,9 @@ class TestStalenessProperties:
         _, _, session_factory = authorized_client
         session = session_factory()
 
-        issue = create_test_issue(session, last_verified_at=datetime.utcnow() - timedelta(days=10))
+        issue = create_test_issue(
+            session, last_verified_at=datetime.now(timezone.utc) - timedelta(days=10)
+        )
 
         assert issue.is_stale is True
         assert issue.is_very_stale is False
@@ -68,7 +72,9 @@ class TestStalenessProperties:
         _, _, session_factory = authorized_client
         session = session_factory()
 
-        issue = create_test_issue(session, last_verified_at=datetime.utcnow() - timedelta(days=35))
+        issue = create_test_issue(
+            session, last_verified_at=datetime.now(timezone.utc) - timedelta(days=35)
+        )
 
         assert issue.is_stale is True
         assert issue.is_very_stale is True
@@ -99,7 +105,7 @@ class TestStalenessStatsEndpoint:
         client, _, session_factory = authorized_client
         session = session_factory()
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         # Create issues with different verification states
         create_test_issue(
@@ -176,7 +182,7 @@ class TestIssueResponseIncludesStaleness:
         create_test_issue(
             session,
             url="https://github.com/test/repo/issues/1",
-            last_verified_at=datetime.utcnow() - timedelta(days=10),
+            last_verified_at=datetime.now(timezone.utc) - timedelta(days=10),
             github_state="open",
         )
         session.close()

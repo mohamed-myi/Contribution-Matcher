@@ -1,6 +1,6 @@
 """User repository for authentication and user management."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from core.logging import get_logger
 from core.models import TokenBlacklist, User
@@ -85,7 +85,7 @@ class UserRepository(BaseRepository[User]):
                 user.avatar_url = avatar_url
             if encrypted_token:
                 user.github_access_token = encrypted_token
-            user.updated_at = datetime.utcnow()
+            user.updated_at = datetime.now(timezone.utc)
         else:
             user = User(
                 github_id=github_id,
@@ -108,7 +108,7 @@ class UserRepository(BaseRepository[User]):
         user = self.get_by_id(user_id)
         if user:
             user.github_access_token = self._encrypt_token(access_token)
-            user.updated_at = datetime.utcnow()
+            user.updated_at = datetime.now(timezone.utc)
             self.session.flush()
             return True
         return False
@@ -134,7 +134,7 @@ class TokenBlacklistRepository(BaseRepository[TokenBlacklist]):
         """Remove expired tokens from blacklist."""
         result = (
             self.session.query(TokenBlacklist)
-            .filter(TokenBlacklist.expires_at < datetime.utcnow())
+            .filter(TokenBlacklist.expires_at < datetime.now(timezone.utc))
             .delete()
         )
         self.session.flush()

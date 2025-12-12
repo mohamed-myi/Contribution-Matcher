@@ -131,48 +131,23 @@ class Settings(BaseSettings):
         import os
         import warnings
 
+        # Local import to avoid circular import between config <-> security/logging.
+        from core.security.validation import validate_jwt_secret as validate_jwt_secret_value
+
         env = os.getenv("ENV", "development")
         is_production = env.lower() in ("production", "prod")
 
-        # List of forbidden default/weak values
-        forbidden_values = [
-            "CHANGE_ME",
-            "changeme",
-            "secret",
-            "your-secret-key",
-            "jwt-secret",
-            "supersecret",
-            "development",
-            "test",
-        ]
-
-        is_forbidden = v.lower() in [fv.lower() for fv in forbidden_values]
-        is_too_short = len(v) < 32
+        valid, error = validate_jwt_secret_value(v)
 
         if is_production:
             # In production, fail hard on insecure secrets
-            if is_forbidden:
-                raise ValueError(
-                    f"JWT_SECRET_KEY cannot be a default value ('{v}') in production. "
-                    'Generate a secure key with: python -c "import secrets; print(secrets.token_urlsafe(48))"'
-                )
-            if is_too_short:
-                raise ValueError(
-                    f"JWT_SECRET_KEY must be at least 32 characters in production (got {len(v)}). "
-                    'Generate a secure key with: python -c "import secrets; print(secrets.token_urlsafe(48))"'
-                )
+            if not valid:
+                raise ValueError(error or "Invalid JWT_SECRET_KEY")
         else:
             # In development, warn but allow
-            if is_forbidden:
+            if not valid:
                 warnings.warn(
-                    f"JWT_SECRET_KEY is set to a default value ('{v}'). "
-                    "This is insecure - set a proper key for production.",
-                    UserWarning,
-                    stacklevel=2,
-                )
-            elif is_too_short:
-                warnings.warn(
-                    f"JWT_SECRET_KEY should be at least 32 characters (got {len(v)})",
+                    error or "Invalid JWT_SECRET_KEY",
                     UserWarning,
                     stacklevel=2,
                 )
@@ -202,12 +177,17 @@ class Settings(BaseSettings):
             Tuple of (errors, warnings) - errors are fatal, warnings are advisory
         """
         errors = []
-        warnings = []
+        config_warnings = []
 
-        if self.jwt_secret_key == "CHANGE_ME":
-            errors.append("JWT_SECRET_KEY must be set for production")
-        elif len(self.jwt_secret_key) < 32:
-            errors.append("JWT_SECRET_KEY must be at least 32 characters")
+        # Local import to avoid circular import between config <-> security/logging.
+        from core.security.validation import validate_jwt_secret as validate_jwt_secret_value
+
+        jwt_valid, jwt_error = validate_jwt_secret_value(self.jwt_secret_key)
+        if not jwt_valid and jwt_error:
+            if self.is_production:
+                errors.append(jwt_error)
+            else:
+                config_warnings.append(jwt_error)
 
         if not self.github_client_id:
             errors.append("GITHUB_CLIENT_ID is required for OAuth")
@@ -223,7 +203,7 @@ class Settings(BaseSettings):
                 'Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"'
             )
         elif not self.token_encryption_key:
-            warnings.append(
+            config_warnings.append(
                 "TOKEN_ENCRYPTION_KEY not set - GitHub access tokens will be stored "
                 "in plaintext. Set this key to encrypt tokens at rest."
             )
@@ -240,7 +220,7 @@ class Settings(BaseSettings):
                 "SQLite is not suitable for production. Configure DATABASE_URL to use PostgreSQL."
             )
 
-        return errors, warnings
+        return errors, config_warnings
 
 
 @lru_cache

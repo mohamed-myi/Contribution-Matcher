@@ -7,7 +7,7 @@ These replace the deprecated SQLite functions from core.database.database.
 
 import csv
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 from core.db import db
 from core.models import Issue, IssueTechnology
@@ -72,7 +72,7 @@ def upsert_issue(
             existing.last_commit_date = last_commit_date
             existing.contributor_count = contributor_count
             existing.is_active = is_active
-            existing.updated_at = datetime.utcnow()
+            existing.updated_at = datetime.now(timezone.utc)
             session.flush()
             return existing.id
         else:
@@ -129,7 +129,7 @@ def update_issue_label(issue_id: int, label: str) -> bool:
         issue = session.query(Issue).filter(Issue.id == issue_id).first()
         if issue:
             issue.label = label
-            issue.labeled_at = datetime.utcnow()
+            issue.labeled_at = datetime.now(timezone.utc)
             return True
         return False
 

@@ -9,10 +9,6 @@ import os
 import re
 from dataclasses import dataclass
 
-from core.logging import get_logger
-
-logger = get_logger("security.validation")
-
 
 class SecurityConfigError(Exception):
     """Raised when security configuration is invalid."""
@@ -242,6 +238,10 @@ def validate_security_config(
     warnings_filtered = [w for w in warnings if w is not None]
 
     # Log results
+    # NOTE: logger creation is deferred to runtime to avoid circular imports with settings/logging.
+    from core.logging import get_logger
+
+    logger = get_logger("security.validation")
     if errors_filtered:
         for error in errors_filtered:
             logger.error("config_validation_error", error=error)

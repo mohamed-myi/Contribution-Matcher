@@ -1,6 +1,6 @@
 """Developer profile repository."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from core.models import DevProfile
 
@@ -42,7 +42,7 @@ class ProfileRepository(BaseRepository[DevProfile]):
                 profile.preferred_languages = preferred_languages
             if time_availability_hours_per_week is not None:
                 profile.time_availability_hours_per_week = time_availability_hours_per_week
-            profile.updated_at = datetime.utcnow()
+            profile.updated_at = datetime.now(timezone.utc)
         else:
             profile = DevProfile(
                 user_id=user_id,

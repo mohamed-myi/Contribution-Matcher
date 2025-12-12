@@ -12,7 +12,7 @@ Tests all filter types:
 - Combined filters
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from backend.app.models import Issue
 from core.models import IssueTechnology
@@ -33,7 +33,7 @@ def create_test_issues(session, user_id=1):
             repo_stars=100,
             repo_languages={"Python": 50000, "JavaScript": 10000},
             cached_score=85.0,
-            created_at=datetime.utcnow() - timedelta(days=5),
+            created_at=datetime.now(timezone.utc) - timedelta(days=5),
             is_active=True,
         ),
         # Issue 2: JavaScript, intermediate, feature, 500 stars, score 65
@@ -48,7 +48,7 @@ def create_test_issues(session, user_id=1):
             repo_stars=500,
             repo_languages={"JavaScript": 80000, "TypeScript": 20000},
             cached_score=65.0,
-            created_at=datetime.utcnow() - timedelta(days=15),
+            created_at=datetime.now(timezone.utc) - timedelta(days=15),
             is_active=True,
         ),
         # Issue 3: Go, advanced, enhancement, 1000 stars, score 45
@@ -63,7 +63,7 @@ def create_test_issues(session, user_id=1):
             repo_stars=1000,
             repo_languages={"Go": 100000},
             cached_score=45.0,
-            created_at=datetime.utcnow() - timedelta(days=45),
+            created_at=datetime.now(timezone.utc) - timedelta(days=45),
             is_active=True,
         ),
         # Issue 4: Python, beginner, documentation, 50 stars, score 90
@@ -78,7 +78,7 @@ def create_test_issues(session, user_id=1):
             repo_stars=50,
             repo_languages={"Python": 30000},
             cached_score=90.0,
-            created_at=datetime.utcnow() - timedelta(days=3),
+            created_at=datetime.now(timezone.utc) - timedelta(days=3),
             is_active=True,
         ),
         # Issue 5: TypeScript, intermediate, bug, 2000 stars, score 75
@@ -93,7 +93,7 @@ def create_test_issues(session, user_id=1):
             repo_stars=2000,
             repo_languages={"TypeScript": 90000, "JavaScript": 5000},
             cached_score=75.0,
-            created_at=datetime.utcnow() - timedelta(days=10),
+            created_at=datetime.now(timezone.utc) - timedelta(days=10),
             is_active=True,
         ),
     ]

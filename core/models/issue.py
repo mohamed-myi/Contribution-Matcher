@@ -2,7 +2,7 @@
 Issue-related SQLAlchemy models.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
@@ -55,9 +55,13 @@ class Issue(Base):
     last_commit_date: Mapped[str | None] = mapped_column(String(64))
     contributor_count: Mapped[int | None] = mapped_column(Integer)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
     )
     label: Mapped[str | None] = mapped_column(String(16))
     labeled_at: Mapped[datetime | None] = mapped_column(DateTime)
@@ -135,7 +139,12 @@ class Issue(Base):
         """Check if issue needs re-verification (not verified in 7+ days)."""
         if not self.last_verified_at:
             return True
-        days_since_verified = (datetime.utcnow() - self.last_verified_at).days
+        last_verified_at = self.last_verified_at
+        if last_verified_at.tzinfo is None:
+            last_verified_at = last_verified_at.replace(tzinfo=timezone.utc)
+        else:
+            last_verified_at = last_verified_at.astimezone(timezone.utc)
+        days_since_verified = (datetime.now(timezone.utc) - last_verified_at).days
         return days_since_verified >= 7
 
     @property
@@ -143,7 +152,12 @@ class Issue(Base):
         """Check if issue is very stale (not verified in 30+ days)."""
         if not self.last_verified_at:
             return True
-        days_since_verified = (datetime.utcnow() - self.last_verified_at).days
+        last_verified_at = self.last_verified_at
+        if last_verified_at.tzinfo is None:
+            last_verified_at = last_verified_at.replace(tzinfo=timezone.utc)
+        else:
+            last_verified_at = last_verified_at.astimezone(timezone.utc)
+        days_since_verified = (datetime.now(timezone.utc) - last_verified_at).days
         return days_since_verified >= 30
 
 
@@ -177,7 +191,9 @@ class IssueBookmark(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     issue_id: Mapped[int] = mapped_column(ForeignKey("issues.id", ondelete="CASCADE"), index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
 
     user: Mapped["User"] = relationship("User", back_populates="bookmarks")
     issue: Mapped[Issue] = relationship("Issue", back_populates="bookmarks")
@@ -197,7 +213,9 @@ class IssueLabel(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     issue_id: Mapped[int] = mapped_column(ForeignKey("issues.id", ondelete="CASCADE"))
     label: Mapped[str] = mapped_column(String(8))  # 'good' or 'bad'
-    labeled_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    labeled_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
 
     user: Mapped["User"] = relationship("User", back_populates="labels")
     issue: Mapped[Issue] = relationship("Issue", back_populates="labels_relationship")
@@ -217,7 +235,9 @@ class IssueEmbedding(Base):
     description_embedding: Mapped[bytes | None] = mapped_column(LargeBinary)
     title_embedding: Mapped[bytes | None] = mapped_column(LargeBinary)
     embedding_model: Mapped[str] = mapped_column(String(255), default="all-MiniLM-L6-v2")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
 
     issue: Mapped[Issue] = relationship("Issue", back_populates="embeddings")
 
@@ -238,7 +258,9 @@ class IssueFeatureCache(Base):
     )
     profile_updated_at: Mapped[datetime | None] = mapped_column(DateTime)
     issue_updated_at: Mapped[datetime | None] = mapped_column(DateTime)
-    computed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
     skill_match_pct: Mapped[float | None] = mapped_column(Float)
     experience_score: Mapped[float | None] = mapped_column(Float)
     repo_quality_score: Mapped[float | None] = mapped_column(Float)
@@ -262,9 +284,13 @@ class IssueNote(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     issue_id: Mapped[int] = mapped_column(ForeignKey("issues.id", ondelete="CASCADE"))
     content: Mapped[str] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
     )
 
     user: Mapped["User"] = relationship("User")

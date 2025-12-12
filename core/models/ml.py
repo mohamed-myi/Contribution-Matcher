@@ -2,7 +2,7 @@
 Machine Learning related SQLAlchemy models.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text
@@ -32,6 +32,8 @@ class UserMLModel(Base):
     metrics: Mapped[dict | None] = mapped_column(JSON)
     evaluation_metrics: Mapped[dict | None] = mapped_column(JSON)
     description: Mapped[str | None] = mapped_column(Text)
-    trained_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    trained_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
 
     user: Mapped["User"] = relationship("User", back_populates="ml_models")

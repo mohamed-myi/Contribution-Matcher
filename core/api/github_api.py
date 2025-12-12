@@ -2,7 +2,7 @@
 
 import threading
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import requests  # type: ignore[import-untyped]
 
@@ -70,7 +70,10 @@ def _wait_for_rate_limit(max_wait: int = 300) -> bool:
 
 
 def _make_request(
-    url: str, params: dict | None = None, timeout: int = 30
+    url: str,
+    params: dict | None = None,
+    timeout: int = 30,
+    _retry: bool = True,
 ) -> requests.Response | None:
     """Make a GitHub API request with rate limiting and error handling."""
     token = _get_token()
@@ -90,16 +93,16 @@ def _make_request(
         elif response.status_code == 401:
             logger.error("api_auth_failed", url=url)
         elif response.status_code == 403:
-            # Rate limited - wait and retry once
+            # Rate limited - wait and retry once (guarded to prevent recursion loops)
             with _rate_limit_lock:
                 reset = _rate_limit["reset"]
 
-            if reset > 0:
+            if _retry and reset > 0:
                 wait_time = min(reset - int(time.time()) + 1, 300)
                 if wait_time > 0:
                     logger.info("rate_limited_retry", wait_seconds=wait_time)
                     time.sleep(wait_time)
-                    return _make_request(url, params, timeout)
+                    return _make_request(url, params, timeout, _retry=False)
             logger.error("rate_limited_no_reset")
         else:
             logger.error("api_error", status=response.status_code, url=url)
@@ -368,7 +371,15 @@ def batch_get_repo_metadata(
                     if (
                         metadata
                         and metadata.cached_at
-                        and datetime.utcnow() - metadata.cached_at < cache_validity
+                        and (
+                            datetime.now(timezone.utc)
+                            - (
+                                metadata.cached_at.replace(tzinfo=timezone.utc)
+                                if metadata.cached_at.tzinfo is None
+                                else metadata.cached_at.astimezone(timezone.utc)
+                            )
+                            < cache_validity
+                        )
                     ):
                         results[key] = metadata.to_dict()
 

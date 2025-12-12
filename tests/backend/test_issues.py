@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from backend.app.models import Issue
 from core import parsing
@@ -84,14 +84,14 @@ def test_list_issues_filters_by_difficulty(monkeypatch, authorized_client):
                 title="Easy task",
                 url="https://example.com/1",
                 difficulty="beginner",
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(timezone.utc),
             ),
             Issue(
                 user_id=1,
                 title="Hard task",
                 url="https://example.com/2",
                 difficulty="advanced",
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(timezone.utc),
             ),
         ]
     )

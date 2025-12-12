@@ -2,7 +2,7 @@
 Issue repository with batch operations and efficient queries.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import selectinload
@@ -82,7 +82,7 @@ class IssueRepository(BaseRepository[Issue]):
             base_conditions.append(Issue.issue_type == filters["issue_type"])
 
         if filters.get("days_back"):
-            cutoff = datetime.utcnow() - timedelta(days=filters["days_back"])
+            cutoff = datetime.now(timezone.utc) - timedelta(days=filters["days_back"])
             base_conditions.append(Issue.created_at >= cutoff)
 
         if filters.get("is_active") is not None:

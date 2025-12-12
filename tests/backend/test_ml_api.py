@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from backend.app.models import DevProfile, Issue, IssueTechnology
 
@@ -13,8 +13,8 @@ def _prepare_issues(session, user_id: int):
             difficulty="beginner" if idx % 2 == 0 else "advanced",
             issue_type="bug",
             repo_topics=["ml"],
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
             repo_stars=10,
             repo_forks=1,
         )

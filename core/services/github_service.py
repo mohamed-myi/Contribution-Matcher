@@ -10,7 +10,7 @@ Key optimizations:
 
 import time
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from core.cache import CacheKeys, cache
@@ -37,7 +37,12 @@ class RateLimitInfo:
     @property
     def seconds_until_reset(self) -> int:
         """Return seconds until the GitHub rate limit resets."""
-        delta = self.reset_at - datetime.utcnow()
+        reset_at = self.reset_at
+        if reset_at.tzinfo is None:
+            reset_at = reset_at.replace(tzinfo=timezone.utc)
+        else:
+            reset_at = reset_at.astimezone(timezone.utc)
+        delta = reset_at - datetime.now(timezone.utc)
         return max(0, int(delta.total_seconds()))
 
     def to_dict(self) -> dict:

@@ -1,6 +1,6 @@
 """Repository metadata repository for caching."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import and_, or_
 
@@ -64,7 +64,7 @@ class RepoMetadataRepository(BaseRepository[RepoMetadata]):
                 metadata.last_commit_date = last_commit_date
             if contributor_count is not None:
                 metadata.contributor_count = contributor_count
-            metadata.cached_at = datetime.utcnow()
+            metadata.cached_at = datetime.now(timezone.utc)
         else:
             metadata = RepoMetadata(
                 repo_owner=repo_owner,
@@ -105,7 +105,7 @@ class RepoMetadataRepository(BaseRepository[RepoMetadata]):
 
     def cleanup_stale(self, older_than_days: int = 30) -> int:
         """Remove cached metadata older than specified days."""
-        cutoff = datetime.utcnow() - timedelta(days=older_than_days)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=older_than_days)
         result = self.session.query(RepoMetadata).filter(RepoMetadata.cached_at < cutoff).delete()
         self.session.flush()
         return result

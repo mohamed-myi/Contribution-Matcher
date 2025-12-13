@@ -36,7 +36,7 @@ export const apiClient = axios.create({
  */
 const retryRequest = async (error, retryCount = 0) => {
   const config = error.config;
-  
+
   // Don't retry if max attempts reached or not retryable
   if (
     retryCount >= API_CONFIG.retryAttempts ||
@@ -46,14 +46,14 @@ const retryRequest = async (error, retryCount = 0) => {
   ) {
     return Promise.reject(error);
   }
-  
+
   // Mark as retry to prevent infinite loops
   config._retry = true;
   config._retryCount = retryCount + 1;
-  
+
   // Wait before retrying
   await new Promise(resolve => setTimeout(resolve, API_CONFIG.retryDelay * (retryCount + 1)));
-  
+
   return apiClient(config);
 };
 
@@ -61,13 +61,9 @@ const retryRequest = async (error, retryCount = 0) => {
 // Primary auth is via HttpOnly cookies (sent automatically with withCredentials: true)
 apiClient.interceptors.request.use(
   (config) => {
-    // Fallback: use localStorage token if cookie auth fails
-    // This maintains backward compatibility during migration
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    
+    // We rely exclusively on HttpOnly cookies now
+    // No need to manually inject Authorization header from localStorage
+
     // Add CSRF token for state-changing requests
     if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(config.method?.toUpperCase())) {
       const csrfToken = getCookie('csrf_token');
@@ -75,7 +71,7 @@ apiClient.interceptors.request.use(
         config.headers['X-CSRF-Token'] = csrfToken;
       }
     }
-    
+
     return config;
   },
   (error) => Promise.reject(error)
@@ -99,19 +95,19 @@ apiClient.interceptors.response.use(
   async (error) => {
     // Handle 401 Unauthorized
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
+      // Local storage cleanup not needed anymore
       if (window.location.pathname !== '/login' && !window.location.pathname.startsWith('/auth')) {
         window.location.href = '/login';
       }
       return Promise.reject(error);
     }
-    
+
     // Retry on transient errors
     const retryCount = error.config?._retryCount || 0;
     if (API_CONFIG.retryableStatuses.includes(error.response?.status)) {
       return retryRequest(error, retryCount);
     }
-    
+
     return Promise.reject(error);
   }
 );
@@ -126,7 +122,7 @@ export const api = {
   getCurrentUser: () => apiClient.get('/auth/me'),
   logout: () => apiClient.post('/auth/logout'),
   deleteAccount: () => apiClient.delete('/auth/account'),
-  
+
   // Exchange auth code for JWT token (secure token exchange pattern)
   // This is called after OAuth callback to get the actual JWT
   exchangeAuthCode: (code) => apiClient.post(`/auth/token?code=${encodeURIComponent(code)}`),
@@ -147,10 +143,10 @@ export const api = {
       params: { format, bookmarks_only: bookmarksOnly },
       responseType: 'blob',
     });
-    
+
     // Create download link
-    const blob = new Blob([response.data], { 
-      type: format === 'json' ? 'application/json' : 'text/csv' 
+    const blob = new Blob([response.data], {
+      type: format === 'json' ? 'application/json' : 'text/csv'
     });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -184,7 +180,7 @@ export const api = {
   removeLabel: (id) => apiClient.delete(`/ml/label/${id}`),
   getLabelStatus: () => apiClient.get('/ml/label-status'),
   getUnlabeledIssues: (limit = 50, includeOthers = false) => apiClient.get('/ml/unlabeled-issues', { params: { limit, include_others: includeOthers } }),
-  getLabeledIssues: (limit = 50, offset = 0, labelFilter = null) => 
+  getLabeledIssues: (limit = 50, offset = 0, labelFilter = null) =>
     apiClient.get('/ml/labeled-issues', { params: { limit, offset, label_filter: labelFilter } }),
   trainModel: (options = {}) => apiClient.post('/ml/train', options),
   getModelInfo: () => apiClient.get('/ml/model-info'),
@@ -197,7 +193,7 @@ export const api = {
 
   // Staleness & Verification
   verifyIssueStatus: (issueId) => apiClient.post(`/issues/${issueId}/verify-status`),
-  bulkVerifyIssues: (limit = 50, minAgeDays = 7) => 
+  bulkVerifyIssues: (limit = 50, minAgeDays = 7) =>
     apiClient.post('/issues/verify-bulk', null, { params: { limit, min_age_days: minAgeDays } }),
   getStalenessStats: () => apiClient.get('/issues/staleness-stats'),
 };

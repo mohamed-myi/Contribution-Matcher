@@ -61,7 +61,7 @@ def upgrade() -> None:
         sa.Column("repo_topics", sa.JSON()),
         sa.Column("last_commit_date", sa.String(length=64)),
         sa.Column("contributor_count", sa.Integer()),
-        sa.Column("is_active", sa.Boolean(), server_default=sa.text("1")),
+        sa.Column("is_active", sa.Boolean(), server_default=sa.text("true")),
         sa.Column("created_at", sa.DateTime(), server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime(), server_default=sa.func.now()),
         sa.Column("label", sa.String(length=16)),

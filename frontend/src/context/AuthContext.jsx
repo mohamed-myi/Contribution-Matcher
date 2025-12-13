@@ -20,12 +20,12 @@ function hasAuthCookie() {
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  // Token state is for backward compatibility during migration
-  // Primary auth is now via HttpOnly cookies
-  const [token, setToken] = useState(() => localStorage.getItem('token'));
+  // Token state is no longer needed as we rely on HttpOnly cookies
+  // We keep the state for now to avoid breaking dependents, but it will be null
+  const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   // Profile state for first-login handling
   const [profile, setProfile] = useState(null);
   const [profileLoading, setProfileLoading] = useState(false);
@@ -54,7 +54,7 @@ export function AuthProvider({ children }) {
   // Sync profile from GitHub
   const syncFromGitHub = useCallback(async () => {
     if (!user?.github_username) return null;
-    
+
     try {
       setProfileLoading(true);
       await api.createProfileFromGithub(user.github_username);
@@ -74,7 +74,7 @@ export function AuthProvider({ children }) {
     // Check if we might be authenticated (cookie or token)
     // With cookie-based auth, we should try if there's any indication of auth
     const mightBeAuthenticated = hasAuthCookie() || token;
-    
+
     // Skip if definitely not authenticated (unless forcing check)
     if (!mightBeAuthenticated && !forceCheck) {
       setLoading(false);
@@ -88,9 +88,8 @@ export function AuthProvider({ children }) {
       setError(null);
     } catch (err) {
       console.error('Failed to fetch user:', err);
-      // Token is invalid, clear it
+      // Token is invalid
       if (err.response?.status === 401) {
-        localStorage.removeItem('token');
         setToken(null);
         setUser(null);
       }
@@ -111,7 +110,7 @@ export function AuthProvider({ children }) {
 
     const checkProfileAndSync = async () => {
       const existingProfile = await fetchProfile();
-      
+
       if (!existingProfile) {
         // No profile - show first login prompt
         setShowFirstLoginPrompt(true);
@@ -132,13 +131,13 @@ export function AuthProvider({ children }) {
   // The server also sets HttpOnly cookies, which are the primary auth mechanism
   // Returns a promise that resolves with the user or rejects with an error
   const login = useCallback(async (newToken) => {
-    // Store in localStorage as fallback during migration
+    // We no longer store token in localStorage
+    // The server sets the HttpOnly cookie which is handled automatically
     if (newToken) {
-      localStorage.setItem('token', newToken);
       setToken(newToken);
     }
     setLoading(true);
-    
+
     try {
       // This will now use the HttpOnly cookie (primary) or Authorization header (fallback)
       const response = await apiClient.get('/auth/me');
@@ -164,7 +163,6 @@ export function AuthProvider({ children }) {
       // Ignore errors - we're logging out anyway
       console.error('Logout API call failed:', err);
     } finally {
-      localStorage.removeItem('token');
       setToken(null);
       setUser(null);
       setProfile(null);

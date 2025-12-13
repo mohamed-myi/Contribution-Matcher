@@ -27,6 +27,7 @@ from ..auth.github_oauth import exchange_code_for_token, get_github_user, get_oa
 from ..auth.jwt import create_access_token, decode_access_token, get_token_expiry
 from ..config import get_settings
 from ..database import get_db
+from ..dependencies.rate_limit import enforce_public_rate_limit, enforce_rate_limit
 from ..models import User
 from ..schemas import UserResponse
 
@@ -210,7 +211,7 @@ def _exchange_auth_code(code: str) -> tuple[str | None, int | None]:
     return None, None
 
 
-@router.get("/login")
+@router.get("/login", dependencies=[Depends(enforce_public_rate_limit)])
 def login():
     """
     Redirect to GitHub OAuth authorization page.
@@ -253,6 +254,8 @@ def oauth_callback(
     code: str = Query(...),
     state: str = Query(None),
     db: Session = Depends(get_db),
+    # Public rate limit for callback
+    _=Depends(enforce_public_rate_limit),
 ):
     """
     Handle GitHub OAuth callback.
@@ -369,6 +372,8 @@ def oauth_callback(
 @router.post("/token", response_model=None)
 def exchange_token(
     code: str = Query(...),
+    # Public rate limit for token exchange
+    _=Depends(enforce_public_rate_limit),
 ):
     """
     Exchange an auth code for a JWT token.
@@ -434,13 +439,13 @@ def exchange_token(
     return response
 
 
-@router.get("/me", response_model=UserResponse)
+@router.get("/me", response_model=UserResponse, dependencies=[Depends(enforce_rate_limit)])
 def current_user(user: User = Depends(get_current_user)) -> UserResponse:
     """Get current authenticated user."""
     return UserResponse.model_validate(user)
 
 
-@router.post("/logout", dependencies=[Depends(validate_csrf)])
+@router.post("/logout", dependencies=[Depends(validate_csrf), Depends(enforce_rate_limit)])
 def logout(
     request: Request,
     db: Session = Depends(get_db),
@@ -508,7 +513,7 @@ def logout(
     return response
 
 
-@router.delete("/account", dependencies=[Depends(validate_csrf)])
+@router.delete("/account", dependencies=[Depends(validate_csrf), Depends(enforce_rate_limit)])
 def delete_account(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -530,7 +535,7 @@ def delete_account(
     return {"status": "account_deleted"}
 
 
-@router.post("/refresh", dependencies=[Depends(validate_csrf)])
+@router.post("/refresh", dependencies=[Depends(validate_csrf), Depends(enforce_rate_limit)])
 def refresh_token(
     request: Request,
     db: Session = Depends(get_db),

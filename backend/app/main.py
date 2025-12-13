@@ -29,6 +29,7 @@ from .config import get_settings
 from .dependencies.rate_limit import enforce_rate_limit
 from .error_handlers import register_exception_handlers
 from .middleware.request_id import RequestIDMiddleware
+from .middleware.security import SecurityHeadersMiddleware
 from .routers import (
     auth as auth_router,
     issues as issues_router,
@@ -207,6 +208,9 @@ def create_app() -> FastAPI:
 
     # GZip compression for responses > 500 bytes
     app.add_middleware(GZipMiddleware, minimum_size=500)
+
+    # Security Headers (CSP, X-Frame-Options, etc) - ADDED HERE
+    app.add_middleware(SecurityHeadersMiddleware)
 
     # Request ID middleware (for tracing)
     app.add_middleware(RequestIDMiddleware)

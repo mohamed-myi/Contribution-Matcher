@@ -81,9 +81,7 @@ def get_logger(name: str = __name__) -> structlog.stdlib.BoundLogger:
     return structlog.get_logger(name)  # type: ignore[no-any-return]
 
 
-# =============================================================================
 # Context Management
-# =============================================================================
 
 
 def bind_context(**kwargs: Any) -> None:
@@ -124,9 +122,7 @@ class LogContext:
         return False
 
 
-# =============================================================================
 # Decorators
-# =============================================================================
 
 
 def log_function_call(logger: structlog.stdlib.BoundLogger | None = None) -> Callable[[F], F]:
@@ -201,9 +197,7 @@ def log_timing(
     return decorator
 
 
-# =============================================================================
 # FastAPI Integration
-# =============================================================================
 
 
 class RequestLoggingMiddleware:
@@ -265,9 +259,7 @@ class RequestLoggingMiddleware:
             clear_context()
 
 
-# =============================================================================
 # Celery Integration
-# =============================================================================
 
 
 def configure_celery_logging():
@@ -292,9 +284,7 @@ def configure_celery_logging():
         clear_context()
 
 
-# =============================================================================
 # Lazy-loaded Module Loggers
-# =============================================================================
 
 
 class _LazyLogger:

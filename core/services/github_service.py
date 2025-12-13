@@ -74,9 +74,7 @@ class GitHubService:
         self._seen_repos: set[tuple[str, str]] = set()
         self._repo_cache: dict[tuple[str, str], dict] = {}
 
-    # =========================================================================
     # Rate Limit Management
-    # =========================================================================
 
     def get_rate_limit(self) -> RateLimitInfo | None:
         """
@@ -160,9 +158,7 @@ class GitHubService:
 
         return True
 
-    # =========================================================================
     # Batch Discovery (Enforced Pattern)
-    # =========================================================================
 
     def discover_issues(
         self,
@@ -286,9 +282,7 @@ class GitHubService:
 
         return parsed_issues
 
-    # =========================================================================
     # Batch Status Check
-    # =========================================================================
 
     def batch_check_status(
         self,
@@ -391,9 +385,7 @@ class GitHubService:
 
         return results
 
-    # =========================================================================
     # GraphQL Repository Query
-    # =========================================================================
 
     def graphql_get_repos(
         self,
@@ -415,9 +407,7 @@ class GitHubService:
         # Filter out None values to match return type
         return {k: v for k, v in results.items() if v is not None}  # type: ignore[return-value]
 
-    # =========================================================================
     # Session Management
-    # =========================================================================
 
     def clear_session_cache(self) -> None:
         """Clear session-level repository caches for the service instance."""

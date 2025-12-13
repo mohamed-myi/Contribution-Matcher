@@ -34,23 +34,23 @@ exclude = [
 
 [tool.ruff.lint]
 select = [
-    "E",    # pycodestyle errors
-    "W",    # pycodestyle warnings
-    "F",    # Pyflakes
-    "I",    # isort
-    "B",    # flake8-bugbear
-    "C4",   # flake8-comprehensions
-    "UP",   # pyupgrade
-    "ARG",  # flake8-unused-arguments
-    "SIM",  # flake8-simplify
+    "E",
+    "W",
+    "F",
+    "I",
+    "B",
+    "C4",
+    "UP",
+    "ARG",
+    "SIM",
 ]
 ignore = [
-    "E501",   # line too long (handled by black)
-    "B008",   # do not perform function calls in argument defaults
-    "B904",   # raise without from (sometimes intentional)
-    "ARG001", # unused function argument
-    "ARG002", # unused method argument
-    "SIM108", # use ternary operator (not always cleaner)
+    "E501",
+    "B008",
+    "B904",
+    "ARG001",
+    "ARG002",
+    "SIM108",
 ]
 
 [tool.ruff.lint.isort]

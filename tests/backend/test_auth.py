@@ -184,9 +184,7 @@ def test_auth_me_protected(test_app_client):
     assert resp.status_code == 401
 
 
-# =============================================================================
 # Account Lockout Tests
-# =============================================================================
 
 
 class TestAccountLockout:

@@ -27,11 +27,8 @@ class TestDiscoverWorkflow:
     @patch("core.cli.contribution_matcher.batch_get_repo_metadata")
     def test_discover_issues_workflow(self, mock_repo_meta, mock_search, test_db, monkeypatch):
         """Test complete issue discovery workflow."""
-        test_db_path, _, _ = test_db
-
-        # Set DATABASE_URL to use the test database so cmd_discover uses it
-        test_db_url = f"sqlite:///{test_db_path}"
-        monkeypatch.setenv("DATABASE_URL", test_db_url)
+        db_url, _, _ = test_db
+        monkeypatch.setenv("DATABASE_URL", db_url)
 
         # Reset and re-initialize the global db object with the test database URL
         from core.db import db
@@ -39,7 +36,7 @@ class TestDiscoverWorkflow:
         if db.is_initialized:
             db.engine.dispose()
         db._initialized = False
-        db.initialize(test_db_url)
+        db.initialize(db_url)
 
         # Create a user with id=1 for the CLI to use (upsert_issue defaults to user_id=1)
         from core.models import User
@@ -106,7 +103,7 @@ class TestDiscoverWorkflow:
         assert issues[0]["title"] == "Test Issue"
 
     @patch("core.cli.contribution_matcher.search_issues")
-    def test_discover_with_filters(self, mock_search, test_db):
+    def test_discover_with_filters(self, mock_search, init_test_db):
         """Test discovery with filters."""
         mock_search.return_value = []
 
@@ -129,7 +126,7 @@ class TestProfileWorkflow:
     """Tests for profile creation workflow."""
 
     @patch("core.cli.contribution_matcher.create_profile_from_github")
-    def test_create_profile_from_github(self, mock_create, test_db):
+    def test_create_profile_from_github(self, mock_create, init_test_db):
         """Test creating profile from GitHub."""
         mock_create.return_value = {
             "skills": ["python"],
@@ -147,7 +144,7 @@ class TestProfileWorkflow:
 
         mock_create.assert_called_once_with("testuser")
 
-    def test_create_profile_manual(self, test_db, monkeypatch):
+    def test_create_profile_manual(self, init_test_db, monkeypatch):
         """Test creating profile manually."""
         # Mock input
         inputs = iter(
@@ -184,7 +181,7 @@ class TestProfileWorkflow:
 class TestScoringWorkflow:
     """Tests for scoring workflow."""
 
-    def test_score_issues_workflow(self, test_db, sample_profile, multiple_issues_in_db):
+    def test_score_issues_workflow(self, init_test_db, sample_profile, multiple_issues_in_db):
         """Test scoring issues against profile."""
         # Save profile
         from core.profile import save_dev_profile
@@ -390,18 +387,15 @@ class TestListWorkflow:
 
     def test_list_issues_workflow(self, test_db, multiple_issues_in_db, capsys, monkeypatch):
         """Test listing issues."""
-        test_db_path, _, _ = test_db
-
-        # Set DATABASE_URL to use the test database so cmd_list uses it
-        test_db_url = f"sqlite:///{test_db_path}"
-        monkeypatch.setenv("DATABASE_URL", test_db_url)
+        db_url, _, _ = test_db
+        monkeypatch.setenv("DATABASE_URL", db_url)
         # Reset and re-initialize the global db object with the test database URL
         from core.db import db
 
         if db.is_initialized:
             db.engine.dispose()
         db._initialized = False
-        db.initialize(test_db_url)
+        db.initialize(db_url)
         args = Mock()
         args.difficulty = "beginner"
         args.issue_type = None
@@ -418,7 +412,7 @@ class TestListWorkflow:
 class TestStatsWorkflow:
     """Tests for statistics workflow."""
 
-    def test_stats_workflow(self, test_db, multiple_issues_in_db, capsys):
+    def test_stats_workflow(self, init_test_db, multiple_issues_in_db, capsys):
         """Test statistics command."""
         args = Mock()
         cmd_stats(args)

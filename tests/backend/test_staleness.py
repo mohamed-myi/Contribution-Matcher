@@ -228,9 +228,20 @@ class TestMarkIssuesClosedAuthorization:
                 url="https://github.com/test/repo/issues/100",
                 github_state="open",
             )
+            # Create a second user for the test
+            from backend.app.models import User
+
+            other_user = User(
+                github_id="other_user",
+                github_username="other_user",
+                email="other@example.com",
+            )
+            session.add(other_user)
+            session.flush()
+
             issue_b = create_test_issue(
                 session,
-                user_id=current_user.id + 999,
+                user_id=other_user.id,
                 url="https://github.com/test/repo/issues/200",
                 github_state="open",
             )

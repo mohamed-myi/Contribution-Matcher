@@ -19,33 +19,69 @@ from core.profile import save_dev_profile
 @pytest.fixture(scope="function")
 def test_db():
     """Create a fresh test database for each test using ORM."""
-    # Use unique database file name per worker to avoid race conditions in parallel tests
+    # PostgreSQL configuration
+    # Use environment variables or default to local Docker configuration
     # pytest-xdist sets PYTEST_XDIST_WORKER to values like "gw0", "gw1", etc.
     worker_id = os.environ.get("PYTEST_XDIST_WORKER")
-    worker_suffix = f"_{worker_id}" if worker_id and worker_id != "master" else ""
-    test_db_path = f"test_contribution_matcher{worker_suffix}.db"
 
-    # Remove test database if it exists
-    if os.path.exists(test_db_path):
-        os.remove(test_db_path)
+    postgres_user = os.environ.get("POSTGRES_USER", "postgres")
+    postgres_password = os.environ.get("POSTGRES_PASSWORD", "postgres")
+    postgres_db = os.environ.get("POSTGRES_DB", "contribution_matcher")
+    postgres_host = os.environ.get("POSTGRES_HOST", "localhost")
+    postgres_port = os.environ.get("POSTGRES_PORT", "5432")
 
-    # Create engine and tables
-    engine = create_engine(
-        f"sqlite:///{test_db_path}",
-        connect_args={"check_same_thread": False},
+    # Use a separate test database name to avoid wiping development data
+    test_db_name = f"{postgres_db}_test_{worker_id or 'master'}"
+
+    # Connect to default database to create the test database
+    default_db_url = (
+        f"postgresql://{postgres_user}:{postgres_password}@{postgres_host}:{postgres_port}/postgres"
     )
-    # Use checkfirst=True to prevent errors if tables already exist (race condition protection)
-    Base.metadata.create_all(bind=engine, checkfirst=True)
+
+    # Create test database
+    from sqlalchemy import text
+
+    try:
+        # Connect to 'postgres' database to create new DB
+        admin_engine = create_engine(default_db_url, isolation_level="AUTOCOMMIT")
+        with admin_engine.connect() as conn:
+            # Terminate existing connections to the test database
+            conn.execute(
+                text(f"""
+                SELECT pg_terminate_backend(pg_stat_activity.pid)
+                FROM pg_stat_activity
+                WHERE pg_stat_activity.datname = '{test_db_name}'
+                AND pid <> pg_backend_pid();
+            """)
+            )
+            # Drop if exists
+            conn.execute(text(f"DROP DATABASE IF EXISTS {test_db_name}"))
+            # Create fresh
+            conn.execute(text(f"CREATE DATABASE {test_db_name}"))
+        admin_engine.dispose()
+    except Exception as e:
+        pytest.fail(f"Could not create test database: {e}")
+
+    # Connect to the new test database
+    db_url = f"postgresql://{postgres_user}:{postgres_password}@{postgres_host}:{postgres_port}/{test_db_name}"
+
+    engine = create_engine(db_url)
+
+    # Create tables
+    Base.metadata.create_all(bind=engine)
 
     # Create session factory
     TestingSessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
-    yield test_db_path, TestingSessionLocal, engine
+    yield db_url, TestingSessionLocal, engine
 
-    # Cleanup after test
+    # Cleanup
     engine.dispose()
-    if os.path.exists(test_db_path):
-        os.remove(test_db_path)
+    # Optional: Drop database after test run?
+    # To keep debugging data, we might leave it.
+    # But for clean state in local dev, we might want to drop it.
+    # However, since we use DROP IF EXISTS at start, it cleans up next time.
+    # Leaving it allows inspection.
 
 
 @pytest.fixture
@@ -324,32 +360,33 @@ def mock_requests_get():
 @pytest.fixture
 def init_test_db(test_db, monkeypatch):
     """Initialize the global db object with the test database URL."""
-    test_db_path, _, _ = test_db
-    test_db_url = f"sqlite:///{test_db_path}"
+    db_url, _, _ = test_db
     # Set DATABASE_URL environment variable
-    monkeypatch.setenv("DATABASE_URL", test_db_url)
+    monkeypatch.setenv("DATABASE_URL", db_url)
     # Reset and re-initialize the global db object
     from core.db import db
 
     if db.is_initialized:
         db.engine.dispose()
     db._initialized = False
-    db.initialize(test_db_url)
+    db.initialize(db_url)
     # Create a user with id=1 for CLI functions that default to user_id=1
     from core.models import User
 
     with db.session() as session:
+        # For Postgres, we need to handle ID sequence/conflict if we force ID=1
+        # But User model usually uses string ID (github_id) or auto-increment integer ID
+        # Let's check if user exists first
         existing_user = session.query(User).filter(User.id == 1).first()
         if not existing_user:
             user = User(
-                id=1,
                 github_id="test_user_1",
                 github_username="testuser1",
                 email="test1@example.com",
             )
             session.add(user)
             session.commit()
-    yield test_db_url
+    yield db_url
     # Cleanup
     if db.is_initialized:
         db.engine.dispose()

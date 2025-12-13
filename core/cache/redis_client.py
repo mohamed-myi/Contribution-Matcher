@@ -94,7 +94,6 @@ class RedisCache:
         try:
             settings = get_settings()
 
-            # Create connection pool
             self._pool = redis.ConnectionPool(
                 host=settings.redis_host,
                 port=settings.redis_port,
@@ -103,7 +102,9 @@ class RedisCache:
                 max_connections=50,
                 socket_timeout=5,
                 socket_connect_timeout=5,
-                decode_responses=False,  # We handle encoding ourselves
+                decode_responses=False,
+                retry_on_timeout=True,  # Enable auto-retry on timeout
+                health_check_interval=30,  # Periodic health check
             )
 
             # Test connection
@@ -132,6 +133,19 @@ class RedisCache:
         if not self._initialized:
             self.initialize()
 
+        # Try to reconnect if unavailable
+        if not self._available and self._initialized:
+            try:
+                # If we have a pool but marked unavailable, check if it's alive now
+                if self._pool:
+                    r = redis.Redis(connection_pool=self._pool)
+                    r.ping()
+                    self._available = True
+                    logger.info("redis_reconnected")
+                    return r
+            except Exception:
+                pass
+
         if not self._available or self._pool is None:
             return None
 
@@ -144,9 +158,7 @@ class RedisCache:
             self.initialize()
         return self._available
 
-    # =========================================================================
-    # JSON Operations (for API responses, scores, etc.)
-    # =========================================================================
+    # JSON Operations
 
     def get_json(self, key: str) -> dict | None:
         """
@@ -239,9 +251,7 @@ class RedisCache:
             self.set_json(key, result, ttl)
         return result
 
-    # =========================================================================
-    # Model Operations (for ML models, embeddings, etc.)
-    # =========================================================================
+    # Model Operations
 
     def get_model(self, key: str) -> Any | None:
         """
@@ -304,9 +314,7 @@ class RedisCache:
             logger.debug("cache_set_model_error", key=key, error=str(e))
             return False
 
-    # =========================================================================
     # Key Operations
-    # =========================================================================
 
     def delete(self, key: str) -> bool:
         """Delete a key from cache."""
@@ -409,9 +417,7 @@ class RedisCache:
         except (ConnectionError, TimeoutError):
             return False
 
-    # =========================================================================
     # Health Check
-    # =========================================================================
 
     def health_check(self) -> dict[str, Any]:
         """

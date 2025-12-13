@@ -1,6 +1,5 @@
-# =============================================================================
 # Contribution Matcher - Multi-stage Dockerfile
-# =============================================================================
+#
 # Supports multiple targets:
 #   - api: FastAPI application (uvicorn)
 #   - worker: Celery worker
@@ -11,11 +10,11 @@
 #   docker build --target api -t contribution-matcher-api .
 #   docker build --target worker -t contribution-matcher-worker .
 #   docker build --target scheduler -t contribution-matcher-scheduler .
-# =============================================================================
 
-# =============================================================================
+
+
 # Base stage - Common dependencies
-# =============================================================================
+
 FROM python:3.11-slim AS base
 
 # Prevent Python from writing bytecode and buffering stdout/stderr
@@ -35,9 +34,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# =============================================================================
+
 # Dependencies stage - Install Python packages
-# =============================================================================
+
 FROM base AS dependencies
 
 # Copy requirements first for better caching
@@ -54,9 +53,8 @@ RUN pip install --no-cache-dir \
     celery[redis] \
     cryptography
 
-# =============================================================================
+
 # Application stage - Copy source code
-# =============================================================================
 FROM dependencies AS app
 
 # Copy application code
@@ -69,9 +67,8 @@ COPY main.py ./
 RUN useradd --create-home --shell /bin/bash appuser && \
     chown -R appuser:appuser /app
 
-# =============================================================================
+
 # API Service
-# =============================================================================
 FROM app AS api
 
 USER appuser
@@ -92,9 +89,8 @@ CMD ["gunicorn", "backend.app.main:app", \
      "--access-logfile", "-", \
      "--error-logfile", "-"]
 
-# =============================================================================
+
 # Celery Worker - Discovery Queue
-# =============================================================================
 FROM app AS worker-discovery
 
 USER appuser
@@ -106,9 +102,8 @@ CMD ["celery", "-A", "workers.celery_app", "worker", \
      "--loglevel=INFO", \
      "--max-tasks-per-child=100"]
 
-# =============================================================================
+
 # Celery Worker - Scoring Queue
-# =============================================================================
 FROM app AS worker-scoring
 
 USER appuser
@@ -120,9 +115,8 @@ CMD ["celery", "-A", "workers.celery_app", "worker", \
      "--loglevel=INFO", \
      "--max-tasks-per-child=500"]
 
-# =============================================================================
+
 # Celery Worker - ML Queue
-# =============================================================================
 FROM app AS worker-ml
 
 USER appuser
@@ -134,9 +128,8 @@ CMD ["celery", "-A", "workers.celery_app", "worker", \
      "--loglevel=INFO", \
      "--max-tasks-per-child=10"]
 
-# =============================================================================
+
 # Celery Worker - Default (all queues)
-# =============================================================================
 FROM app AS worker
 
 USER appuser
@@ -147,9 +140,8 @@ CMD ["celery", "-A", "workers.celery_app", "worker", \
      "--loglevel=INFO", \
      "--max-tasks-per-child=100"]
 
-# =============================================================================
+
 # Celery Beat Scheduler
-# =============================================================================
 FROM app AS scheduler
 
 USER appuser
@@ -157,9 +149,8 @@ USER appuser
 CMD ["celery", "-A", "workers.celery_app", "beat", \
      "--loglevel=INFO"]
 
-# =============================================================================
+
 # CLI Tools
-# =============================================================================
 FROM app AS cli
 
 USER appuser

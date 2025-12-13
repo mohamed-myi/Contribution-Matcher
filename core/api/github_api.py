@@ -44,15 +44,7 @@ def _update_rate_limit(response: requests.Response) -> None:
 
 
 def _wait_for_rate_limit(max_wait: int = 300) -> bool:
-    """
-    Pause when remaining GitHub rate limit is low.
-
-    Args:
-        max_wait: Maximum seconds to wait before aborting.
-
-    Returns:
-        True if it is safe to proceed; False if waiting would exceed max_wait.
-    """
+    """Pause when remaining GitHub rate limit is low."""
     with _rate_limit_lock:
         remaining = _rate_limit["remaining"]
         reset = _rate_limit["reset"]

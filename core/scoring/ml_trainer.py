@@ -17,6 +17,10 @@ from sklearn.metrics import (
 from sklearn.model_selection import TimeSeriesSplit, train_test_split
 from sklearn.preprocessing import StandardScaler
 
+# Monkeypatch np.int for compatibility with older libraries (e.g. skopt)
+if not hasattr(np, "int"):
+    np.int = int
+
 from core.profile import load_dev_profile
 
 
@@ -424,14 +428,11 @@ def train_xgboost_model(
         ]
 
         # Meta-learner
-        meta_learner = xgb.XGBClassifier(
-            n_estimators=50,
-            max_depth=3,
-            learning_rate=0.1,
-            random_state=42,
-            eval_metric="logloss",
-            use_label_encoder=False,
-        )
+        # Use LogisticRegression as it's more standard for stacking and avoids
+        # XGBoost/sklearn compatibility issues (is_classifier checks)
+        from sklearn.linear_model import LogisticRegression
+
+        meta_learner = LogisticRegression(random_state=42)
 
         # Create stacking ensemble
         model = StackingClassifier(
@@ -490,16 +491,12 @@ def train_legacy_model(force: bool = False) -> dict:
         Dictionary containing training metrics and metadata.
     """
 
-    print("\n" + "=" * 80)
     print("STEP 1: LOADING LABELED ISSUES")
-    print("=" * 80)
 
     issues, labels = load_labeled_issues()
     print(f"Found {len(issues)} labeled issues in database")
 
-    print("\n" + "=" * 80)
     print("STEP 2: VALIDATING DATA REQUIREMENTS")
-    print("=" * 80)
 
     if len(issues) < 10:
         raise ValueError(
@@ -530,9 +527,7 @@ def train_legacy_model(force: bool = False) -> dict:
     print(f"  - Bad issues: {bad_count}")
     print(f"  - Balance: {min(good_count, bad_count) / max(good_count, bad_count) * 100:.1f}%")
 
-    print("\n" + "=" * 80)
     print("STEP 3: LOADING PROFILE DATA")
-    print("=" * 80)
 
     profile_data = None
     try:
@@ -544,9 +539,7 @@ def train_legacy_model(force: bool = False) -> dict:
     except Exception as e:
         print(f"Warning: Error loading profile data: {e}")
 
-    print("\n" + "=" * 80)
     print("STEP 4: EXTRACTING FEATURES")
-    print("=" * 80)
 
     X = []
     y = []
@@ -573,9 +566,7 @@ def train_legacy_model(force: bool = False) -> dict:
     print(f"  - Issues processed: {len(X)}")
     print(f"  - Features per issue: {X.shape[1]} (should be 11)")
 
-    print("\n" + "=" * 80)
     print("STEP 5: SPLITTING DATA INTO TRAIN/TEST SETS")
-    print("=" * 80)
 
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42, stratify=y
@@ -585,9 +576,7 @@ def train_legacy_model(force: bool = False) -> dict:
     print(f"  - Training set: {len(X_train)} issues (80%)")
     print(f"  - Test set: {len(X_test)} issues (20%)")
 
-    print("\n" + "=" * 80)
     print("STEP 6: SCALING FEATURES")
-    print("=" * 80)
 
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
@@ -595,9 +584,7 @@ def train_legacy_model(force: bool = False) -> dict:
 
     print("Feature scaling complete")
 
-    print("\n" + "=" * 80)
     print("STEP 7: TRAINING GRADIENT BOOSTING CLASSIFIER")
-    print("=" * 80)
 
     model = GradientBoostingClassifier(
         n_estimators=100, learning_rate=0.1, max_depth=5, random_state=42
@@ -607,9 +594,7 @@ def train_legacy_model(force: bool = False) -> dict:
 
     print("Model training complete")
 
-    print("\n" + "=" * 80)
     print("STEP 8: EVALUATING MODEL PERFORMANCE")
-    print("=" * 80)
 
     y_pred = model.predict(X_test_scaled)
     model.predict_proba(X_test_scaled)
@@ -631,9 +616,7 @@ def train_legacy_model(force: bool = False) -> dict:
     print(f"Actual Bad   {cm[0][0]:4d}   {cm[0][1]:4d}")
     print(f"       Good  {cm[1][0]:4d}   {cm[1][1]:4d}")
 
-    print("\n" + "=" * 80)
     print("STEP 9: SAVING MODEL AND SCALER")
-    print("=" * 80)
 
     with open(MODEL_PATH, "wb") as f:
         pickle.dump(model, f)
@@ -643,9 +626,7 @@ def train_legacy_model(force: bool = False) -> dict:
         pickle.dump(scaler, f)
     print(f"Scaler saved to {SCALER_PATH}")
 
-    print("\n" + "=" * 80)
     print("TRAINING COMPLETE!")
-    print("=" * 80)
 
     return {
         "accuracy": accuracy,
@@ -685,16 +666,12 @@ def train_model(
     if legacy:
         return train_legacy_model(force=force)
 
-    print("\n" + "=" * 80)
     print("STEP 1: LOADING LABELED ISSUES")
-    print("=" * 80)
 
     issues, labels = load_labeled_issues()
     print(f"Found {len(issues)} labeled issues in database")
 
-    print("\n" + "=" * 80)
     print("STEP 2: VALIDATING DATA REQUIREMENTS")
-    print("=" * 80)
 
     if len(issues) < 10:
         raise ValueError(
@@ -725,9 +702,7 @@ def train_model(
     print(f"  - Bad issues: {bad_count}")
     print(f"  - Balance: {min(good_count, bad_count) / max(good_count, bad_count) * 100:.1f}%")
 
-    print("\n" + "=" * 80)
     print("STEP 3: LOADING PROFILE DATA")
-    print("=" * 80)
 
     profile_data = None
     try:
@@ -738,9 +713,7 @@ def train_model(
     except Exception as e:
         print(f"Warning: Error loading profile data: {e}")
 
-    print("\n" + "=" * 80)
     print("STEP 4: EXTRACTING FEATURES")
-    print("=" * 80)
 
     X = []
     y = []
@@ -768,9 +741,7 @@ def train_model(
     print(f"  - Issues processed: {len(X)}")
     print(f"  - Features per issue: {X.shape[1]} (expected: {expected_features})")
 
-    print("\n" + "=" * 80)
     print("STEP 5: SPLITTING DATA (TIME SERIES)")
-    print("=" * 80)
 
     tscv = TimeSeriesSplit(n_splits=5)
     splits = list(tscv.split(X))
@@ -783,9 +754,7 @@ def train_model(
     print(f"  - Training set: {len(X_train)} issues")
     print(f"  - Test set: {len(X_test)} issues")
 
-    print("\n" + "=" * 80)
     print("STEP 6: FEATURE SELECTION")
-    print("=" * 80)
 
     # Select top 100 features using mutual information
     feature_selector = SelectKBest(score_func=mutual_info_classif, k=min(100, X_train.shape[1]))
@@ -795,9 +764,7 @@ def train_model(
     print("Feature selection complete:")
     print(f"  - Selected {X_train_selected.shape[1]} features from {X_train.shape[1]} total")
 
-    print("\n" + "=" * 80)
     print("STEP 7: SCALING FEATURES")
-    print("=" * 80)
 
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train_selected)
@@ -805,9 +772,7 @@ def train_model(
 
     print("Feature scaling complete")
 
-    print("\n" + "=" * 80)
     print("STEP 8: TRAINING XGBOOST MODEL")
-    print("=" * 80)
 
     model, threshold, metrics = train_xgboost_model(
         X_train_scaled,
@@ -819,9 +784,7 @@ def train_model(
         tune_iterations=tune_iterations,
     )
 
-    print("\n" + "=" * 80)
     print("STEP 9: EVALUATING MODEL PERFORMANCE")
-    print("=" * 80)
 
     y_pred_proba = model.predict_proba(X_test_scaled)[:, 1]
     y_pred = (y_pred_proba >= threshold).astype(int)
@@ -833,9 +796,7 @@ def train_model(
     print(f"Actual Bad   {cm[0][0]:4d}   {cm[0][1]:4d}")
     print(f"       Good  {cm[1][0]:4d}   {cm[1][1]:4d}")
 
-    print("\n" + "=" * 80)
     print("STEP 10: SAVING MODEL AND ARTIFACTS")
-    print("=" * 80)
 
     with open(MODEL_PATH_V2, "wb") as f:
         pickle.dump(model, f)
@@ -849,9 +810,7 @@ def train_model(
         pickle.dump(feature_selector, f)
     print(f"Feature selector saved to {FEATURE_SELECTOR_PATH_V2}")
 
-    print("\n" + "=" * 80)
     print("TRAINING COMPLETE!")
-    print("=" * 80)
 
     return {
         "accuracy": metrics["accuracy"],

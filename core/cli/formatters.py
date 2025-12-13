@@ -136,7 +136,8 @@ def format_csv(issues: list[dict], output_file: str | None = None) -> str | None
 
     if output_file:
         with open(output_file, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+            # restval="" handles missing keys gracefully
+            writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore", restval="")
             writer.writeheader()
             for issue in issues:
                 writer.writerow(issue)
@@ -145,7 +146,7 @@ def format_csv(issues: list[dict], output_file: str | None = None) -> str | None
         import io
 
         output = io.StringIO()
-        writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
+        writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore", restval="")
         writer.writeheader()
         for issue in issues:
             writer.writerow(issue)
@@ -161,7 +162,7 @@ def format_excel(issues: list[dict], output_file: str) -> None:
     """
     if not HAS_OPENPYXL:
         raise ImportError(
-            "openpyxl is required for Excel export. Install with: pip install openpyxl"
+            "openpyxl is required for Excel export. \nPlease install it with: pip install openpyxl"
         )
 
     if not issues:

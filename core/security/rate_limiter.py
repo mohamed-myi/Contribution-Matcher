@@ -19,9 +19,7 @@ from core.logging import get_logger
 logger = get_logger("security.rate_limiter")
 
 
-# =============================================================================
 # In-Memory Fallback Rate Limiter
-# =============================================================================
 
 
 class InMemoryRateLimiter:
@@ -174,9 +172,7 @@ class LockoutResult:
     retry_after: int | None = None  # Seconds until lockout expires
 
 
-# =============================================================================
 # Account Lockout Configuration
-# =============================================================================
 
 
 class AccountLockout:

@@ -1,6 +1,40 @@
 # Contribution Matcher
+Note: The UI contains the proper name, "IssueIndex", but I only came up with that after I realized how ugly "Contribution Matcher" looked and sounded.
+## Background
 
-A tool that discovers GitHub issues and matches them to developer skills using hybrid scoring (rule-based + ML). Built with a React frontend and FastAPI backend.
+This project originated as a personal automation script running on GitHub Actions. Its original purpose was to passively collect job descriptions via a daily cron job, parse them, and cross-reference them with my resume to find relevant opportunities. It operated purely as a backend utility. Once I realizedthe potential I decided to expand it into a full-stack application. The other option was to convert it to a dating app, but I can't see a way to get enough users/data to make it viable.
+
+I wanted to create a more advanced model and needed a source of real human data that was realistically being sourced and had a reasonable amount of randomness. I wanted to try solving a real problem instead of testing proven algorithms on curated data. Job descriptions tend to have a pretty consistent format, so that model produced a high precision score quickly. The model and architecture are intentionally overdone from just progressively experimenting with different frameworks and choosing to integrate instead of using a monolithic framework.
+
+*   **Distributed Systems**: Implementing Celery and Redis to handle asynchronous ingestion and processing.
+*   **Machine Learning**: Building and integrating custom scoring models from scratch.
+*   **Clean Architecture**: Enforcing strict separation of concerns to practice domain-driven design patterns.
+
+The backend was built prior to the current product idea, which led to some complex database migrations and distinct architectural choices. I have spent significant time refining these components, and the project is now intended for portfolio purposes to demonstrate full-stack engineering and distributed system capabilities.
+
+## Highlights
+
+*   **Distributed Architecture**: Decoupled ingestion and scoring pipelines using Celery & Redis for robust background processing.
+*   **Clean Architecture**: Strict separation between core business logic, API layers, and data repositories to mock real-world enterprise patterns.
+*   **Hybrid ML Scoring**: Combining rule-based heuristics with logistic regression for customized, learned recommendations.
+*   **Full Stack Integration**: End-to-end type safety and state management with FastAPI and React 19.
+
+## Tech Stack
+
+### Backend
+*   **FastAPI**: High-performance async API.
+*   **Celery + Redis**: Distributed task queue for ingestion and scoring.
+*   **Alembic**: Complex database migration management.
+*   **Scikit-learn**: Logic regression models for issue scoring.
+*   **APScheduler**: In-process scheduling for maintenance tasks.
+
+### Frontend
+*   **React 19**: Latest React features.
+*   **TanStack Query**: Server state management and caching.
+*   **Vitest**: Modern, fast unit testing.
+*   **Vite**: Next-generation frontend tooling.
+
+---
 
 ## Quick Start
 
@@ -18,22 +52,6 @@ cd frontend && npm install && npm run dev
 ```
 
 Visit http://localhost:5173
-
-## Features
-
-### Core Functionality
-- **GitHub OAuth** - Secure authentication via GitHub
-- **Issue Discovery** - Finds "good first issue" and "help wanted" issues from GitHub
-- **Smart Matching** - Scores issues based on skills, experience, interests, and repository quality
-- **ML Training** - Train a personalized model from labeled issue preferences
-- **Profile Sources** - Create profile from GitHub repos, resume PDF, or manual entry
-- **Staleness Tracking** - Monitors issue freshness and marks closed issues
-
-### User Experience
-- **First Login Prompt** - New users prompted to sync profile from GitHub
-- **Auto-Resync** - GitHub-sourced profiles automatically resync on login
-- **Bookmarks and Notes** - Save and annotate issues of interest
-- **Issue Labeling** - Mark issues as good/bad matches to train the ML model
 
 ## Architecture
 
@@ -68,32 +86,6 @@ contribution_matcher/
     ├── backend/             # API integration tests
     └── *.py                 # Unit tests for core modules
 ```
-
-## Tech Stack
-
-### Backend
-- Python 3.10+
-- FastAPI with Pydantic validation
-- SQLAlchemy 2.0 ORM
-- Alembic migrations
-- APScheduler (in-process scheduling)
-- Celery + Redis (distributed task queue)
-- scikit-learn (ML models)
-- structlog (structured logging)
-
-### Frontend
-- React 19
-- Vite (build tool)
-- TanStack Query (React Query) for server state
-- React Router for navigation
-- Axios for HTTP requests
-- react-window for virtualized lists
-
-### Infrastructure
-- SQLite (development) / PostgreSQL (production)
-- Redis (caching and task queue)
-- Docker Compose for local development
-- GitHub Actions for CI/CD
 
 ## Database Schema
 
@@ -133,7 +125,7 @@ contribution_matcher/
 | Interest Match | 5% | Repository topics vs user interests |
 
 ### ML Enhancement
-- Trained on user-labeled issues (good/bad)
+- Trained on user-labeled issues (like/dislike)
 - Logistic regression classifier with feature vectors
 - Adjusts base score based on learned preferences
 - Optional heavy ML dependencies (XGBoost, sentence-transformers) via `requirements-ml.txt`
@@ -150,7 +142,7 @@ PAT_TOKEN=                # GitHub Personal Access Token for API calls
 
 ### Optional Environment Variables
 ```bash
-DATABASE_URL=sqlite:///contribution_matcher.db  # PostgreSQL for production
+DATABASE_URL=sqlite:///contribution_matcher.db  # Tested with SQLite and PostgreSQL for production
 REDIS_HOST=localhost
 REDIS_PORT=6379
 TOKEN_ENCRYPTION_KEY=     # Fernet key for encrypting stored tokens
@@ -303,8 +295,8 @@ pre-commit run --all-files  # Run all pre-commit hooks
 
 ---
 
-Note: Documentation for this project was AI-assisted.
+Note: Documentation was AI-assisted, but guided and reviewed thoroughly by myself.
 
 ## Credits
 
-Developed by Mohamed Ibrahim
+By Mohamed Ibrahim.

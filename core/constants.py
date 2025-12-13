@@ -4,9 +4,8 @@ Application constants for Contribution Matcher.
 Contains skill categories, technology mappings, and scoring weights.
 """
 
-# =============================================================================
+
 # Skill Categories
-# =============================================================================
 
 SKILL_CATEGORIES = {
     "frontend": [
@@ -342,17 +341,17 @@ SKILL_CATEGORIES = {
 # Flattened unique skills for quick lookups
 KEYWORD_SKILLS = sorted({skill.lower() for skills in SKILL_CATEGORIES.values() for skill in skills})
 
-# =============================================================================
+
 # GitHub API Constants
-# =============================================================================
+
 
 GITHUB_API_BASE = "https://api.github.com"
 GITHUB_GRAPHQL_ENDPOINT = "https://api.github.com/graphql"
 RATE_LIMIT_REQUESTS_PER_HOUR = 5000
 
-# =============================================================================
+
 # Issue Discovery Labels
-# =============================================================================
+
 
 GOOD_FIRST_ISSUE_LABELS = [
     "good first issue",
@@ -402,9 +401,9 @@ DISCOVERY_LANGUAGES = [
     "elixir",
 ]
 
-# =============================================================================
+
 # Technology Mappings
-# =============================================================================
+
 
 TECHNOLOGY_SYNONYMS = {
     "javascript": ["js", "ecmascript", "node", "node.js", "nodejs"],
@@ -478,9 +477,9 @@ POPULAR_LANGUAGES = [
     "matlab",
 ]
 
-# =============================================================================
+
 # Scoring Weights
-# =============================================================================
+
 
 CODE_FOCUSED_TYPES = ["bug", "feature", "refactoring"]
 

@@ -25,9 +25,7 @@ def get_beat_schedule():
         Dictionary of scheduled tasks
     """
     return {
-        # =================================================================
         # Discovery Tasks (Daily)
-        # =================================================================
         "discover-issues-daily": {
             "task": "workers.tasks.discovery_tasks.batch_discover",
             "schedule": crontab(
@@ -47,9 +45,7 @@ def get_beat_schedule():
             },
             "options": {"queue": "discovery"},
         },
-        # =================================================================
         # Cleanup Tasks (Daily)
-        # =================================================================
         "cleanup-stale-issues-daily": {
             "task": "workers.tasks.discovery_tasks.cleanup_stale_issues",
             "schedule": crontab(
@@ -60,9 +56,7 @@ def get_beat_schedule():
             "kwargs": {"limit": 50},
             "options": {"queue": "discovery"},
         },
-        # =================================================================
         # Scoring Tasks (After Discovery)
-        # =================================================================
         "recompute-scores-daily": {
             "task": "workers.tasks.scoring_tasks.score_user_issues",
             "schedule": crontab(
@@ -73,9 +67,7 @@ def get_beat_schedule():
             "kwargs": {"batch_size": 100},
             "options": {"queue": "scoring"},
         },
-        # =================================================================
         # ML Tasks (Weekly)
-        # =================================================================
         "train-model-weekly": {
             "task": "workers.tasks.ml_tasks.train_model",
             "schedule": crontab(
@@ -100,9 +92,7 @@ def get_beat_schedule():
             "kwargs": {"batch_size": 50},
             "options": {"queue": "ml"},
         },
-        # =================================================================
         # Maintenance Tasks (Weekly)
-        # =================================================================
         "cleanup-old-models-weekly": {
             "task": "workers.tasks.ml_tasks.cleanup_old_models",
             "schedule": crontab(

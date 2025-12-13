@@ -67,7 +67,7 @@ def cmd_discover(args):
     """Discover new GitHub issues."""
     _init_database()
 
-    print(f"\n{'=' * 60}\nSearching for GitHub Issues\n{'=' * 60}\n")
+    print("\nSearching for GitHub Issues\n")
 
     labels = None
     if args.labels:
@@ -144,9 +144,7 @@ def cmd_discover(args):
             print(f"Error processing issue {issue.get('html_url', 'unknown')}: {e}")
             continue
 
-    print(f"\n{'=' * 60}")
-    print(f"Search complete: Processed {new_count} issues")
-    print(f"{'=' * 60}\n")
+    print(f"Search complete: Processed {new_count} issues\n")
 
 
 def cmd_discover_async(args):
@@ -517,14 +515,10 @@ def cmd_update_profile(args):
         print("Profile not found. Create one first with 'create-profile'.")
         return
 
-    print("\n" + "=" * 80)
-    print("UPDATE DEVELOPER PROFILE")
-    print("=" * 80)
+    print("\nUPDATE DEVELOPER PROFILE")
     print("\nCurrent profile:")
     print(json.dumps(profile, indent=2))
-    print("\n" + "=" * 80)
-    print("Enter new values (press Enter to keep current value)")
-    print("=" * 80 + "\n")
+    print("\nEnter new values (press Enter to keep current value)\n")
 
     # Update skills
     current_skills = ", ".join(profile.get("skills", []))
@@ -565,9 +559,7 @@ def cmd_update_profile(args):
     try:
         encrypt = not getattr(args, "no_encrypt", False)
         save_dev_profile(profile, encrypt=encrypt)
-        print("\n" + "=" * 80)
         print("Profile updated successfully!")
-        print("=" * 80)
     except Exception as e:
         print(f"\nError saving profile: {e}")
 
@@ -698,14 +690,11 @@ def cmd_label_status(args):
     unlabeled = total_issues - total_labeled
     progress = (total_labeled / 200.0) * 100 if total_labeled < 200 else 100.0
 
-    print("\n" + "=" * 80)
-    print("LABELING STATUS")
-    print("=" * 80)
+    print("\nLABELING STATUS")
     print(f"\nTotal Issues: {total_issues}")
     print(f"Labeled: {total_labeled} | Unlabeled: {unlabeled}")
     print(f"Good: {good_issues} | Bad: {bad_issues}")
     print(f"\nProgress to 200: {progress:.1f}%")
-    print("=" * 80)
 
 
 def cmd_train_model(args):
@@ -765,9 +754,7 @@ def cmd_stats(args):
 
     stats = get_statistics()
 
-    print("\n" + "=" * 80)
-    print("CONTRIBUTION MATCHER STATISTICS")
-    print("=" * 80)
+    print("\nCONTRIBUTION MATCHER STATISTICS")
     print(f"\nTotal Issues: {stats.get('total_issues', 0)}")
     print(f"Active Issues: {stats.get('active_issues', 0)}")
     print(f"Labeled Issues: {stats.get('labeled_issues', 0)}")
@@ -778,8 +765,6 @@ def cmd_stats(args):
             if d:  # Skip None key
                 print(f"  {d}: {c}")
 
-    print("=" * 80)
-
 
 def cmd_variety_stats(args):
     """Show variety statistics."""
@@ -787,9 +772,7 @@ def cmd_variety_stats(args):
 
     stats = get_variety_statistics()
 
-    print("\n" + "=" * 80)
-    print("ISSUE VARIETY STATISTICS")
-    print("=" * 80)
+    print("\nISSUE VARIETY STATISTICS")
     print(
         f"\nActive: {stats.get('active_issues', 0)} | Inactive: {stats.get('inactive_issues', 0)}"
     )

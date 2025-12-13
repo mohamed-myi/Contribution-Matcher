@@ -29,9 +29,9 @@ celery_app = Celery(
     ],
 )
 
-# =============================================================================
+
 # Queue Configuration with Priority Support
-# =============================================================================
+
 
 # Define exchanges
 default_exchange = Exchange("default", type="direct")
@@ -83,9 +83,9 @@ celery_app.conf.task_default_routing_key = "default"
 # Default task priority (0=highest, 9=lowest)
 celery_app.conf.task_default_priority = 5
 
-# =============================================================================
+
 # Task Routing with Priority
-# =============================================================================
+
 
 celery_app.conf.task_routes = {
     # Scoring tasks -> scoring queue (high priority)
@@ -118,9 +118,9 @@ celery_app.conf.task_routes = {
     },
 }
 
-# =============================================================================
+
 # Worker Concurrency Configuration
-# =============================================================================
+
 
 # Configure concurrency per queue type when running workers:
 # celery -A workers worker -Q scoring -c 8 --prefetch-multiplier=4
@@ -128,9 +128,9 @@ celery_app.conf.task_routes = {
 # celery -A workers worker -Q ml -c 1 --prefetch-multiplier=1
 # celery -A workers worker -Q staleness -c 2 --prefetch-multiplier=1
 
-# =============================================================================
+
 # Serialization
-# =============================================================================
+
 
 celery_app.conf.update(
     # Use pickle for complex objects (ML models, numpy arrays)
@@ -142,9 +142,9 @@ celery_app.conf.update(
     enable_utc=True,
 )
 
-# =============================================================================
+
 # Rate Limiting
-# =============================================================================
+
 
 celery_app.conf.update(
     # Default rate limit (can be overridden per-task)
@@ -154,9 +154,9 @@ celery_app.conf.update(
     worker_prefetch_multiplier=1,
 )
 
-# =============================================================================
+
 # Retry Policy
-# =============================================================================
+
 
 celery_app.conf.update(
     # Retry on connection errors
@@ -168,9 +168,9 @@ celery_app.conf.update(
     task_time_limit=600,  # 10 minutes hard limit
 )
 
-# =============================================================================
+
 # Task Acknowledgment
-# =============================================================================
+
 
 celery_app.conf.update(
     # Acknowledge tasks after completion (not before)
@@ -179,9 +179,9 @@ celery_app.conf.update(
     task_reject_on_worker_lost=True,
 )
 
-# =============================================================================
+
 # Logging
-# =============================================================================
+
 
 celery_app.conf.update(
     # Worker hijacks root logger
@@ -202,17 +202,14 @@ def setup_worker_logging(**kwargs):
     configure_celery_logging()
 
 
-# =============================================================================
 # Beat Schedule (Periodic Tasks)
-# =============================================================================
 
 
 apply_beat_schedule(celery_app)
 
 
-# =============================================================================
 # Auto-discovery (optional - we explicitly include tasks above)
-# =============================================================================
+
 
 # Uncomment to auto-discover tasks in Django apps
 # celery_app.autodiscover_tasks()

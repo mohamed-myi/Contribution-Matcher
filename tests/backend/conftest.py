@@ -1,12 +1,9 @@
 import os
 import sys
-import tempfile
 from collections.abc import Callable, Iterator
-from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -14,21 +11,14 @@ if PROJECT_ROOT not in sys.path:
     sys.path.append(PROJECT_ROOT)
 
 from backend.app.auth.dependencies import get_current_user  # noqa: E402
-from backend.app.database import Base, get_db  # noqa: E402
+from backend.app.database import get_db  # noqa: E402
 from backend.app.main import create_app  # noqa: E402
 from backend.app.models import User  # noqa: E402
 
 
-@pytest.fixture(scope="function")
-def test_app_client() -> Iterator[tuple[TestClient, sessionmaker]]:
-    db_dir = Path(tempfile.mkdtemp(prefix="backend_tests_"))
-    db_path = db_dir / "test_backend.db"
-    engine = create_engine(
-        f"sqlite:///{db_path}",
-        connect_args={"check_same_thread": False},
-    )
-    TestingSessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
-    Base.metadata.create_all(bind=engine)
+@pytest.fixture
+def test_app_client(test_db) -> Iterator[tuple[TestClient, sessionmaker]]:
+    db_url, TestingSessionLocal, engine = test_db
 
     app = create_app()
 

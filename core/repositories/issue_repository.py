@@ -13,14 +13,7 @@ from .base import BaseRepository
 
 
 class IssueRepository(BaseRepository[Issue]):
-    """
-    Repository for Issue operations with optimized batch queries.
-
-    Key features:
-    - list_with_bookmarks: Efficient 2-query pattern (not N+1)
-    - bulk_upsert: Single transaction for multiple issues
-    - Eager loading of relationships
-    """
+    """Repository for Issue operations with optimized batch queries."""
 
     model = Issue
 
@@ -48,30 +41,7 @@ class IssueRepository(BaseRepository[Issue]):
         limit: int = 20,
         skip_count: bool = False,
     ) -> tuple[list[Issue], int, set[int]]:
-        """
-        Get issues with bookmark status efficiently.
-
-        Uses 2-3 queries instead of N+1:
-        1. Main query with eager loading
-        2. Optimized count (optional, uses subquery)
-        3. Batch fetch bookmark IDs
-
-        Args:
-            user_id: User ID
-            filters: Filter dictionary with keys:
-                - difficulty: Filter by difficulty level
-                - technology: Filter by technology
-                - language: Filter by repo language
-                - issue_type: Filter by issue type
-                - days_back: Only issues created within N days
-                - is_active: Filter by active status
-            offset: Pagination offset
-            limit: Pagination limit
-            skip_count: Skip total count query (for infinite scroll)
-
-        Returns:
-            Tuple of (issues, total_count, bookmarked_issue_ids)
-        """
+        """Get issues with bookmark status efficiently."""
         # Build base filter conditions (reused for both count and select)
         base_conditions = [Issue.user_id == user_id]
 
@@ -90,11 +60,9 @@ class IssueRepository(BaseRepository[Issue]):
 
         if filters.get("language"):
             lang = filters["language"]
-            # Use JSON key extraction for proper language filtering
-            # This works with SQLite's JSON functions
-            base_conditions.append(
-                func.json_extract(Issue.repo_languages, f'$."{lang}"').isnot(None)
-            )
+            # Use Postgres operator '->>' directly
+            # This extracts the JSON key as text, returning NULL if key is missing
+            base_conditions.append(Issue.repo_languages.op("->>")(lang).isnot(None))
 
         if filters.get("min_stars"):
             base_conditions.append(Issue.repo_stars >= filters["min_stars"])
@@ -165,20 +133,7 @@ class IssueRepository(BaseRepository[Issue]):
         user_id: int,
         issues_data: list[dict],
     ) -> list[Issue]:
-        """
-        Batch insert/update issues with single commit.
-
-        Issues are matched by URL for upsert behavior.
-        Technologies are replaced for each issue.
-
-        Args:
-            user_id: User ID
-            issues_data: List of issue dictionaries with keys matching Issue model
-                Each dict may have 'technologies' key with list of (tech, category) tuples
-
-        Returns:
-            List of created/updated Issue objects
-        """
+        """Batch insert/update issues with single commit."""
         results = []
 
         for data in issues_data:

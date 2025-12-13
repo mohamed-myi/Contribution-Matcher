@@ -67,9 +67,7 @@ class ScoringService:
         self._scaler_legacy: Any | None = None
         self._model_version: str | None = None
 
-    # =========================================================================
-    # Lazy ML Model Loading (3-tier cache)
-    # =========================================================================
+    # Lazy ML Model Loading
 
     def _load_model_component(
         self,
@@ -196,9 +194,7 @@ class ScoringService:
         cache.delete_pattern(CacheKeys.ml_pattern())
         logger.info("ML model cache invalidated")
 
-    # =========================================================================
     # Scoring Methods
-    # =========================================================================
 
     def predict_issue_quality(
         self,

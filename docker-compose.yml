@@ -1,30 +1,7 @@
-# =============================================================================
-# Contribution Matcher - Docker Compose Configuration
-# =============================================================================
-#
-# Services:
-#   - api: FastAPI application
-#   - worker-discovery: Celery worker for GitHub API (rate limited)
-#   - worker-scoring: Celery worker for scoring (parallel)
-#   - worker-ml: Celery worker for ML training (single)
-#   - scheduler: Celery beat for periodic tasks
-#   - postgres: PostgreSQL 15 database
-#   - redis: Redis 7 for caching and Celery broker
-#
-# Usage:
-#   docker-compose up -d              # Start all services
-#   docker-compose up -d api postgres redis  # Start minimal stack
-#   docker-compose logs -f api        # Follow API logs
-#   docker-compose exec api alembic upgrade head  # Run migrations
-#
-# =============================================================================
-
 version: "3.9"
 
 services:
-  # ===========================================================================
   # API Service
-  # ===========================================================================
   api:
     build:
       context: .
@@ -64,9 +41,8 @@ services:
     volumes:
       - ./models:/app/models:ro  # ML models (read-only)
 
-  # ===========================================================================
+
   # Celery Worker - Discovery (GitHub API, rate limited)
-  # ===========================================================================
   worker-discovery:
     build:
       context: .
@@ -90,9 +66,8 @@ services:
     networks:
       - cm-network
 
-  # ===========================================================================
+
   # Celery Worker - Scoring (parallel processing)
-  # ===========================================================================
   worker-scoring:
     build:
       context: .
@@ -117,9 +92,8 @@ services:
     volumes:
       - ./models:/app/models:ro
 
-  # ===========================================================================
+
   # Celery Worker - ML (single worker, memory intensive)
-  # ===========================================================================
   worker-ml:
     build:
       context: .
@@ -148,9 +122,8 @@ services:
         limits:
           memory: 2G
 
-  # ===========================================================================
+
   # Celery Beat Scheduler
-  # ===========================================================================
   scheduler:
     build:
       context: .
@@ -170,9 +143,8 @@ services:
     networks:
       - cm-network
 
-  # ===========================================================================
+
   # PostgreSQL Database
-  # ===========================================================================
   postgres:
     image: postgres:15-alpine
     container_name: cm-postgres
@@ -195,9 +167,9 @@ services:
     networks:
       - cm-network
 
-  # ===========================================================================
+  #
   # Redis Cache & Message Broker
-  # ===========================================================================
+  #
   redis:
     image: redis:7-alpine
     container_name: cm-redis
@@ -216,9 +188,7 @@ services:
     networks:
       - cm-network
 
-  # ===========================================================================
   # Frontend (optional - for local development)
-  # ===========================================================================
   frontend:
     image: node:20-alpine
     container_name: cm-frontend
@@ -238,9 +208,8 @@ services:
     networks:
       - cm-network
 
-# =============================================================================
+
 # Volumes
-# =============================================================================
 volumes:
   postgres-data:
     name: cm-postgres-data
@@ -249,9 +218,8 @@ volumes:
   frontend-node-modules:
     name: cm-frontend-node-modules
 
-# =============================================================================
+
 # Networks
-# =============================================================================
 networks:
   cm-network:
     name: cm-network
